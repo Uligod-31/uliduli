@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#15161a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="description" content="UliDUli — percorre labirintos-arte, conhece personagens e descobre a saída de cada mundo." />
+  <meta property="og:title" content="UliDUli — Aventura de Labirintos" />
+  <meta property="og:description" content="Cada labirinto é uma obra de arte. O teu caminho pinta-a." />
+  <meta property="og:image" content="icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>UliDUli</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #15161a; overflow: hidden; overscroll-behavior: none; touch-action: none; }
+    #game { position: fixed; inset: 0; z-index: 1; }
+    #game canvas { background: transparent !important; }
+    #splash { position: fixed; inset: 0; display: grid; place-items: center; background: #15161a; color: #eceef3;
+      font: 600 15px system-ui, sans-serif; letter-spacing: .12em; transition: opacity .4s; z-index: 5; }
+    #splash b { display: block; font-size: 34px; letter-spacing: .04em; margin-bottom: 14px;
+      background: linear-gradient(135deg,#3b74f2,#8a4bea 55%,#e02bc0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    #splash.hide { opacity: 0; pointer-events: none; }
+  </style>
+  <script type="module" crossorigin src="./assets/index-DxUMV14R.js"></script>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="splash"><div style="text-align:center"><b>UliDUli</b>A carregar labirintos…</div></div>
+  <script>
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !/^(localhost|127\.|\[::1\])/.test(location.hostname)) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
