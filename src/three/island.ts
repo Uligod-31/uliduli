@@ -1,0 +1,173 @@
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { Maze } from '../core/maze';
+import { Pal } from '../core/theme';
+import { mulberry32 } from '../core/rng';
+import { collectWalls } from '../art/render';
+import { hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
+
+export const WALL_H = 0.52;
+export const WALL_T = 0.27;
+export const FLOOR_T = 0.45;
+
+export interface DynWall { group: THREE.Group; closed: boolean; cur: number; vel: number; target: number }
+
+export interface Island {
+  group: THREE.Group;
+  dyn: DynWall[];
+  radius: number;
+  cellPos(i: number, out?: THREE.Vector3): THREE.Vector3;
+  gridPos(gx: number, gy: number, out?: THREE.Vector3): THREE.Vector3;
+  update(dt: number): void;
+  dispose(): void;
+}
+
+function paint(g: THREE.BufferGeometry, v: number) {
+  const n = g.attributes.position.count;
+  const c = new Float32Array(n * 3).fill(v);
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+}
+
+/** Parede macia, "a derreter": topo caído, lábio inchado, pingos e linha neon. */
+function wallParts(len: number, rng: () => number) {
+  const h = WALL_H, t = WALL_T;
+  const g = new THREE.BoxGeometry(len, h, t, Math.max(4, Math.round(len * 8)), 7, 2);
+  const ph = rng() * 50;
+  const droop = rng() < 0.3 ? 0.16 + rng() * 0.18 : 0.03 + rng() * 0.04;
+  const topDrop = (x: number) => h * (0.05 * vnoise(x * 2.4 + ph) + droop * Math.max(0, 1 - Math.pow((2 * x) / len, 2)));
+  const pos = g.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const u = (y + h / 2) / h;
+    const n = vnoise(x * 2.4 + ph);
+    pos.setY(i, y - topDrop(x) * smooth(0.4, 1, u));
+    pos.setZ(i, z + Math.sign(z) * 0.045 * smooth(0.35, 0.95, u) * (0.4 + n));
+    const v = (0.62 + 0.38 * Math.pow(u, 0.7)) * (0.9 + 0.1 * n);
+    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.translate(0, h / 2, 0);
+  g.computeVertexNormals();
+
+  const parts: THREE.BufferGeometry[] = [g];
+  const drips = rng() < 0.6 ? 1 + Math.floor(rng() * 2) : 0;
+  for (let k = 0; k < drips; k++) {
+    const d = new THREE.SphereGeometry(0.045, 8, 6);
+    const x = (rng() - 0.5) * len * 0.8;
+    d.applyMatrix4(new THREE.Matrix4().compose(
+      new THREE.Vector3(x, h - topDrop(x) - 0.1, (rng() < 0.5 ? -1 : 1) * (t / 2 + 0.035)),
+      new THREE.Quaternion(), new THREE.Vector3(1, 2.4 + rng() * 2.2, 1)));
+    paint(d, 0.95);
+    parts.push(d);
+  }
+  // linha neon no topo (a "Maze Art" a brilhar)
+  const s = new THREE.BoxGeometry(len * 0.94, 0.022, 0.05, Math.max(4, Math.round(len * 8)), 1, 1);
+  const sp = s.attributes.position;
+  for (let i = 0; i < sp.count; i++) sp.setY(i, h - topDrop(sp.getX(i)) + 0.012 + sp.getY(i));
+  return { solid: parts, strip: s };
+}
+
+export function buildIsland(m: Maze, pal: Pal, seed: number): Island {
+  const group = new THREE.Group();
+  const { cols, rows } = m;
+  const rng = mulberry32(seed * 977 + 13);
+  const open: number[] = [];
+  for (let i = 0; i < cols * rows; i++) if (!m.solid[i]) open.push(i);
+  const px = (i: number) => (i % cols) + 0.5 - cols / 2;
+  const pz = (i: number) => ((i / cols) | 0) + 0.5 - rows / 2;
+  let R = 0;
+  for (const i of open) R = Math.max(R, Math.hypot(px(i), pz(i)));
+
+  // chão em xadrez (o plano de xadrez surreal de Dalí)
+  const boxG = new THREE.BoxGeometry(0.985, FLOOR_T, 0.985);
+  const nA = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 0);
+  const nB = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 1);
+  const mk = (list: number[], color: number) => {
+    const mesh = new THREE.InstancedMesh(boxG, new THREE.MeshStandardMaterial({ color, roughness: 0.28, metalness: 0.12 }), list.length);
+    const mat = new THREE.Matrix4();
+    list.forEach((i, k) => mesh.setMatrixAt(k, mat.makeTranslation(px(i), -FLOOR_T / 2, pz(i))));
+    mesh.receiveShadow = true;
+    return mesh;
+  };
+  group.add(mk(nA, pal.floorA), mk(nB, pal.floorB));
+
+  // ventre rochoso (estalactites) — a ilha flutua
+  const cone = new THREE.ConeGeometry(0.72, 1, 4, 1, false).rotateY(Math.PI / 4).rotateX(Math.PI);
+  const rocks = new THREE.InstancedMesh(cone, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), open.length);
+  const mat = new THREE.Matrix4();
+  const cA = new THREE.Color(0x3a2a30), cB = new THREE.Color(0x6a4a3c), cc = new THREE.Color();
+  open.forEach((i, k) => {
+    const dn = Math.hypot(px(i), pz(i)) / Math.max(R, 1);
+    const depth = (1.5 + 6.5 * Math.pow(1 - dn, 1.4)) * (0.75 + 0.5 * rng());
+    mat.compose(new THREE.Vector3(px(i), -FLOOR_T - depth / 2, pz(i)), new THREE.Quaternion(), new THREE.Vector3(1, depth, 1));
+    rocks.setMatrixAt(k, mat);
+    rocks.setColorAt(k, cc.copy(cA).lerp(cB, rng()));
+  });
+  rocks.castShadow = false;
+  group.add(rocks);
+
+  // paredes fixas
+  const segs = collectWalls(m);
+  const solids: THREE.BufferGeometry[] = [], strips: THREE.BufferGeometry[] = [];
+  segs.forEach((s, k) => {
+    const { solid, strip } = wallParts(1 + WALL_T, mulberry32(seed * 31 + k * 7 + 1));
+    const cx = (s.x1 + s.x2) / 2 - cols / 2, cz = (s.y1 + s.y2) / 2 - rows / 2;
+    const m4 = new THREE.Matrix4().compose(
+      new THREE.Vector3(cx, 0, cz),
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.y1 === s.y2 ? 0 : Math.PI / 2),
+      new THREE.Vector3(1, 1, 1));
+    for (const g of solid) { g.applyMatrix4(m4); solids.push(g); }
+    strip.applyMatrix4(m4); strips.push(strip);
+  });
+  const hedgeMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(pal.wall).lerp(new THREE.Color(0xffffff), 0.28), map: hedgeTexture(), bumpMap: hedgeTexture(), bumpScale: 2, roughness: 0.88, vertexColors: true });
+  const walls = new THREE.Mesh(mergeGeometries(solids, false)!, hedgeMat);
+  walls.castShadow = true; walls.receiveShadow = true;
+  group.add(walls);
+  const stripMat = new THREE.MeshBasicMaterial({ color: hdr(pal.accent, 1.5), toneMapped: false });
+  group.add(new THREE.Mesh(mergeGeometries(strips, false)!, stripMat));
+  solids.forEach((g) => g.dispose()); strips.forEach((g) => g.dispose());
+
+  // sebes dinâmicas (flores brancas): sobem e descem com mola
+  const dyn: DynWall[] = [];
+  const dynMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(pal.wall).lerp(new THREE.Color(pal.accent), 0.45), map: hedgeTexture(), roughness: 0.8,
+    vertexColors: true, emissive: new THREE.Color(pal.accent), emissiveIntensity: 0.18,
+  });
+  const blossomMat = new THREE.MeshBasicMaterial({ color: hdr(0xffffff, 1.4), toneMapped: false });
+  m.dyn.forEach((e, k) => {
+    const horizontal = e.dir === 2;
+    const r2 = mulberry32(seed * 53 + k);
+    const { solid, strip } = wallParts(1 + WALL_T, r2);
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(mergeGeometries(solid, false)!, dynMat);
+    body.castShadow = true;
+    g.add(body, new THREE.Mesh(strip, new THREE.MeshBasicMaterial({ color: hdr(0xffffff, 1.6), toneMapped: false })));
+    for (let b = -1; b <= 1; b++) {
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), blossomMat);
+      f.position.set(b * 0.3, WALL_H + 0.02, 0);
+      g.add(f);
+    }
+    g.position.set((e.a % cols) + (horizontal ? 0.5 : 1) - cols / 2, 0, ((e.a / cols) | 0) + (horizontal ? 1 : 0.5) - rows / 2);
+    if (!horizontal) g.rotation.y = Math.PI / 2;
+    group.add(g);
+    dyn.push({ group: g, closed: true, cur: 1, vel: 0, target: 1 });
+  });
+
+  return {
+    group, dyn, radius: R,
+    cellPos: (i, out = new THREE.Vector3()) => out.set(px(i), 0, pz(i)),
+    gridPos: (gx, gy, out = new THREE.Vector3()) => out.set(gx - cols / 2, 0, gy - rows / 2),
+    update(dt: number) {
+      for (const d of dyn) {
+        d.vel += (d.target - d.cur) * 190 * dt;
+        d.vel *= Math.exp(-9 * dt);
+        d.cur += d.vel * dt;
+        const s = Math.max(0.001, d.cur);
+        d.group.scale.y = s;
+        d.group.visible = d.cur > 0.03 || d.target > 0.5;
+      }
+    },
+    dispose() { disposeTree(group); },
+  };
+}
