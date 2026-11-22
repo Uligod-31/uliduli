@@ -24,7 +24,7 @@ export class TitleScene extends Phaser.Scene {
 
     const logo = gradText(this, W / 2, 190, 'UliDUli', 150);
     this.tweens.add({ targets: logo, y: 200, duration: 2400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    label(this, W / 2, 302, 'AVENTURA DE LABIRINTOS', 26, UI.text, true).setAlpha(0.9).setStyle({ letterSpacing: 7 } as any);
+    label(this, W / 2, 302, 'LABIRINTOS SEM REGRAS · ESCAPA OU SOBREVIVE', 24, UI.text, true).setAlpha(0.9).setStyle({ letterSpacing: 7 } as any);
     this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 150, 340, 300, 5);
 
     button(this, W / 2, 1000, 520, 118, 'Jogar', () => this.scene.start('Worlds'), 'primary', 44);

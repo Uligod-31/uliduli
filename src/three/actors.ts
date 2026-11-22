@@ -3,10 +3,99 @@ import { brandAt } from '../core/theme';
 import { glowSprite, hdr } from './common';
 
 /**
- * Uli, humanoide: cabeça, tronco, braços e pernas. Toque característico: o CACHECOL NEON que flutua atrás dele
- * (gradiente azul→fúcsia, a brilhar) e os óculos-lanterna na testa. Pés em y = 0.
+ * Uli, rebelde: jaqueta de cabedal preta com neon, crista em gradiente, visor escuro, brinco e botas pesadas.
+ * Toque característico: o CACHECOL NEON que flutua atrás dele. Pés em y = 0.
  */
 export function makeUli(): THREE.Group {
+  const root = new THREE.Group();
+  const fig = new THREE.Group();
+  root.add(fig);
+  const skin = new THREE.MeshStandardMaterial({ color: 0xe8b894, roughness: 0.55 });
+  const leather = new THREE.MeshPhysicalMaterial({ color: 0x15161a, roughness: 0.32, clearcoat: 0.9, clearcoatRoughness: 0.25, metalness: 0.1 });
+  const denim = new THREE.MeshStandardMaterial({ color: 0x20222a, roughness: 0.75 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0xc8ccd6, roughness: 0.25, metalness: 0.9 });
+  const neonB = new THREE.MeshBasicMaterial({ color: hdr(0x5b92ff, 2.2), toneMapped: false });
+  const neonF = new THREE.MeshBasicMaterial({ color: hdr(0xff4fd8, 2.2), toneMapped: false });
+  const cast = <T extends THREE.Mesh>(m: T) => { m.castShadow = true; return m; };
+  const capsule = (r: number, l: number, mat: THREE.Material) => cast(new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 6, 12), mat));
+
+  // pernas + botas pesadas com sola neon
+  const mkLeg = (x: number) => {
+    const p = new THREE.Group(); p.position.set(x, 0.27, 0);
+    const l = capsule(0.052, 0.13, denim); l.position.y = -0.1;
+    const knee = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.03, 0.02), neonB); knee.position.set(0, -0.09, 0.052);
+    const boot = cast(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.075, 0.17), leather)); boot.position.set(0, -0.215, 0.025);
+    const toe = cast(new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), leather)); toe.scale.set(1, 0.7, 1); toe.position.set(0, -0.2, 0.1);
+    const sole = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.02, 0.2), neonF); sole.position.set(0, -0.258, 0.03);
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.014, 0.012), metal); buckle.position.set(0, -0.19, 0.06);
+    p.add(l, knee, boot, toe, sole, buckle); fig.add(p); return p;
+  };
+  const legL = mkLeg(-0.07), legR = mkLeg(0.07);
+
+  // tronco: jaqueta de cabedal com riscas neon e ombros com pontas
+  const torso = capsule(0.12, 0.14, leather); torso.position.y = 0.4; torso.scale.set(1.12, 1, 0.88);
+  const zip = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.2, 0.012), metal); zip.position.set(0.03, 0.41, 0.108); zip.rotation.z = 0.08;
+  fig.add(torso, zip);
+  for (const s of [-1, 1]) {
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.18, 0.012), neonB); stripe.position.set(s * 0.1, 0.4, 0.088); fig.add(stripe);
+    for (let k = 0; k < 3; k++) { const stud = cast(new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.05, 6), metal)); stud.position.set(s * (0.15 + k * 0.012), 0.53 - k * 0.012, 0); stud.rotation.z = -s * (1.1 + k * 0.1); fig.add(stud); }
+  }
+  const belt = new THREE.Mesh(new THREE.TorusGeometry(0.115, 0.014, 8, 24), metal);
+  belt.rotation.x = Math.PI / 2; belt.position.y = 0.31; belt.scale.set(1.1, 0.88, 1); fig.add(belt);
+  const emblem = new THREE.Mesh(new THREE.CircleGeometry(0.032, 16), neonF); emblem.position.set(-0.05, 0.45, 0.108); fig.add(emblem);
+
+  // braços de cabedal + pulseira neon
+  const mkArm = (x: number) => {
+    const p = new THREE.Group(); p.position.set(x, 0.47, 0);
+    const a = capsule(0.042, 0.12, leather); a.position.y = -0.09;
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.043, 0.01, 6, 14), neonF); band.rotation.x = Math.PI / 2; band.position.y = -0.17;
+    const hand = cast(new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 8), skin)); hand.position.y = -0.21;
+    p.add(a, band, hand); fig.add(p); return p;
+  };
+  const armL = mkArm(-0.175), armR = mkArm(0.175);
+
+  // cabeça: crista (moicano) em gradiente, visor escuro, brinco, sorriso de lado
+  const head = new THREE.Group(); head.position.y = 0.66; fig.add(head);
+  const skull = cast(new THREE.Mesh(new THREE.SphereGeometry(0.17, 32, 24), skin)); skull.scale.set(1, 1.05, 1); head.add(skull);
+  const jaw = cast(new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 12), skin)); jaw.scale.set(1.2, 0.8, 1); jaw.position.set(0, -0.1, 0.05); head.add(jaw);
+  for (const s of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), skin); ear.position.set(s * 0.165, -0.01, 0); head.add(ear);
+  }
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.006, 6, 14), metal); ring.position.set(-0.17, -0.06, 0); ring.rotation.y = Math.PI / 2; head.add(ring);
+  const visor = cast(new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.2, 6, 14), new THREE.MeshPhysicalMaterial({ color: 0x08090d, roughness: 0.08, metalness: 0.6, clearcoat: 1 })));
+  visor.rotation.z = Math.PI / 2; visor.scale.set(1, 1, 0.6); visor.position.set(0, 0.0, 0.14); head.add(visor);
+  const slit = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.012, 0.01), new THREE.MeshBasicMaterial({ color: hdr(0xff4fd8, 3), toneMapped: false })); slit.position.set(0, 0.0, 0.178); head.add(slit);
+  const smirk = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.007, 6, 16, Math.PI * 0.8), new THREE.MeshBasicMaterial({ color: 0x4a1a14 }));
+  smirk.rotation.z = Math.PI + 0.3; smirk.position.set(0.02, -0.075, 0.155); head.add(smirk);
+  // moicano: espigões do gradiente azul → violeta → fúcsia
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const spike = cast(new THREE.Mesh(new THREE.ConeGeometry(0.045 - t * 0.008, 0.2 - Math.abs(t - 0.4) * 0.12, 8),
+      new THREE.MeshPhysicalMaterial({ color: brandAt(t), roughness: 0.25, clearcoat: 1, emissive: brandAt(t), emissiveIntensity: 0.55 })));
+    spike.position.set(0, 0.17 + Math.sin(t * 2.6) * 0.04, 0.1 - t * 0.2); spike.rotation.x = 0.55 - t * 1.1; head.add(spike);
+  }
+  const fuzz = new THREE.Mesh(new THREE.SphereGeometry(0.172, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.36), new THREE.MeshStandardMaterial({ color: 0x1a1b22, roughness: 0.9 }));
+  fuzz.position.set(0, 0.012, -0.01); head.add(fuzz);
+
+  // cachecol neon (marca registada) + colarinho
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.032, 10, 24), new THREE.MeshBasicMaterial({ color: hdr(0xe02bc0, 1.9), toneMapped: false }));
+  collar.rotation.x = Math.PI / 2; collar.position.y = 0.52; fig.add(collar);
+  const scarf: THREE.Mesh[] = [];
+  for (let i = 0; i < 8; i++) {
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(0.1 - i * 0.004, 0.022, 0.1),
+      new THREE.MeshBasicMaterial({ color: hdr(brandAt(i / 7), 2.3 - i * 0.12), toneMapped: false }));
+    fig.add(seg); scarf.push(seg);
+  }
+  const halo = glowSprite(0xe02bc0, 0.55, 0.45); halo.position.set(0, 0.5, -0.2); fig.add(halo);
+
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.2, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.012; root.add(shadow);
+  root.userData = { body: fig, shadow, legL, legR, armL, armR, scarf, head };
+  return root;
+}
+
+/** (versão anterior, infantil) */
+function makeUliKid(): THREE.Group {
   const root = new THREE.Group();
   const fig = new THREE.Group();
   root.add(fig);

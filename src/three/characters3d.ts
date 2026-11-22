@@ -36,9 +36,10 @@ function pimpa(): THREE.Group {
     const foot = mesh(sph(0.1, 1, 0.5, 2), pearl, s * 0.2, 0.04, 0.12);
     g.add(leg, foot);
   }
-  const vest = mesh(new THREE.CylinderGeometry(0.46, 0.4, 0.55, 40, 1, true), gloss(0x8a4bea, 0.25, { side: THREE.DoubleSide }), 0, 1.4, 0);
+  const vest = mesh(new THREE.CylinderGeometry(0.46, 0.4, 0.55, 40, 1, true), gloss(0x15161a, 0.3, { side: THREE.DoubleSide }), 0, 1.4, 0);
   g.add(vest);
-  for (const y of [1.55, 1.35]) g.add(mesh(sph(0.04), emit(0xffcf4a, 1.6), 0, y, 0.45));
+  for (const y of [1.6, 1.4, 1.2]) g.add(mesh(new THREE.ConeGeometry(0.035, 0.09, 6), new THREE.MeshStandardMaterial({ color: 0xc8ccd6, metalness: 0.9, roughness: 0.25 }), 0.2, y, 0.42));
+  for (const s of [-1, 1]) g.add(mesh(new THREE.TorusGeometry(0.035, 0.008, 6, 14), emit(0xff4fd8, 1.6), s * 0.33, 2.6, 0.05));
   // muleta
   const crutch = mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.3, 8), gloss(0x7a5232, 0.6), 0.95, 1.15, 0.1); crutch.rotation.z = 0.12;
   const fork = mesh(new THREE.BoxGeometry(0.34, 0.05, 0.05), gloss(0x7a5232, 0.6), 0.82, 2.28, 0.1);

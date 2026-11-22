@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { Maze } from '../core/maze';
 import { WorldDef } from '../worlds';
 import { buildIsland, Island } from './island';
@@ -54,6 +55,7 @@ export class Stage {
   private tmp = new THREE.Vector3();
   private raf = 0;
   private titleAng = 0;
+  private fx: ShaderPass;
   private fogBase = new THREE.Color();
   private prevP = new THREE.Vector3();
   private speed = 0;
@@ -78,6 +80,23 @@ export class Stage {
     const b = this.bloom;
     for (const t of [b.renderTargetBright, ...b.renderTargetsHorizontal, ...b.renderTargetsVertical]) { t.texture.type = THREE.UnsignedByteType; t.dispose(); }
     this.composer.addPass(this.bloom);
+    // grão, vinheta e aberração cromática: ar de filme sujo / punk
+    this.fx = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; varying vec2 vUv;
+        float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+        void main(){
+          vec2 c = vUv - 0.5; float d = dot(c,c);
+          vec2 off = c * d * 0.028;
+          vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+          col *= 1.0 - smoothstep(0.12, 0.62, d) * 0.6;
+          col += (h(vUv * 900.0 + time) - 0.5) * 0.07;
+          col *= 0.97 + 0.03 * sin(vUv.y * 900.0);
+          gl_FragColor = vec4(col, 1.0);
+        }`,
+    });
+    this.composer.addPass(this.fx);
     this.composer.addPass(new OutputPass());
 
     this.sun.castShadow = true;
@@ -239,6 +258,7 @@ export class Stage {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     this.t += dt;
+    this.fx.uniforms.time.value = (this.t * 37) % 100;
     this.sync();
     this.step(dt);
     this.composer.render();

@@ -18,7 +18,9 @@ export const UI = {
   warn: 0xffc457,
 };
 
-export const FONT = "'Trebuchet MS','Segoe UI',system-ui,sans-serif";
+/** Títulos/botões: tipografia condensada, dura e industrial (cai para Impact/Roboto Condensed). */
+export const FONT_HEAD = "'Bebas Neue','Oswald','Impact','Haettenschweiler','Arial Narrow Bold','sans-serif-condensed',sans-serif";
+export const FONT ="'Trebuchet MS','Segoe UI',system-ui,sans-serif";
 
 export const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
 export const toHex = (c: number) => '#' + c.toString(16).padStart(6, '0');
