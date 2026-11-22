@@ -103,6 +103,7 @@ export class GameScene extends Phaser.Scene {
 
   // ───────────────────────── Joystick de vidro ─────────────────────────
   private pad = { cx: W / 2, cy: H - 335, r: 150, id: -1, dir: -1, kx: 0, ky: 0 };
+  private padSince = 0;
   private padArrows: Phaser.GameObjects.Graphics[] = [];
   private padKnob!: Phaser.GameObjects.Graphics;
 
@@ -164,7 +165,8 @@ export class GameScene extends Phaser.Scene {
     if (d === this.pad.dir) return;
     if (this.pad.dir >= 0) this.drawArrow(this.pad.dir, false);
     this.pad.dir = d;
-    if (d >= 0) { this.drawArrow(d, true); this.queued = { dir: d, run: true }; sfx.unlock(); }
+    // toque = um passo; só segurar (≥ 0,2 s) dá avanço contínuo
+    if (d >= 0) { this.drawArrow(d, true); this.queued = { dir: d, run: false }; this.padSince = this.time.now; sfx.unlock(); }
   }
 
   private toggleView() {
@@ -220,7 +222,7 @@ export class GameScene extends Phaser.Scene {
     const k = this.keys;
     let dir = -1;
     // joystick segurado: continua a andar (sem repetir o "toc" na parede)
-    if (this.pad.dir >= 0 && !this.queued && canPass(this.m, this.idx, this.pad.dir, this.phase)) this.queued = { dir: this.pad.dir, run: true };
+    if (this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 200 && canPass(this.m, this.idx, this.pad.dir, this.phase)) this.queued = { dir: this.pad.dir, run: false };
     if (k.UP.isDown || k.W.isDown) dir = 0;
     else if (k.RIGHT.isDown || k.D.isDown) dir = 1;
     else if (k.DOWN.isDown || k.S.isDown) dir = 2;
