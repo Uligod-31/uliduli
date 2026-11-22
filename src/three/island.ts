@@ -19,6 +19,7 @@ export interface Island {
   cellPos(i: number, out?: THREE.Vector3): THREE.Vector3;
   gridPos(gx: number, gy: number, out?: THREE.Vector3): THREE.Vector3;
   update(dt: number): void;
+  pulse(p: number): void;
   dispose(): void;
 }
 
@@ -60,6 +61,16 @@ function wallParts(len: number, rng: () => number) {
       new THREE.Quaternion(), new THREE.Vector3(1, 2.4 + rng() * 2.2, 1)));
     paint(d, 0.95);
     parts.push(d);
+  }
+  // espinhos nas sebes (o jardim morde)
+  const thorns = 2 + Math.floor(rng() * 3);
+  for (let k = 0; k < thorns; k++) {
+    const x = (rng() - 0.5) * len * 0.85, side = rng() < 0.5 ? -1 : 1;
+    const c = new THREE.ConeGeometry(0.028, 0.15 + rng() * 0.08, 5);
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(side * (0.5 + rng() * 0.5), 0, (rng() - 0.5) * 0.5));
+    c.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, h - topDrop(x) + 0.03, side * t * 0.32), q, new THREE.Vector3(1, 1, 1)));
+    paint(c, 0.4);
+    parts.push(c);
   }
   // linha neon no topo (a "Maze Art" a brilhar)
   const s = new THREE.BoxGeometry(len * 0.94, 0.022, 0.05, Math.max(4, Math.round(len * 8)), 1, 1);
@@ -126,6 +137,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number): Island {
   group.add(walls);
   const stripMat = new THREE.MeshBasicMaterial({ color: hdr(pal.accent, 1.5), toneMapped: false });
   group.add(new THREE.Mesh(mergeGeometries(strips, false)!, stripMat));
+  const stripBase = stripMat.color.clone();
   solids.forEach((g) => g.dispose()); strips.forEach((g) => g.dispose());
 
   // sebes dinâmicas (flores brancas): sobem e descem com mola
@@ -156,6 +168,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number): Island {
 
   return {
     group, dyn, radius: R,
+    pulse(p: number) { stripMat.color.copy(stripBase).multiplyScalar(1 + 1.1 * p); },
     cellPos: (i, out = new THREE.Vector3()) => out.set(px(i), 0, pz(i)),
     gridPos: (gx, gy, out = new THREE.Vector3()) => out.set(gx - cols / 2, 0, gy - rows / 2),
     update(dt: number) {

@@ -119,7 +119,18 @@ class Sfx {
     o.connect(lp); o2.connect(lp); lp.connect(g).connect(this.musicGain!);
     o.start(t); o2.start(t); o.stop(t + len + 0.03); o2.stop(t + len + 0.03);
   }
+  private kicks: number[] = [];
+  /** Pulso 0..1 do último bumbo (para os visuais baterem com o ritmo). */
+  pulse(): number {
+    if (!this.ctx || save.mute) return 0;
+    const now = this.ctx.currentTime;
+    let p = 0;
+    for (const t of this.kicks) if (t <= now) p = Math.max(p, Math.exp(-(now - t) * 9));
+    if (this.kicks.length > 24) this.kicks = this.kicks.filter((t) => t > now - 0.5);
+    return p;
+  }
   private kick(t: number, vol = 0.95) {
+    this.kicks.push(t);
     const c = this.ctx!;
     const o = c.createOscillator(), g = c.createGain();
     o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.14);

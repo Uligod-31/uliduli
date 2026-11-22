@@ -209,6 +209,51 @@ function makeUliOld(): THREE.Group {
   return root;
 }
 
+/** Espada: guarda da Rainha — armadura negra, ombros com pontas, visor vermelho e alabarda. */
+export function makeGuard(): THREE.Group {
+  const root = new THREE.Group();
+  const fig = new THREE.Group();
+  root.add(fig);
+  const armor = new THREE.MeshPhysicalMaterial({ color: 0x0c0c10, roughness: 0.3, metalness: 0.7, clearcoat: 0.8 });
+  const trim = new THREE.MeshBasicMaterial({ color: hdr(0xff2030, 2.4), toneMapped: false });
+  const cast = <T extends THREE.Mesh>(m: T) => { m.castShadow = true; return m; };
+  const mkLeg = (x: number) => {
+    const p = new THREE.Group(); p.position.set(x, 0.3, 0);
+    const l = cast(new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.16, 6, 10), armor)); l.position.y = -0.13;
+    const boot = cast(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.19), armor)); boot.position.set(0, -0.26, 0.025);
+    p.add(l, boot); fig.add(p); return p;
+  };
+  const legL = mkLeg(-0.09), legR = mkLeg(0.09);
+  const torso = cast(new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.18, 6, 12), armor)); torso.position.y = 0.48; torso.scale.set(1.15, 1, 0.9);
+  const emblem = new THREE.Mesh(new THREE.OctahedronGeometry(0.05), trim); emblem.scale.set(0.8, 1.2, 0.5); emblem.position.set(0, 0.5, 0.14);
+  fig.add(torso, emblem);
+  const mkArm = (x: number) => {
+    const p = new THREE.Group(); p.position.set(x, 0.58, 0);
+    const a = cast(new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.14, 6, 10), armor)); a.position.y = -0.1;
+    p.add(a); fig.add(p); return p;
+  };
+  const armL = mkArm(-0.21), armR = mkArm(0.21);
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 3; k++) {
+      const sp = cast(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.13, 6), armor));
+      sp.position.set(s * (0.21 + k * 0.02), 0.65 + k * 0.01, (k - 1) * 0.06); sp.rotation.z = -s * (0.9 + k * 0.1); fig.add(sp);
+    }
+  }
+  const head = new THREE.Group(); head.position.y = 0.8; fig.add(head);
+  head.add(cast(new THREE.Mesh(new THREE.SphereGeometry(0.15, 20, 16), armor)));
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.025, 0.02), trim); visor.position.set(0, 0.01, 0.145); head.add(visor);
+  for (const s of [-1, 1]) { const h = cast(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.22, 6), armor)); h.position.set(s * 0.11, 0.15, 0); h.rotation.z = -s * 0.5; head.add(h); }
+  const crest = cast(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.2, 6), trim)); crest.position.y = 0.2; head.add(crest);
+  // alabarda
+  const shaft = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.95, 6), armor)); shaft.position.set(0.28, 0.5, 0.06); fig.add(shaft);
+  const blade = cast(new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 4), trim)); blade.position.set(0.28, 1.05, 0.06); fig.add(blade);
+  const glow = glowSprite(0xff1020, 1.3, 0.55); glow.position.set(0, 0.45, 0); fig.add(glow);
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.24, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.012; root.add(shadow);
+  root.userData = { body: fig, legL, legR, armL, armR, head };
+  return root;
+}
+
 export function makeRose(accent: number): THREE.Group {
   const g = new THREE.Group();
   const petal = new THREE.MeshStandardMaterial({ color: 0xff3f9c, emissive: 0xff2b88, emissiveIntensity: 0.9, roughness: 0.35 });

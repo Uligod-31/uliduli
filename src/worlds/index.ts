@@ -14,6 +14,7 @@ export interface LevelDef {
   shift: number;   // passos entre mudanças das sebes dinâmicas
   loops: number;
   fog: number;     // 0 = sem nevoeiro; senão raio de visão em células
+  guards?: number; // Espadas: guardas que perseguem o jogador
   intro: Line[];
   outro?: Line[];
 }
@@ -42,7 +43,7 @@ const jardim: WorldDef = {
   name: 'Jardim Sebe',
   tagline: 'Sebes que mordem, relógios que mentem e uma rainha com mau perder.',
   rule: 'Sebes rebeldes: mudam de lugar de N em N passos.',
-  pal: mkPal(0x0f2a22, 0xd5eeb8, 0x1f8a52, 0xff4fd8),
+  pal: mkPal(0x0a0710, 0x4b4f58, 0x1c6a40, 0xff4fd8),
   ready: true,
   preview: { mask: 'heart', cols: 9, rows: 9, seed: 5 },
   levels: [
@@ -66,15 +67,17 @@ const jardim: WorldDef = {
       ],
     },
     {
-      title: 'O Diamante', cols: 9, rows: 13, mask: 'diamond', seed: 33, dyn: 4, shift: 8, loops: 0.08, fog: 0,
+      title: 'O Diamante', cols: 9, rows: 13, mask: 'diamond', seed: 33, dyn: 4, shift: 8, loops: 0.08, fog: 0, guards: 1,
       intro: [
         { who: 'pimpa', text: 'Um diamante. Corta o tempo, e corta quem se atrasa.' },
         { who: 'uli', text: 'Então vou cortar caminho.' },
-        { who: 'pimpa', text: 'É isso. Ou ficas pelo caminho.' },
+        { who: 'pimpa', text: 'Cuidado com os Espadas. Os guardas da Rainha. Mexem-se de dois em dois passos e farejam-te de longe.' },
+        { who: 'uli', text: 'E se me apanham?' },
+        { who: 'pimpa', text: 'Voltas ao início. Ou pior. Aprende o ritmo deles.' },
       ],
     },
     {
-      title: 'Nevoeiro de Orvalho', cols: 8, rows: 12, mask: 'circle', seed: 44, dyn: 2, shift: 8, loops: 0.05, fog: 3.1,
+      title: 'Nevoeiro de Orvalho', cols: 8, rows: 12, mask: 'circle', seed: 44, dyn: 2, shift: 8, loops: 0.05, fog: 3.1, guards: 1,
       intro: [
         { who: 'sorriso', text: 'Nevoeiro. A minha casa. Aqui ninguém me vê a rir de ti.' },
         { who: 'sorriso', text: 'Só vês o que está perto de ti. Como na vida real.' },
@@ -83,7 +86,7 @@ const jardim: WorldDef = {
       ],
     },
     {
-      title: 'Coração de Roseira', cols: 10, rows: 12, mask: 'heart', seed: 55, dyn: 4, shift: 7, loops: 0.08, fog: 0,
+      title: 'Coração de Roseira', cols: 10, rows: 12, mask: 'heart', seed: 55, dyn: 4, shift: 7, loops: 0.08, fog: 0, guards: 2,
       intro: [
         { who: 'lagarta', text: 'Um labirinto em forma de coração. Alguém desenhou isto a sofrer.' },
         { who: 'uli', text: 'Gosto.' },
@@ -91,7 +94,7 @@ const jardim: WorldDef = {
       ],
     },
     {
-      title: 'O Palácio da Rainha', cols: 10, rows: 14, mask: 'rect', seed: 66, dyn: 6, shift: 6, loops: 0.07, fog: 4.2,
+      title: 'O Palácio da Rainha', cols: 10, rows: 14, mask: 'rect', seed: 66, dyn: 6, shift: 6, loops: 0.07, fog: 4.2, guards: 3,
       intro: [
         { who: 'rainha', text: 'QUEM É QUE PISOU O MEU RELVADO?!' },
         { who: 'uli', text: 'Passava por aqui.' },

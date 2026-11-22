@@ -8,7 +8,9 @@ import { Maze } from '../core/maze';
 import { WorldDef } from '../worlds';
 import { buildIsland, Island } from './island';
 import { Scenery, themeFor } from './scenery';
-import { makeUli, makeRose, makePortal, Trail } from './actors';
+import { makeUli, makeRose, makePortal, makeGuard, Trail } from './actors';
+import { sfx } from '../core/audio';
+import { mix } from '../core/theme';
 import { glowSprite, hdr, disposeTree } from './common';
 
 export type ViewMode = 'follow' | 'overview';
@@ -36,6 +38,7 @@ export class Stage {
   orbs: { m: THREE.Group; life: number; delay: number; base: THREE.Vector3 }[] = [];
   parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
 
+  guards: { g: THREE.Group; x: number; y: number; tx: number; ty: number; dir: number; walk: number }[] = [];
   /** posição do jogador em unidades de grelha (células, fracionário), salto e direção */
   player = { x: 0, y: 0, h: 0, dir: 0 };
   view: ViewMode = 'follow';
@@ -56,6 +59,8 @@ export class Stage {
   private raf = 0;
   private titleAng = 0;
   private fx: ShaderPass;
+  private dangerCur = 0;
+  private pulseCur = 0;
   private fogBase = new THREE.Color();
   private prevP = new THREE.Vector3();
   private speed = 0;
@@ -67,7 +72,7 @@ export class Stage {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.4;
     this.el = this.renderer.domElement;
     Object.assign(this.el.style, { position: 'fixed', left: '0', top: '0', zIndex: '0', display: 'none' });
     document.body.insertBefore(this.el, document.body.firstChild);
@@ -82,15 +87,16 @@ export class Stage {
     this.composer.addPass(this.bloom);
     // grão, vinheta e aberração cromática: ar de filme sujo / punk
     this.fx = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; varying vec2 vUv;
         float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
         void main(){
           vec2 c = vUv - 0.5; float d = dot(c,c);
-          vec2 off = c * d * 0.028;
+          vec2 off = c * (d * 0.028 + pulse * 0.012 + danger * 0.02);
           vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
           col *= 1.0 - smoothstep(0.12, 0.62, d) * 0.6;
+          col += vec3(0.55, 0.0, 0.06) * danger * smoothstep(0.08, 0.5, d) * (0.65 + 0.35 * sin(time * 0.6));
           col += (h(vUv * 900.0 + time) - 0.5) * 0.07;
           col *= 0.97 + 0.03 * sin(vUv.y * 900.0);
           gl_FragColor = vec4(col, 1.0);
@@ -120,7 +126,7 @@ export class Stage {
     this.scene.fog = new THREE.Fog(theme.horizon, 90, 900);
 
     // luzes: sol-chave frontal-esquerda, contra-luz no horizonte
-    this.hemi.color.set(theme.mid); this.hemi.groundColor.set(theme.ground);
+    this.hemi.color.set(mix(theme.mid, 0xffffff, 0.55)); this.hemi.groundColor.set(mix(theme.horizon, 0x553322, 0.4));
     this.sun.color.set(0xffe2b0);
     const R = this.island.radius + 3;
     this.sun.position.set(-R * 1.1, R * 1.6, R * 0.9);
@@ -168,6 +174,8 @@ export class Stage {
     this.orbs = [];
     for (const p of this.parts) this.scene.remove(p.m), disposeTree(p.m);
     this.parts = [];
+    for (const G of this.guards) this.scene.remove(G.g), disposeTree(G.g);
+    this.guards = [];
     if (this.island) { this.scene.remove(this.island.group); this.island.dispose(); this.island = undefined; }
     if (this.scenery) { this.scene.remove(this.scenery.group); this.scenery.dispose(); this.scenery = undefined; }
     if (this.scene.environment) { this.scene.environment.dispose(); this.scene.environment = null; }
@@ -188,6 +196,20 @@ export class Stage {
     const m = this.maze!, I = this.island!;
     const pa = I.cellPos(a), pb = I.cellPos(b);
     this.trail.add(pa.x, pa.z, pb.x, pb.z, k);
+  }
+
+  setGuards(cells: number[]) {
+    for (const G of this.guards) this.scene.remove(G.g), disposeTree(G.g);
+    this.guards = cells.map((c) => {
+      const g = makeGuard();
+      const x = (c % this.maze!.cols) + 0.5, y = ((c / this.maze!.cols) | 0) + 0.5;
+      this.scene.add(g);
+      return { g, x, y, tx: x, ty: y, dir: 0, walk: Math.random() * 6 };
+    });
+  }
+  moveGuard(i: number, cell: number) {
+    const G = this.guards[i];
+    G.tx = (cell % this.maze!.cols) + 0.5; G.ty = ((cell / this.maze!.cols) | 0) + 0.5;
   }
 
   removeRose(idx: number) {
@@ -350,6 +372,35 @@ export class Stage {
     this.uli.rotation.y += da * (1 - Math.exp(-dt * 14));
     (this.uli.userData.shadow as THREE.Mesh).scale.setScalar(1 - Math.min(1, this.player.h) * 0.25);
     this.lamp.position.set(wp.x, 1.4, wp.z);
+
+    // Espadas: deslizam até à nova casa, viram-se para onde vão
+    let danger = 0;
+    for (const G of this.guards) {
+      const f = 1 - Math.exp(-dt * 9);
+      const dx = G.tx - G.x, dy = G.ty - G.y;
+      G.x += dx * f; G.y += dy * f;
+      const moving = Math.hypot(dx, dy) > 0.05;
+      if (moving) { const a = Math.atan2(dx, dy); let da = a - G.dir; da = Math.atan2(Math.sin(da), Math.cos(da)); G.dir += da * (1 - Math.exp(-dt * 14)); G.walk += dt * 11; }
+      const gp = I.gridPos(G.x, G.y, new THREE.Vector3());
+      G.g.position.set(gp.x, 0, gp.z); G.g.rotation.y = G.dir;
+      const U = G.g.userData, sw = moving ? Math.sin(G.walk) * 0.7 : 0;
+      (U.body as THREE.Object3D).position.y = moving ? Math.abs(Math.sin(G.walk)) * 0.04 : Math.sin(this.t * 2 + G.walk) * 0.01;
+      (U.legL as THREE.Object3D).rotation.x = sw; (U.legR as THREE.Object3D).rotation.x = -sw;
+      (U.armL as THREE.Object3D).rotation.x = -sw * 0.8; (U.armR as THREE.Object3D).rotation.x = sw * 0.8;
+      (U.head as THREE.Object3D).rotation.y = Math.sin(this.t * 1.2 + G.walk) * 0.4;
+      const dist = Math.hypot(G.x - this.player.x, G.y - this.player.y);
+      danger = Math.max(danger, Math.max(0, 1 - dist / 4.5));
+    }
+    this.dangerCur += (danger - this.dangerCur) * (1 - Math.exp(-dt * 6));
+    this.fx.uniforms.danger.value = this.dangerCur;
+    // ritmo: o bumbo faz a imagem, o neon e a câmara pulsarem
+    const pulse = sfx.pulse();
+    this.pulseCur += (pulse - this.pulseCur) * 0.6;
+    this.bloom.strength = 0.62 + 0.5 * this.pulseCur + this.dangerCur * 0.3;
+    this.fx.uniforms.pulse.value = this.pulseCur;
+    const fov = 58 - 1.6 * this.pulseCur;
+    if (Math.abs(this.camera.fov - fov) > 0.01) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+    I.pulse(this.pulseCur);
 
     // roses e portal
     for (const [i, r] of this.roses) {

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { W, H, UI, FONT, toHex, lighten, brandAt } from '../core/theme';
 import { button, gradText, label, roundBtn, Btn } from '../core/ui';
-import { Maze, DIRS, OPP, canPass, neighbor, pathTo } from '../core/maze';
+import { Maze, DIRS, OPP, canPass, neighbor, pathTo, distFrom } from '../core/maze';
+import { mulberry32, shuffle } from '../core/rng';
 import { levelMaze } from '../art/thumb';
 import { LevelDef, WorldDef, getWorld } from '../worlds';
 import { sfx } from '../core/audio';
@@ -30,6 +31,8 @@ export class GameScene extends Phaser.Scene {
   private rosas = new Set<number>();
   private hints = 2;
   private overview = false;
+  private guards: number[] = [];
+  private guardPrev: number[] = [];
 
   private pips!: Phaser.GameObjects.Graphics;
   private movesTxt!: Phaser.GameObjects.Text;
@@ -56,7 +59,22 @@ export class GameScene extends Phaser.Scene {
     this.trail = [m.start];
     this.rosas = new Set(m.rosas);
 
+    // Espadas: nascem longe do início, nunca em cima de rosas ou da saída
+    this.guards = []; this.guardPrev = [];
+    if (def.guards) {
+      const rng = mulberry32(def.seed * 17 + 3);
+      const dist = distFrom(m, m.start);
+      const far = Array.from({ length: m.cols * m.rows }, (_, i) => i)
+        .filter((i) => !m.solid[i] && i !== m.exit && i !== m.start && !m.rosas.includes(i) && dist[i] >= Math.max(7, m.shortest * 0.35));
+      shuffle(far, rng);
+      for (const c of far) {
+        if (this.guards.length >= def.guards) break;
+        if (this.guards.every((g) => Math.abs((g % m.cols) - (c % m.cols)) + Math.abs(((g / m.cols) | 0) - ((c / m.cols) | 0)) >= 5)) this.guards.push(c);
+      }
+      this.guardPrev = this.guards.map(() => -1);
+    }
     stage.load(m, this.wd, def.seed, { intro: !this.skipIntro });
+    stage.setGuards(this.guards);
     stage.start('game');
     if (def.fog) stage.setDark(def.fog * 1.0);
     this.events.once('shutdown', () => stage.stop());
@@ -176,7 +194,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHud() {
-    this.rosaTxt.setText(`✿ ${this.collected}/${this.m.rosas.length}`);
+    this.rosaTxt.setText(`✿ ${this.collected}/${this.m.rosas.length}` + (this.guards.length ? `   ☠ ${this.guards.length}` : ''));
     this.movesTxt.setText(`Passos ${this.moves}  (par ${this.m.par})`);
     this.pips.clear();
     if (this.m.dyn.length) {
@@ -274,10 +292,12 @@ export class GameScene extends Phaser.Scene {
       sfx.collect(); stage.removeRose(ni);
     }
     if (ni === m.exit) { this.updateHud(); this.finish(); return; }
+    if (this.guards.includes(ni)) { this.caught(); return; }
     if (m.dyn.length && this.moves % this.def.shift === 0) {
       this.phase ^= 1; stage.setPhase(this.phase, true); stop = true;
       sfx.shift(); stage.shake(0.35);
     }
+    if (this.guards.length && this.moves % 2 === 0) { this.tickGuards(); if (this.done) return; }
     this.updateHud();
 
     if (this.queued) {
@@ -290,6 +310,54 @@ export class GameScene extends Phaser.Scene {
       if (opts.length === 1) { this.step(opts[0]); return; }
     }
     this.run = false;
+  }
+
+  /** Os Espadas movem-se de 2 em 2 passos: caçam se estiveres a ≤ 6 casas, senão patrulham. */
+  private tickGuards() {
+    const m = this.m;
+    const dist = distFrom(m, this.idx, this.phase);
+    this.guards.forEach((g, i) => {
+      const opts: number[] = [];
+      for (let d = 0; d < 4; d++) if (canPass(m, g, d, this.phase)) opts.push(neighbor(m, g, d));
+      if (!opts.length) return;
+      let pick: number;
+      const hunting = dist[g] >= 0 && dist[g] <= 6;
+      if (hunting) {
+        const best = Math.min(...opts.map((o) => (dist[o] < 0 ? 99 : dist[o])));
+        const cands = opts.filter((o) => (dist[o] < 0 ? 99 : dist[o]) === best && !this.guards.some((h, j) => j !== i && h === o));
+        pick = (cands.length ? cands : opts.filter((o) => (dist[o] < 0 ? 99 : dist[o]) === best))[0];
+      } else {
+        const fwd = opts.filter((o) => o !== this.guardPrev[i]);
+        const pool = fwd.length ? fwd : opts;
+        pick = pool[Math.floor(Math.random() * pool.length)];
+      }
+      this.guardPrev[i] = g;
+      this.guards[i] = pick;
+      stage.moveGuard(i, pick);
+    });
+    if (this.guards.includes(this.idx)) { this.blocked = true; this.time.delayedCall(160, () => this.caught()); }
+  }
+
+  private caught() {
+    if (this.done) return;
+    this.done = true;
+    sfx.bump(); sfx.shift();
+    stage.shake(1.1);
+    const p = stage.worldPos(this.idx);
+    stage.burst(p.x, p.z, [0xff2030, 0xff7a3a, 0xffffff], 40, 0.5);
+    this.cameras.main.flash(260, 255, 30, 40);
+    const root = this.add.container(0, 0).setDepth(160);
+    const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x200006, 0.62).setInteractive();
+    const title = gradText(this, W / 2, 470, 'APANHADO', 120);
+    title.setFill('#ff2a3d');
+    const quips = ['Os Espadas não perdoam.', 'A Rainha manda cumprimentos.', 'Aprende o ritmo deles, rebelde.', 'Quase. Tenta outra vez.'];
+    const q = this.add.text(W / 2, 580, quips[Math.floor(Math.random() * quips.length)], { fontFamily: FONT, fontSize: '30px', color: '#ffd0d4' }).setOrigin(0.5);
+    root.add([dim, title, q]);
+    root.add(button(this, W / 2, 740, 520, 110, 'Tentar outra vez', () => this.scene.restart({ world: this.wd.id, level: this.li, skipIntro: true }), 'primary', 38));
+    root.add(button(this, W / 2, 880, 520, 90, 'Níveis', () => this.scene.start('Levels', { world: this.wd.id }), 'ghost', 30));
+    root.setAlpha(0);
+    this.tweens.add({ targets: root, alpha: 1, duration: 260 });
+    this.tweens.add({ targets: title, scale: { from: 1.25, to: 1 }, duration: 320, ease: 'Back.Out' });
   }
 
   private useHint() {

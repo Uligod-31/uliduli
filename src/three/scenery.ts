@@ -7,7 +7,8 @@ export interface SceneTheme { top: number; mid: number; horizon: number; ground:
 
 /** Tema do céu/solo de cada mundo (Jardim: crepúsculo dalinesco ouro e verde-azulado). */
 export function themeFor(id: string, pal: Pal): SceneTheme {
-  if (id === 'jardim') return { top: 0x04202b, mid: 0x1c6c78, horizon: 0xffa35c, ground: 0xc7a374, ground2: 0x9c7a50, sun: 0xffd9a0 };
+  // Jardim em brasa: crepúsculo infernal, chão de cinza queimada
+  if (id === 'jardim') return { top: 0x07030d, mid: 0x4a0f35, horizon: 0xff4a1f, ground: 0x3a2a2c, ground2: 0x1f1517, sun: 0xff7a3a };
   return {
     top: mix(pal.bgBot, 0x000000, 0.2), mid: mix(pal.bgTop, pal.accent, 0.35), horizon: mix(pal.accent, 0xffffff, 0.25),
     ground: mix(pal.floorA, pal.accent, 0.3), ground2: mix(pal.floorB, pal.bgBot, 0.4), sun: mix(pal.accent, 0xffffff, 0.5),
