@@ -77,7 +77,7 @@ export class GameScene extends Phaser.Scene {
     top.fillRect(0, 0, W, 230);
     const bot = this.add.graphics().setDepth(29);
     bot.fillGradientStyle(0x0a0b10, 0x0a0b10, 0x0a0b10, 0x0a0b10, 0, 0, 0.7, 0.7);
-    bot.fillRect(0, H - 400, W, 400);
+    bot.fillRect(0, H - 520, W, 520);
 
     this.add.text(W / 2, 54, wd.name.toUpperCase(), { fontFamily: FONT, fontSize: '22px', color: toHex(lighten(wd.pal.accent, 0.35)), fontStyle: 'bold' }).setOrigin(0.5).setDepth(30).setStyle({ letterSpacing: 5 } as any);
     this.add.text(W / 2, 96, `Nível ${this.li + 1} · ${def.title}`, { fontFamily: FONT, fontSize: '30px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(30);
@@ -94,14 +94,15 @@ export class GameScene extends Phaser.Scene {
     this.pips = this.add.graphics().setDepth(30);
     if (this.m.dyn.length) label(this, W / 2, 160, 'as sebes mudam em', 18, UI.textDim as string).setDepth(30);
 
-    this.hintBtn = roundBtn(this, 96, H - 200, 66, '✦2', 'Vagalume', () => this.useHint(), 38).setDepth(31);
-    roundBtn(this, W - 96, H - 262, 52, '◎', 'mapa', () => this.toggleView(), 36).setDepth(31);
-    roundBtn(this, W - 96, H - 128, 52, '↻', 'reiniciar', () => this.scene.restart({ world: wd.id, level: this.li, skipIntro: true }), 36).setDepth(31);
+    // rodapé: três botões numa linha; o joystick fica por cima deles
+    this.hintBtn = button(this, 175, H - 70, 300, 88, 'Vagalume ✦2', () => this.useHint(), 'primary', 28).setDepth(31);
+    button(this, 385, H - 70, 100, 88, '◎', () => this.toggleView(), 'ghost', 38).setDepth(31);
+    button(this, 575, H - 70, 220, 88, 'Reiniciar', () => this.scene.restart({ world: wd.id, level: this.li, skipIntro: true }), 'ghost', 24).setDepth(31);
     this.buildPad();
   }
 
   // ───────────────────────── Joystick de vidro ─────────────────────────
-  private pad = { cx: W / 2, cy: H - 190, r: 150, id: -1, dir: -1, kx: 0, ky: 0 };
+  private pad = { cx: W / 2, cy: H - 335, r: 150, id: -1, dir: -1, kx: 0, ky: 0 };
   private padArrows: Phaser.GameObjects.Graphics[] = [];
   private padKnob!: Phaser.GameObjects.Graphics;
 
@@ -184,7 +185,7 @@ export class GameScene extends Phaser.Scene {
         this.pips.fillCircle(x0 + i * gap, 188, 7);
       }
     }
-    this.hintBtn.txt.setText(`✦${this.hints}`);
+    this.hintBtn.txt.setText(`Vagalume ✦${this.hints}`);
     this.hintBtn.setAlpha(this.hints > 0 ? 1 : 0.45);
   }
 

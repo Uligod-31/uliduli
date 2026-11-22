@@ -55,6 +55,9 @@ export class Stage {
   private raf = 0;
   private titleAng = 0;
   private fogBase = new THREE.Color();
+  private prevP = new THREE.Vector3();
+  private speed = 0;
+  private walkT = 0;
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -262,7 +265,7 @@ export class Stage {
       if (this.celebrate > 0) { this.titleAng += dt * 0.35; want.set(Math.sin(this.titleAng) * d * 0.5, d * 0.78, Math.cos(this.titleAng) * d * 0.72); }
     } else {
       const p = this.worldPlayer(this.tmp);
-      const k = asp < 0.8 ? 1 : 0.8;
+      const k = asp < 0.8 ? 0.74 : 0.62;
       const dist = (this.darkTarget ? 0.8 : 1) * k;
       const e = this.introT;
       const ease = e * e * (3 - 2 * e);
@@ -270,7 +273,7 @@ export class Stage {
       const ovD = R * (asp < 1 ? 2.3 : 1.75);
       const ov = new THREE.Vector3(Math.sin((1 - ease) * 1.3) * ovD * 0.6, ovD * 0.82, Math.cos((1 - ease) * 1.3) * ovD * 0.72);
       want.copy(ov).lerp(follow, ease);
-      look.set(0, 0, 0).lerp(this.tmp.set(p.x, 0.2, p.z + 0.6), ease);
+      look.set(0, 0, 0).lerp(this.tmp.set(p.x, 0.2, p.z + 1.2), ease);
     }
     if (snap) { this.camPos.copy(want); this.camLook.copy(look); }
     else {
@@ -300,9 +303,28 @@ export class Stage {
     const wp = this.worldPlayer(this.tmp);
     this.uli.position.set(wp.x, 0, wp.z);
     const body = this.uli.userData.body as THREE.Group;
-    body.position.y = 0.32 + Math.sin(Math.min(1, this.player.h) * Math.PI) * 0.22 + Math.sin(this.t * 2.4) * 0.012;
-    const sq = 1 - this.player.h * 0.06;
-    body.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
+    // marcha: velocidade a partir do deslocamento
+    const spd = dt > 0 ? Math.hypot(wp.x - this.prevP.x, wp.z - this.prevP.z) / dt : 0;
+    this.prevP.set(wp.x, 0, wp.z);
+    this.speed += (Math.min(1, spd / 6) - this.speed) * (1 - Math.exp(-dt * 12));
+    this.walkT += dt * (6 + this.speed * 10);
+    const sw = Math.sin(this.walkT) * 0.85 * this.speed;
+    const U = this.uli.userData;
+    body.position.y = Math.abs(Math.sin(this.walkT)) * 0.05 * this.speed + Math.sin(this.t * 2.4) * 0.008 * (1 - this.speed);
+    (U.legL as THREE.Object3D).rotation.x = sw;
+    (U.legR as THREE.Object3D).rotation.x = -sw;
+    (U.armL as THREE.Object3D).rotation.x = -sw * 0.9 + Math.sin(this.t * 1.7) * 0.05;
+    (U.armR as THREE.Object3D).rotation.x = sw * 0.9 - Math.sin(this.t * 1.7) * 0.05;
+    (U.armL as THREE.Object3D).rotation.z = 0.08; (U.armR as THREE.Object3D).rotation.z = -0.08;
+    const celeb = this.celebrate > 0;
+    if (celeb) { (U.armL as THREE.Object3D).rotation.z = 2.6 + Math.sin(this.t * 9) * 0.3; (U.armR as THREE.Object3D).rotation.z = -2.6 - Math.sin(this.t * 9) * 0.3; (U.armL as THREE.Object3D).rotation.x = 0; (U.armR as THREE.Object3D).rotation.x = 0; body.position.y = Math.abs(Math.sin(this.t * 6)) * 0.12; }
+    (U.head as THREE.Object3D).rotation.z = Math.sin(this.t * 1.3) * 0.04;
+    // cachecol neon a flutuar atrás
+    (U.scarf as THREE.Mesh[]).forEach((s, i) => {
+      const lift = this.speed * 0.05 * i;
+      s.position.set(Math.sin(this.t * 5 - i * 0.9) * 0.03 * (0.4 + this.speed), 0.5 + lift + Math.sin(this.t * 6.5 - i * 0.7) * 0.03, -0.1 - i * 0.085);
+      s.rotation.z = Math.sin(this.t * 5 - i * 0.9) * 0.3; s.rotation.x = -0.15 * this.speed;
+    });
     let da = this.player.dir - this.uli.rotation.y;
     da = Math.atan2(Math.sin(da), Math.cos(da));
     this.uli.rotation.y += da * (1 - Math.exp(-dt * 14));

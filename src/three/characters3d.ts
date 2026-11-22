@@ -144,7 +144,13 @@ function rainha(): THREE.Group {
 
 export function buildPortrait(kind: CharKind): { group: THREE.Group; center: THREE.Vector3; dist: number } {
   switch (kind) {
-    case 'uli': { const u = makeUli(); u.scale.setScalar(3.2); u.position.y = 0.3; return { group: u, center: new THREE.Vector3(0, 1.5, 0), dist: 8.2 }; }
+    case 'uli': {
+      const u = makeUli(); u.scale.setScalar(3.4);
+      const U = u.userData; (U.armR as THREE.Object3D).rotation.z = -0.5; (U.armL as THREE.Object3D).rotation.z = 0.15;
+      (U.scarf as THREE.Mesh[]).forEach((s, i) => { s.position.set(Math.sin(i * 0.9) * 0.05, 0.5 + i * 0.012, -0.1 - i * 0.085); s.rotation.z = Math.sin(i * 0.9) * 0.3; });
+      u.rotation.y = 0.5;
+      return { group: u, center: new THREE.Vector3(0, 1.45, 0), dist: 9.2 };
+    }
     case 'pimpa': return { group: pimpa(), center: new THREE.Vector3(0.3, 1.85, 0), dist: 7.4 };
     case 'lagarta': return { group: lagarta(), center: new THREE.Vector3(0.1, 2.15, 0), dist: 9.4 };
     case 'sorriso': return { group: sorriso(), center: new THREE.Vector3(0, 1.7, 0), dist: 6.4 };
