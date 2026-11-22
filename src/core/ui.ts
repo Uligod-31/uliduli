@@ -48,6 +48,27 @@ export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: 
   return c;
 }
 
+/** Botão redondo de vidro (semitransparente), com legenda pequena opcional. */
+export function roundBtn(scene: Phaser.Scene, x: number, y: number, r: number, label: string, sub: string, cb: () => void, size = 40): Btn {
+  const g = scene.add.graphics();
+  g.fillStyle(0x0a0b10, 0.42); g.fillCircle(0, 0, r);
+  g.lineStyle(3, UI.blue, 0.55); g.strokeCircle(0, 0, r);
+  g.lineStyle(2, UI.fuchsia, 0.35); g.strokeCircle(0, 0, r - 7);
+  const txt = scene.add.text(0, sub ? -8 : 0, label, { fontFamily: FONT, fontSize: `${size}px`, color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+  const items: Phaser.GameObjects.GameObject[] = [g, txt];
+  if (sub) items.push(scene.add.text(0, r * 0.52, sub, { fontFamily: FONT, fontSize: '17px', color: UI.textDim as string }).setOrigin(0.5));
+  const c = scene.add.container(x, y, items) as Btn;
+  c.txt = txt;
+  c.setSize(r * 2, r * 2).setInteractive(new Phaser.Geom.Circle(r, r, r), Phaser.Geom.Circle.Contains);
+  c.on('pointerup', (p: Phaser.Input.Pointer) => {
+    if (p.getDistance() > 16) return;
+    sfx.unlock(); sfx.ui();
+    scene.tweens.add({ targets: c, scale: 0.92, duration: 70, yoyo: true });
+    cb();
+  });
+  return c;
+}
+
 /** Texto com o gradiente de assinatura. */
 export function gradText(scene: Phaser.Scene, x: number, y: number, s: string, size: number): Phaser.GameObjects.Text {
   const t = scene.add.text(x, y, s, { fontFamily: FONT, fontSize: `${size}px`, fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);

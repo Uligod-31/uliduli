@@ -270,7 +270,7 @@ export class Stage {
       const ovD = R * (asp < 1 ? 2.3 : 1.75);
       const ov = new THREE.Vector3(Math.sin((1 - ease) * 1.3) * ovD * 0.6, ovD * 0.82, Math.cos((1 - ease) * 1.3) * ovD * 0.72);
       want.copy(ov).lerp(follow, ease);
-      look.set(0, 0, 0).lerp(this.tmp.set(p.x, 0.2, p.z - 1.3), ease);
+      look.set(0, 0, 0).lerp(this.tmp.set(p.x, 0.2, p.z + 0.6), ease);
     }
     if (snap) { this.camPos.copy(want); this.camLook.copy(look); }
     else {

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { W, H, UI, FONT, toHex, lighten } from '../core/theme';
-import { button, gradText, label, Btn } from '../core/ui';
+import { W, H, UI, FONT, toHex, lighten, brandAt } from '../core/theme';
+import { button, gradText, label, roundBtn, Btn } from '../core/ui';
 import { Maze, DIRS, OPP, canPass, neighbor, pathTo } from '../core/maze';
 import { levelMaze } from '../art/thumb';
 import { LevelDef, WorldDef, getWorld } from '../worlds';
@@ -46,6 +46,7 @@ export class GameScene extends Phaser.Scene {
     this.skipIntro = !!d.skipIntro;
     this.moves = 0; this.phase = 0; this.moving = false; this.done = false; this.blocked = true;
     this.run = false; this.lastDir = -1; this.queued = null; this.collected = 0; this.hints = 2; this.overview = false;
+    this.pad.id = -1; this.pad.dir = -1; this.pad.kx = 0; this.pad.ky = 0; this.padArrows = [];
   }
 
   create() {
@@ -75,8 +76,8 @@ export class GameScene extends Phaser.Scene {
     top.fillGradientStyle(0x0a0b10, 0x0a0b10, 0x0a0b10, 0x0a0b10, 0.78, 0.78, 0, 0);
     top.fillRect(0, 0, W, 230);
     const bot = this.add.graphics().setDepth(29);
-    bot.fillGradientStyle(0x0a0b10, 0x0a0b10, 0x0a0b10, 0x0a0b10, 0, 0, 0.85, 0.85);
-    bot.fillRect(0, H - 250, W, 250);
+    bot.fillGradientStyle(0x0a0b10, 0x0a0b10, 0x0a0b10, 0x0a0b10, 0, 0, 0.7, 0.7);
+    bot.fillRect(0, H - 400, W, 400);
 
     this.add.text(W / 2, 54, wd.name.toUpperCase(), { fontFamily: FONT, fontSize: '22px', color: toHex(lighten(wd.pal.accent, 0.35)), fontStyle: 'bold' }).setOrigin(0.5).setDepth(30).setStyle({ letterSpacing: 5 } as any);
     this.add.text(W / 2, 96, `Nível ${this.li + 1} · ${def.title}`, { fontFamily: FONT, fontSize: '30px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(30);
@@ -93,9 +94,76 @@ export class GameScene extends Phaser.Scene {
     this.pips = this.add.graphics().setDepth(30);
     if (this.m.dyn.length) label(this, W / 2, 160, 'as sebes mudam em', 18, UI.textDim as string).setDepth(30);
 
-    this.hintBtn = button(this, 170, H - 90, 290, 88, 'Vagalume ✦2', () => this.useHint(), 'primary', 28).setDepth(31);
-    button(this, 400, H - 90, 130, 88, '◎', () => this.toggleView(), 'ghost', 40).setDepth(31);
-    button(this, 560, H - 90, 200, 88, 'Reiniciar', () => this.scene.restart({ world: wd.id, level: this.li, skipIntro: true }), 'ghost', 24).setDepth(31);
+    this.hintBtn = roundBtn(this, 96, H - 200, 66, '✦2', 'Vagalume', () => this.useHint(), 38).setDepth(31);
+    roundBtn(this, W - 96, H - 262, 52, '◎', 'mapa', () => this.toggleView(), 36).setDepth(31);
+    roundBtn(this, W - 96, H - 128, 52, '↻', 'reiniciar', () => this.scene.restart({ world: wd.id, level: this.li, skipIntro: true }), 36).setDepth(31);
+    this.buildPad();
+  }
+
+  // ───────────────────────── Joystick de vidro ─────────────────────────
+  private pad = { cx: W / 2, cy: H - 190, r: 150, id: -1, dir: -1, kx: 0, ky: 0 };
+  private padArrows: Phaser.GameObjects.Graphics[] = [];
+  private padKnob!: Phaser.GameObjects.Graphics;
+
+  private buildPad() {
+    const { cx, cy, r } = this.pad;
+    const base = this.add.graphics().setDepth(31);
+    base.fillStyle(0x0a0b10, 0.34); base.fillCircle(cx, cy, r);
+    for (let i = 0; i < 40; i++) {            // anel com o gradiente de assinatura
+      const a0 = (i / 40) * Math.PI * 2, a1 = ((i + 1.15) / 40) * Math.PI * 2;
+      base.lineStyle(5, brandAt(0.5 - 0.5 * Math.cos(a0)), 0.55);
+      base.beginPath(); base.arc(cx, cy, r, a0, a1); base.strokePath();
+    }
+    base.lineStyle(2, 0xffffff, 0.12); base.strokeCircle(cx, cy, r - 12);
+    const orbit = this.add.graphics().setDepth(31);   // arcos que giram devagar (um "mini labirinto" em órbita)
+    for (let k = 0; k < 4; k++) {
+      orbit.lineStyle(3, UI.fuchsia, 0.3);
+      orbit.beginPath(); orbit.arc(0, 0, r - 30, k * 1.57 + 0.2, k * 1.57 + 0.95); orbit.strokePath();
+    }
+    orbit.setPosition(cx, cy);
+    this.tweens.add({ targets: orbit, rotation: Math.PI * 2, duration: 14000, repeat: -1 });
+
+    for (let d = 0; d < 4; d++) {
+      const g = this.add.graphics().setDepth(32);
+      this.padArrows.push(g);
+      this.drawArrow(d, false);
+    }
+    this.padKnob = this.add.graphics().setDepth(33);
+    this.drawKnob();
+    this.tweens.add({ targets: this.padKnob, alpha: 0.78, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+  }
+
+  private drawArrow(d: number, active: boolean) {
+    const { cx, cy } = this.pad;
+    const ux = DIRS[d].dx, uy = DIRS[d].dy, px = -uy, py = ux;
+    const c = brandAt([0.1, 0.45, 0.9, 0.7][d]);
+    const g = this.padArrows[d];
+    g.clear();
+    const mx = cx + ux * 98, my = cy + uy * 98;
+    if (active) { g.fillStyle(c, 0.28); g.fillCircle(mx, my, 58); g.fillStyle(0xffffff, 0.12); g.fillCircle(mx, my, 36); }
+    const tip = [mx + ux * 34, my + uy * 34], l = [mx - ux * 18 + px * 40, my - uy * 18 + py * 40], rr = [mx - ux * 18 - px * 40, my - uy * 18 - py * 40];
+    g.fillStyle(active ? c : 0xffffff, active ? 0.92 : 0.26);
+    g.fillTriangle(tip[0], tip[1], l[0], l[1], rr[0], rr[1]);
+    g.lineStyle(3, c, active ? 1 : 0.7);
+    g.strokeTriangle(tip[0], tip[1], l[0], l[1], rr[0], rr[1]);
+  }
+
+  private drawKnob() {
+    const { cx, cy, kx, ky } = this.pad;
+    const g = this.padKnob;
+    g.clear();
+    g.fillStyle(UI.g2, 0.22); g.fillCircle(cx + kx, cy + ky, 54);
+    g.fillStyle(UI.g2, 0.6); g.fillCircle(cx + kx, cy + ky, 36);
+    g.lineStyle(3, 0xffffff, 0.55); g.strokeCircle(cx + kx, cy + ky, 36);
+    g.fillStyle(0xffffff, 0.75); g.fillCircle(cx + kx - 9, cy + ky - 10, 9);
+    g.fillStyle(UI.fuchsia, 0.8); g.fillCircle(cx + kx, cy + ky, 8);
+  }
+
+  private setPadDir(d: number) {
+    if (d === this.pad.dir) return;
+    if (this.pad.dir >= 0) this.drawArrow(this.pad.dir, false);
+    this.pad.dir = d;
+    if (d >= 0) { this.drawArrow(d, true); this.queued = { dir: d, run: true }; sfx.unlock(); }
   }
 
   private toggleView() {
@@ -116,29 +184,42 @@ export class GameScene extends Phaser.Scene {
         this.pips.fillCircle(x0 + i * gap, 188, 7);
       }
     }
-    this.hintBtn.txt.setText(`Vagalume ✦${this.hints}`);
+    this.hintBtn.txt.setText(`✦${this.hints}`);
     this.hintBtn.setAlpha(this.hints > 0 ? 1 : 0.45);
   }
 
   // ───────────────────────── Entrada ─────────────────────────
   private setupInput() {
     this.keys = this.input.keyboard!.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D') as any;
-    let ox = 0, oy = 0;
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { ox = p.x; oy = p.y; sfx.unlock(); });
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (!p.isDown) return;
-      const dx = p.x - ox, dy = p.y - oy;
-      if (Math.abs(dx) < 34 && Math.abs(dy) < 34) return;
-      const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0;
-      ox = p.x; oy = p.y;
-      this.queued = { dir, run: true };
+    const P = this.pad;
+    const read = (p: Phaser.Input.Pointer) => {
+      const dx = p.x - P.cx, dy = p.y - P.cy, len = Math.hypot(dx, dy);
+      const k = Math.min(1, len / 90) * 24;
+      P.kx = len > 0 ? (dx / len) * k : 0; P.ky = len > 0 ? (dy / len) * k : 0;
+      if (len < 34) return -1;
+      return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0;
+    };
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (this.blocked || this.done || P.id >= 0) return;
+      if (Math.hypot(p.x - P.cx, p.y - P.cy) > P.r + 30) return;
+      P.id = p.id; this.setPadDir(read(p));
     });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (p.id === P.id) this.setPadDir(read(p)); });
+    const release = (p: Phaser.Input.Pointer) => {
+      if (p.id !== P.id) return;
+      P.id = -1; P.kx = 0; P.ky = 0; this.setPadDir(-1);
+    };
+    this.input.on('pointerup', release);
+    this.input.on('pointerupoutside', release);
   }
 
   update() {
+    if (this.padKnob) this.drawKnob();
     if (this.blocked || this.done || this.moving) return;
     const k = this.keys;
     let dir = -1;
+    // joystick segurado: continua a andar (sem repetir o "toc" na parede)
+    if (this.pad.dir >= 0 && !this.queued && canPass(this.m, this.idx, this.pad.dir, this.phase)) this.queued = { dir: this.pad.dir, run: true };
     if (k.UP.isDown || k.W.isDown) dir = 0;
     else if (k.RIGHT.isDown || k.D.isDown) dir = 1;
     else if (k.DOWN.isDown || k.S.isDown) dir = 2;
