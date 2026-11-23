@@ -275,8 +275,8 @@ export class Stage {
     this.mode = mode;
     if (mode === 'title' && !this.giant) {
       // um Crescido colossal a espreitar de trás do planeta
-      const g = makeGuard(1); g.scale.setScalar(15);
-      g.position.set(-4, -13, -32);
+      const g = makeGuard(1); g.scale.setScalar(11);
+      g.position.set(-8, -9, -26);
       g.traverse((o) => { if ((o as THREE.Sprite).isSprite) o.visible = false; });
       for (const m of [g.userData.armL, g.userData.armR]) (m as THREE.Object3D).rotation.x = 0.05;
       this.scene.add(g); this.giant = g;
@@ -377,7 +377,7 @@ export class Stage {
       (U.head as THREE.Object3D).rotation.y = Math.sin(this.t * 0.35) * 0.5 - 0.35;
       (U.body as THREE.Object3D).position.y = Math.sin(this.t * 0.6) * 0.02;
       (U.armL as THREE.Object3D).rotation.x = Math.sin(this.t * 0.5) * 0.06; (U.armR as THREE.Object3D).rotation.x = -Math.sin(this.t * 0.5) * 0.06;
-      this.giant.position.x = -4 + Math.sin(this.t * 0.12) * 4;
+      this.giant.position.x = -8 + Math.sin(this.t * 0.12) * 3;
     }
     this.placeCamera(dt);
     this.scenery.update(this.t, this.camera.position);

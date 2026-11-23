@@ -91,7 +91,7 @@ class Snap {
     const bgc = document.createElement('canvas'); bgc.width = 256; bgc.height = 320;
     const g = bgc.getContext('2d')!;
     const rg = g.createRadialGradient(128, 150, 10, 128, 160, 260);
-    rg.addColorStop(0, '#' + new THREE.Color(accent).multiplyScalar(ln ? 0.16 : 0.42).getHexString());
+    rg.addColorStop(0, '#' + new THREE.Color(accent).multiplyScalar(ln ? 0.07 : 0.42).getHexString());
     rg.addColorStop(1, ln ? '#05080a' : '#0c0d12');
     g.fillStyle = rg; g.fillRect(0, 0, 256, 320);
     // chão de xadrez dalinesco ao fundo

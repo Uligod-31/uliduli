@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CharKind } from '../art/characters';
 import { glowSprite, hdr, makeClockTexture } from './common';
 import { makeUli } from './nightmare';
+import { pimpa as pimpaD, lagarta as lagartaD, sorriso as sorrisoD, rainha as rainhaD } from './chars_dark';
 
 const gloss = (color: number, rough = 0.22, extra: Partial<THREE.MeshPhysicalMaterialParameters> = {}) =>
   new THREE.MeshPhysicalMaterial({ color, roughness: rough, clearcoat: 1, clearcoatRoughness: 0.1, ...extra });
@@ -226,7 +227,7 @@ function grimy(g: THREE.Group, k = 0.5) {
 
 export function buildPortrait(kind: CharKind): { group: THREE.Group; center: THREE.Vector3; dist: number } {
   const r = buildPortraitRaw(kind);
-  if (kind === 'pimpa' || kind === 'lagarta' || kind === 'rainha' || kind === 'sorriso') grimy(r.group, kind === 'sorriso' ? 0.2 : 0.55);
+  if (kind === 'raposa' || kind === 'rei') grimy(r.group, 0.6);
   return r;
 }
 
@@ -239,12 +240,12 @@ function buildPortraitRaw(kind: CharKind): { group: THREE.Group; center: THREE.V
       u.rotation.y = 0.5;
       return { group: u, center: new THREE.Vector3(0, 1.45, 0), dist: 9.2 };
     }
-    case 'pimpa': return { group: pimpa(), center: new THREE.Vector3(0.3, 1.85, 0), dist: 7.4 };
-    case 'lagarta': return { group: lagarta(), center: new THREE.Vector3(0.1, 2.15, 0), dist: 9.4 };
-    case 'sorriso': return { group: sorriso(), center: new THREE.Vector3(0, 1.7, 0), dist: 6.4 };
+    case 'pimpa': return { group: pimpaD(), center: new THREE.Vector3(0.1, 2.55, 0), dist: 11 };
+    case 'lagarta': return { group: lagartaD(), center: new THREE.Vector3(-0.3, 2.3, 0), dist: 12.5 };
+    case 'sorriso': return { group: sorrisoD(), center: new THREE.Vector3(0, 2.0, 0), dist: 7.6 };
     case 'raposa': return { group: raposa(), center: new THREE.Vector3(-0.1, 1.45, 0), dist: 8.6 };
     case 'rei': return { group: rei(), center: new THREE.Vector3(0.2, 1.9, 0), dist: 9.2 };
     case 'acendedor': return { group: acendedor(), center: new THREE.Vector3(0.4, 2.0, 0), dist: 10.6 };
-    case 'rainha': return { group: rainha(), center: new THREE.Vector3(0.3, 1.8, 0), dist: 8.0 };
+    case 'rainha': return { group: rainhaD(), center: new THREE.Vector3(0.5, 2.35, 0), dist: 10.5 };
   }
 }
