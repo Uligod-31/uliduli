@@ -381,3 +381,30 @@ export function drawMummy(px = 1536): HTMLCanvasElement {
   g.globalCompositeOperation = 'source-over';
   return cv;
 }
+
+/** Textura de ligaduras (repetível) para as mãos da múmia: tiras com tinta, trama, manchas e hachuras. */
+export function drawBandageTex(px = 512): HTMLCanvasElement {
+  const cv = document.createElement('canvas'); cv.width = cv.height = px;
+  const g = cv.getContext('2d')!; g.lineJoin = 'round';
+  let seed = 515; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const R = (a: number, b: number) => a + (b - a) * rnd();
+  const tones = ['#c9bd98', '#b8ac88', '#a89c78', '#d3c7a4', '#9a8f6e'];
+  g.fillStyle = '#2a2217'; g.fillRect(0, 0, px, px);
+  for (let i = 0; i < 46; i++) {
+    const cx = R(0, px), cy = R(0, px), ang = R(-0.5, 0.5) + (i % 2 ? 0.9 : 0), len = R(200, 380), w = R(40, 84);
+    const tone = tones[(rnd() * tones.length) | 0];
+    for (const [ox, oy] of [[0, 0], [-px, 0], [px, 0], [0, -px], [0, px]]) {
+      g.save(); g.translate(cx + ox, cy + oy); g.rotate(ang);
+      const gr = g.createLinearGradient(0, -w / 2, 0, w / 2); gr.addColorStop(0, '#5a5038'); gr.addColorStop(0.25, tone); gr.addColorStop(0.75, tone); gr.addColorStop(1, '#4a412e');
+      g.fillStyle = gr; g.fillRect(-len / 2, -w / 2, len, w);
+      g.lineWidth = 3; g.strokeStyle = 'rgba(20,14,8,.9)'; g.strokeRect(-len / 2, -w / 2, len, w);
+      g.strokeStyle = 'rgba(45,32,15,.22)'; g.lineWidth = 1;
+      for (let x = -len / 2; x < len / 2; x += 6) { g.beginPath(); g.moveTo(x, -w / 2); g.lineTo(x, w / 2); g.stroke(); }
+      g.strokeStyle = 'rgba(15,10,4,.5)';
+      for (let x = -len / 2; x < len / 2; x += 9) { g.beginPath(); g.moveTo(x, w / 2); g.lineTo(x + 5, w / 2 - R(6, 13)); g.stroke(); }
+      g.restore();
+    }
+  }
+  for (let k = 0; k < 40; k++) { g.fillStyle = 'rgba(80,45,20,.16)'; g.beginPath(); g.ellipse(R(0, px), R(0, px), R(10, 34), R(6, 18), R(0, 3), 0, 6.28); g.fill(); }
+  return cv;
+}

@@ -1,6 +1,6 @@
 ﻿import * as THREE from 'three';
 import { hdr, glowTexture } from './common';
-import { drawMummy, MUMMY_W, MUMMY_H, MUMMY_EYES } from './mummyArt';
+import { drawMummy, drawBandageTex, MUMMY_W, MUMMY_H, MUMMY_EYES } from './mummyArt';
 import { drawSky } from './menuArt';
 
 export interface TitleGiant {
@@ -20,7 +20,13 @@ export function makeTitleGiant(Rd: number): TitleGiant {
   const group = new THREE.Group();
   const cloth = new THREE.MeshStandardMaterial({ color: 0x15131a, roughness: 0.95 });
   const dark = new THREE.MeshBasicMaterial({ color: 0x070405 });
-  const cast = <T extends THREE.Mesh>(m: T) => { m.castShadow = true; return m; };
+  const handMats: THREE.Material[] = [];
+  const inkM = new THREE.MeshBasicMaterial({ color: 0x05060a, side: THREE.BackSide, fog: false });
+  const cast = <T extends THREE.Mesh>(m: T) => {
+    m.castShadow = true;
+    if (handMats.includes(m.material as THREE.Material)) { const o = new THREE.Mesh(m.geometry, inkM); o.scale.setScalar(1.09); m.add(o); }   // contorno de tinta
+    return m;
+  };
 
   // ───────── céu pintado, muito ao fundo ─────────
   if (!skyTex) { skyTex = new THREE.CanvasTexture(drawSky(1080)); skyTex.colorSpace = THREE.SRGBColorSpace; skyTex.anisotropy = 4; }
@@ -56,8 +62,10 @@ export function makeTitleGiant(Rd: number): TitleGiant {
 
   // ───────── mãos gigantes a agarrar o mundo PELOS LADOS ─────────
   // O mundo tem um ventre rochoso: a palma encosta-se ao flanco e os dedos contornam-no, por baixo do labirinto.
-  const hskin = new THREE.MeshStandardMaterial({ color: 0x98a1b6, roughness: 0.65, metalness: 0.3 });
-  const hskinD = new THREE.MeshStandardMaterial({ color: 0x4b515f, roughness: 0.85, metalness: 0.25 });
+  const bandTex = new THREE.CanvasTexture(drawBandageTex(512)); bandTex.wrapS = bandTex.wrapT = THREE.RepeatWrapping; bandTex.colorSpace = THREE.SRGBColorSpace; bandTex.anisotropy = 4;
+  const hskin = new THREE.MeshStandardMaterial({ map: bandTex, color: 0xffffff, roughness: 0.95 });
+  const hskinD = new THREE.MeshStandardMaterial({ map: bandTex, color: 0x8a8578, roughness: 0.95 });
+  handMats.push(hskin, hskinD);
   const wrapM = new THREE.MeshStandardMaterial({ color: 0x9a9a92, roughness: 0.98 });
   const metalM = new THREE.MeshStandardMaterial({ color: 0x8f98aa, metalness: 0.9, roughness: 0.3 });
   const nailM = new THREE.MeshStandardMaterial({ color: 0x2a2c34, roughness: 0.5, metalness: 0.4 });

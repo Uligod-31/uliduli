@@ -139,7 +139,7 @@ export class TitleScene extends Phaser.Scene {
     const dot = this.add.circle(64, 50, 8, 0xff2030);
     this.tweens.add({ targets: dot, alpha: 0.1, duration: 600, yoyo: true, repeat: -1 });
     this.add.text(84, 38, 'REC  ·  SETOR B-612', { fontFamily: FONT, fontSize: '20px', color: '#eceef3' }).setAlpha(0.85);
-    this.add.text(W - 58, 38, 'v0.9', { fontFamily: FONT, fontSize: '20px', color: '#9aa0ae' }).setOrigin(1, 0);
+    this.add.text(W - 58, 38, 'v' + __APP_VERSION__, { fontFamily: FONT, fontSize: '20px', color: '#9aa0ae' }).setOrigin(1, 0);
     const coord = this.add.text(W - 58, 62, '', { fontFamily: FONT, fontSize: '16px', color: '#9aa0ae' }).setOrigin(1, 0);
     this.time.addEvent({ delay: 140, loop: true, callback: () => { coord.setText(`SINAL ${(60 + Math.random() * 35) | 0}%`); } });
     const v = this.add.text(W - 40, 640, 'NÃO OLHES PARA CIMA', { fontFamily: FONT_HEAD, fontSize: '22px', color: '#ffffff' }).setOrigin(0.5).setAngle(90).setAlpha(0.35);
