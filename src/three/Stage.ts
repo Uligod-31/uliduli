@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -64,6 +64,7 @@ export class Stage {
   private dangerCur = 0;
   private pulseCur = 0;
   private fogBase = new THREE.Color();
+  frames = 0;
   private planet = false;
   private giant?: TitleGiant;
   private th: ReturnType<typeof themeFor> = { top: 0, mid: 0, horizon: 0, ground: 0, ground2: 0, sun: 0 };
@@ -75,7 +76,7 @@ export class Stage {
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -282,6 +283,8 @@ export class Stage {
     if (mode !== 'title' && this.giant) this.dropGiant();
     this.el.style.display = 'block';
     this.sync(true);
+    if (mode === 'title') this.placeCamera(0, true);
+    this.sun.castShadow = mode !== 'title';
     if (!this.raf) { this.last = performance.now(); this.loop(); }
   }
   private dropGiant() {
@@ -316,6 +319,7 @@ export class Stage {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     this.t += dt;
+    this.frames++;
     this.fx.uniforms.time.value = (this.t * 37) % 100;
     this.sync();
     this.step(dt);
@@ -490,3 +494,4 @@ export class Stage {
 }
 
 export const stage = new Stage();
+

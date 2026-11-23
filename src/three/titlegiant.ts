@@ -1,5 +1,5 @@
 ﻿import * as THREE from 'three';
-import { hdr } from './common';
+import { hdr, glowTexture } from './common';
 
 export interface TitleGiant {
   group: THREE.Group;
@@ -24,8 +24,8 @@ const surf = (x: number, y: number) => FC * Math.sqrt(Math.max(0, 1 - (x / FA) *
 export function makeTitleGiant(Rd: number): TitleGiant {
   const group = new THREE.Group();
   const cloth = new THREE.MeshStandardMaterial({ color: 0x15131a, roughness: 0.95 });
-  const skin = new THREE.MeshStandardMaterial({ color: 0xcfc6ae, roughness: 0.85 });
-  const skinD = new THREE.MeshStandardMaterial({ color: 0x9d9380, roughness: 0.9 });
+  const skin = new THREE.MeshPhysicalMaterial({ color: 0xa9b3c6, roughness: 0.42, metalness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.35 });
+  const skinD = new THREE.MeshStandardMaterial({ color: 0x6f7788, roughness: 0.7, metalness: 0.3 });
   const dark = new THREE.MeshBasicMaterial({ color: 0x070405 });
   const cast = <T extends THREE.Mesh>(m: T) => { m.castShadow = true; return m; };
 
@@ -73,7 +73,6 @@ export function makeTitleGiant(Rd: number): TitleGiant {
   // luz de baixo (vela) para os dentes se verem
   const under = new THREE.PointLight(0xff9a50, 520, 0, 2); under.position.set(0, -3.2, 5.5); head.add(under);
 
-  const fill = new THREE.PointLight(0xffc880, 110, 0, 2); fill.position.set(0, 5, -4); group.add(fill);
 
   // ───────── o riso ─────────
   const ox = 0, oy = -0.15, W = 1.85;
@@ -123,7 +122,7 @@ export function makeTitleGiant(Rd: number): TitleGiant {
   }
 
   // ───────── braços e mãos, a agarrar o planeta por trás ─────────
-  const hskin = new THREE.MeshStandardMaterial({ color: 0x8c826e, roughness: 0.9 }), hskinD = new THREE.MeshStandardMaterial({ color: 0x625a4b, roughness: 0.95 });
+  const hskin = new THREE.MeshStandardMaterial({ color: 0x5f6574, roughness: 0.75, metalness: 0.3 }), hskinD = new THREE.MeshStandardMaterial({ color: 0x434856, roughness: 0.85, metalness: 0.25 });
   const fingers: { pivot: THREE.Group; ph: number }[] = [];
   const bone = (a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, parent: THREE.Object3D, m: THREE.Material) => {
     const d = new THREE.Vector3().subVectors(b, a), len = d.length();
@@ -173,6 +172,60 @@ export function makeTitleGiant(Rd: number): TitleGiant {
     });
   }
 
+
+  // luzes de palco: azul à esquerda, vermelho à direita (como um cartaz de concerto)
+  const blue = new THREE.DirectionalLight(0x2f6bff, 2.6); blue.position.set(-14, 10, -2); blue.target = head; group.add(blue);
+  const red = new THREE.DirectionalLight(0xff2a3a, 2.4); red.position.set(14, 6, -2); red.target = head; group.add(red);
+
+  // testa: pino de metal com gema e uma chama de vela no alto da cabeça
+  const stud = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.28, 4, 10), new THREE.MeshStandardMaterial({ color: 0xcfd6e6, metalness: 0.9, roughness: 0.25 }));
+  stud.position.set(0, 1.95, surf(0, 1.95) + 0.12); head.add(stud);
+  const gem = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshBasicMaterial({ color: hdr(0xff2030, 3), toneMapped: false })); gem.position.set(0, 1.95, surf(0, 1.95) + 0.3); head.add(gem);
+  const crownFlame = new THREE.Group(); crownFlame.position.set(0, FB * 0.98, 0.3); head.add(crownFlame);
+  const fprof = [[0, 0], [0.28, 0.02], [0.45, 0.25], [0.42, 0.6], [0.26, 0.95], [0.1, 1.3], [0, 1.7]].map(([r, y]) => new THREE.Vector2(r, y));
+  crownFlame.add(new THREE.Mesh(new THREE.LatheGeometry(fprof, 16), new THREE.MeshBasicMaterial({ color: hdr(0xff7a1a, 1.8), transparent: true, opacity: 0.92, toneMapped: false, fog: false })));
+  const fcore = new THREE.Mesh(new THREE.LatheGeometry(fprof.map((v) => new THREE.Vector2(v.x * 0.55, v.y * 0.8 + 0.05)), 12), new THREE.MeshBasicMaterial({ color: hdr(0xffe6a0, 2.2), toneMapped: false, fog: false })); crownFlame.add(fcore);
+
+  // cabelo grisalho em madeixas, a escorrer dos lados do crânio
+  const hairM = new THREE.MeshStandardMaterial({ color: 0xc9ccd2, roughness: 0.9 });
+  const hair = new THREE.Group(); head.add(hair);
+  for (let i = 0; i < 34; i++) {
+    const sd = i % 2 ? 1 : -1, k = i / 34;
+    const x0 = sd * (0.6 + k * 1.5), y0 = FB * (0.92 - k * 0.45);
+    const pts = [V(x0, y0, 0.2 - k), V(sd * (FA + 0.3 + k * 0.5), y0 - 1.2, -0.3), V(sd * (FA + 0.5 + Math.sin(i) * 0.4), y0 - 3.0 - k, -0.6), V(sd * (FA + 0.2 + Math.cos(i * 1.7) * 0.5), y0 - 5.2 - k * 1.5, -0.9)];
+    hair.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 18, 0.035 + (i % 3) * 0.012, 5), hairM));
+  }
+
+  // correntes penduradas, a balançar diante da cara
+  const chains: THREE.Group[] = [];
+  const linkM = new THREE.MeshStandardMaterial({ color: 0x9aa3b4, metalness: 0.9, roughness: 0.3 });
+  const linkG = new THREE.TorusGeometry(0.34, 0.09, 8, 16);
+  for (const sx of [-1, 1]) {
+    const ch = new THREE.Group(); ch.position.set(sx * 4.6, 24, -8.5); group.add(ch);
+    for (let k = 0; k < 30; k++) {
+      const l = new THREE.Mesh(linkG, linkM); l.scale.set(0.8, 1.25, 1); l.position.y = -k * 0.62; l.rotation.y = k % 2 ? Math.PI / 2 : 0; l.castShadow = false; ch.add(l);
+    }
+    chains.push(ch);
+  }
+
+  // archotes diante do planeta + brasas a subir
+  const flames: { g: THREE.Group; ph: number }[] = [];
+  for (const sx of [-1, 1]) {
+    const tx = sx * (Rd + 1.1), tz = 4.2;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 2.6, 8), cloth); pole.position.set(tx, 1.0, tz); group.add(pole);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.14, 0.34, 10), cloth); bowl.position.set(tx, 2.4, tz); group.add(bowl);
+    const fg = new THREE.Group(); fg.position.set(tx, 2.55, tz); group.add(fg);
+    fg.add(new THREE.Mesh(new THREE.ConeGeometry(0.3, 1.1, 10), new THREE.MeshBasicMaterial({ color: hdr(0xff7a1a, 1.8), transparent: true, opacity: 0.9, toneMapped: false, fog: false })).translateY(0.55));
+    fg.add(new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 8), new THREE.MeshBasicMaterial({ color: hdr(0xffe6a0, 2.2), toneMapped: false, fog: false })).translateY(0.38));
+    const g1 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xff7a2a, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); g1.scale.set(3.4, 3.4, 1); g1.position.y = 0.6; fg.add(g1);
+    flames.push({ g: fg, ph: sx });
+  }
+  const EM = 140, ep = new Float32Array(EM * 3), ev = new Float32Array(EM);
+  for (let i = 0; i < EM; i++) { ep[i * 3] = (Math.random() - 0.5) * (Rd * 2.6); ep[i * 3 + 1] = Math.random() * 12 - 2; ep[i * 3 + 2] = Math.random() * 14 - 8; ev[i] = 0.5 + Math.random() * 1.2; }
+  const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(ep, 3));
+  const embers = new THREE.Points(eg, new THREE.PointsMaterial({ color: hdr(0xff8a3a, 2), size: 0.16, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false }));
+  embers.frustumCulled = false; group.add(embers);
+
   return {
     group, head, target, spots, cones, fingers,
     update(t, aim) {
@@ -188,9 +241,19 @@ export function makeTitleGiant(Rd: number): TitleGiant {
       fingers.forEach((f) => { f.pivot.rotation.x = Math.sin(t * 0.8 + f.ph) * 0.06; });
       head.scale.setScalar(2.55 * (1 + 0.006 * Math.sin(t * 1.4)));   // respira
       group.position.y = Math.sin(t * 0.5) * 0.1;
+      chains.forEach((c, i) => { c.rotation.z = Math.sin(t * 0.9 + i * 1.7) * 0.05; c.rotation.x = Math.sin(t * 0.7 + i) * 0.04; });
+      hair.rotation.z = Math.sin(t * 0.6) * 0.015; hair.position.x = Math.sin(t * 0.8) * 0.04;
+      const ff = 0.9 + 0.12 * Math.sin(t * 17) + 0.06 * Math.sin(t * 29);
+      crownFlame.scale.set(1 - 0.08 * Math.sin(t * 11), ff, 1); crownFlame.rotation.z = Math.sin(t * 3.1) * 0.1; fcore.scale.y = 0.95 + 0.1 * Math.sin(t * 21);
+      flames.forEach((f) => { const q = 0.9 + 0.15 * Math.sin(t * 15 + f.ph * 3) + 0.07 * Math.sin(t * 27 + f.ph); f.g.scale.set(1 - 0.1 * Math.sin(t * 9 + f.ph), q, 1); f.g.rotation.z = Math.sin(t * 4 + f.ph) * 0.12; });
+      const pa = eg.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < EM; i++) { let y = pa.getY(i) + ev[i] * 0.022; if (y > 13) y = -2; pa.setY(i, y); pa.setX(i, pa.getX(i) + Math.sin(t * 1.3 + i) * 0.006); }
+      pa.needsUpdate = true;
     },
   };
 }
+
+
 
 
 

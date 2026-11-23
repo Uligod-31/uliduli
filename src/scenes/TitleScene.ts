@@ -10,11 +10,11 @@ import { stage } from '../three/Stage';
 export class TitleScene extends Phaser.Scene {
   private seed = 5;
   private ev?: Phaser.Time.TimerEvent;
+  private shown = false;
 
   constructor() { super('Title'); }
 
   create() {
-    document.getElementById('splash')?.classList.add('hide');
 
     // véus para legibilidade sobre o 3D
     const top = this.add.graphics();
@@ -23,10 +23,11 @@ export class TitleScene extends Phaser.Scene {
     bot.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 0.95, 0.95); bot.fillRect(0, H - 600, W, 600);
 
     this.hud();
+    this.lightning();
 
     // logótipo com falhas: três camadas (ciano, magenta, branco-gelo) que se desalinham
     const mk = (col: string | null, a: number, blend = false) => {
-      const t = this.add.text(W / 2, 196, 'UliDUli', { fontFamily: FONT_HEAD, fontSize: '190px', fontStyle: 'bold', color: col ?? '#ffffff' }).setOrigin(0.5).setAlpha(a);
+      const t = this.add.text(W / 2, 214, 'UliDUli', { fontFamily: FONT_HEAD, fontSize: '190px', fontStyle: 'bold', color: col ?? '#ffffff' }).setOrigin(0.5).setAlpha(a);
       t.setStyle({ letterSpacing: 6 } as any);
       if (blend) t.setBlendMode(Phaser.BlendModes.ADD);
       return t;
@@ -35,7 +36,8 @@ export class TitleScene extends Phaser.Scene {
     const gr = main.context.createLinearGradient(0, 40, 0, main.height);
     gr.addColorStop(0, '#f4f7ff'); gr.addColorStop(0.55, '#b9c6ee'); gr.addColorStop(1, '#7a6ad8');
     main.setFill(gr);
-    const slice = this.add.rectangle(W / 2, 196, W, 10, 0xffffff, 0).setBlendMode(Phaser.BlendModes.ADD);
+    try { (main as any).postFX?.addGlow(0x5b92ff, 3, 0, false, 0.1, 10); } catch { /* sem WebGL FX */ }
+    const slice = this.add.rectangle(W / 2, 214, W, 10, 0xffffff, 0).setBlendMode(Phaser.BlendModes.ADD);
     const glitch = () => {
       const n = 3 + ((Math.random() * 4) | 0);
       let k = 0;
@@ -45,8 +47,8 @@ export class TitleScene extends Phaser.Scene {
         cy.x = W / 2 - o * (Math.random() < 0.5 ? 1 : 0.4); mg.x = W / 2 + o;
         main.x = W / 2 + (j ? (Math.random() - 0.5) * 16 : 0);
         main.setAlpha(j && Math.random() < 0.3 ? 0.35 : 1);
-        cy.y = 196 + (j ? (Math.random() - 0.5) * 8 : 0);
-        slice.setAlpha(j ? 0.35 : 0).setY(140 + Math.random() * 120).setSize(W, 3 + Math.random() * 18);
+        cy.y = 214 + (j ? (Math.random() - 0.5) * 8 : 0);
+        slice.setAlpha(j ? 0.35 : 0).setY(160 + Math.random() * 120).setSize(W, 3 + Math.random() * 18);
         if (++k <= n + 1) this.time.delayedCall(45, step);
         else this.time.delayedCall(1400 + Math.random() * 2800, glitch);
       };
@@ -57,15 +59,15 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: [cy, mg, main], y: '+=8', duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
 
     // bandeira: ESCAPA. OU SOBREVIVE.
-    const sub = this.add.text(W / 2, 322, '', { fontFamily: FONT_HEAD, fontSize: '40px', color: '#eceef3', fontStyle: 'bold' }).setOrigin(0.5);
+    const sub = this.add.text(W / 2, 346, '', { fontFamily: FONT_HEAD, fontSize: '40px', color: '#eceef3', fontStyle: 'bold' }).setOrigin(0.5);
     sub.setStyle({ letterSpacing: 16 } as any);
     const full = 'ESCAPA. OU SOBREVIVE.';
     let ci = 0;
     this.time.addEvent({ delay: 55, repeat: full.length - 1, callback: () => { sub.setText(full.slice(0, ++ci) + (ci < full.length ? '_' : '')); } });
-    const sub2 = this.add.text(W / 2, 372, 'OS ADULTOS CRESCERAM. TU NÃO.', { fontFamily: FONT, fontSize: '22px', color: '#ff4fd8' }).setOrigin(0.5);
-    sub2.setStyle({ letterSpacing: 8 } as any);
+    const sub2 = this.add.text(W / 2, 100, 'OS ADULTOS CRESCERAM. TU NÃO.', { fontFamily: FONT, fontSize: '18px', color: '#ff4fd8' }).setOrigin(0.5);
+    sub2.setStyle({ letterSpacing: 6 } as any);
     this.tweens.add({ targets: sub2, alpha: 0.25, duration: 90, yoyo: true, repeat: -1, repeatDelay: 1700 + Math.random() * 1200 });
-    this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 408, 380, 4);
+    this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 380, 380, 4);
 
     neoButton(this, W / 2, 930, 600, 128, 'Jogar', '01', () => this.scene.start('Worlds'), true, 50);
     neoButton(this, W / 2, 1060, 600, 96, 'Galeria', '02', () => this.scene.start('Gallery'), false, 34);
@@ -84,6 +86,45 @@ export class TitleScene extends Phaser.Scene {
 
     this.events.once('shutdown', () => { this.ev?.remove(); stage.stop(); });
     this.attract();
+  }
+
+  update() {
+    // o ecrã de arranque só sai quando o 3D já desenhou algumas imagens (sem mostrar a câmara a assentar)
+    if (!this.shown && stage.frames > 4) { this.shown = true; document.getElementById('splash')?.classList.add('hide'); }
+  }
+
+  /** Relâmpagos azuis e fúcsia a estalar à volta da cara. */
+  private lightning() {
+    const g = this.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setDepth(5);
+    const flash = this.add.rectangle(W / 2, H / 2, W, H, 0x9bb8ff, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(5);
+    const path = (x0: number, y0: number, x1: number, y1: number, jit: number) => {
+      const pts: [number, number][] = [[x0, y0]];
+      const n = 9;
+      for (let i = 1; i < n; i++) {
+        const t = i / n, nx = -(y1 - y0), ny = x1 - x0, l = Math.hypot(nx, ny) || 1, o = (Math.random() - 0.5) * jit * (1 - Math.abs(t - 0.5) * 0.6);
+        pts.push([x0 + (x1 - x0) * t + (nx / l) * o, y0 + (y1 - y0) * t + (ny / l) * o]);
+      }
+      pts.push([x1, y1]); return pts;
+    };
+    const strike = () => {
+      g.clear();
+      const side = Math.random() < 0.5 ? -1 : 1, y0 = 150 + Math.random() * 420;
+      const x0 = side < 0 ? -10 : W + 10, x1 = W / 2 + side * (120 + Math.random() * 130), y1 = y0 + (Math.random() - 0.2) * 220;
+      const main = path(x0, y0, x1, y1, 70);
+      const bolts = [main];
+      for (let b = 0; b < 2; b++) { const k = 2 + ((Math.random() * 5) | 0), [bx, by] = main[k]; bolts.push(path(bx, by, bx + (Math.random() - 0.5) * 220, by + 60 + Math.random() * 160, 40)); }
+      const col = Math.random() < 0.75 ? 0x5b92ff : 0xff4fd8;
+      for (const [w, c, a] of [[12, col, 0.22], [6, col, 0.55], [2.5, 0xffffff, 1]] as const) {
+        g.lineStyle(w, c, a);
+        for (const pts of bolts) { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const [x, y] of pts) g.lineTo(x, y); g.strokePath(); }
+      }
+      flash.setAlpha(0.16);
+      this.tweens.add({ targets: flash, alpha: 0, duration: 160 });
+      this.time.delayedCall(70, () => { if (Math.random() < 0.6) { g.setAlpha(0.3); this.time.delayedCall(60, () => g.setAlpha(1)); } });
+      this.time.delayedCall(190, () => g.clear());
+      this.time.delayedCall(900 + Math.random() * 2600, strike);
+    };
+    this.time.delayedCall(1800, strike);
   }
 
   /** Moldura técnica: cantos de mira, REC, coordenadas e texto vertical. */
