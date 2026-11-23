@@ -1,13 +1,13 @@
 {
-  "name": "UliDUli — Aventura de Labirintos",
+  "name": "UliDUli — Escapa ou sobrevive",
   "short_name": "UliDUli",
-  "description": "Percorre labirintos-arte, conhece personagens e descobre a saída de cada mundo.",
+  "description": "Labirintos-pesadelo, adultos demasiado altos e uma chama que se recusa a apagar.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
   "orientation": "portrait",
-  "background_color": "#15161a",
-  "theme_color": "#15161a",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
   "lang": "pt-PT",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
