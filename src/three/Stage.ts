@@ -65,6 +65,9 @@ export class Stage {
   private pulseCur = 0;
   private fogBase = new THREE.Color();
   frames = 0;
+  private ema = 1 / 60;
+  private slow = 0;
+  quality = 0;
   private planet = false;
   private giant?: TitleGiant;
   private th: ReturnType<typeof themeFor> = { top: 0, mid: 0, horizon: 0, ground: 0, ground2: 0, sun: 0 };
@@ -284,7 +287,7 @@ export class Stage {
     this.el.style.display = 'block';
     this.sync(true);
     if (mode === 'title') this.placeCamera(0, true);
-    this.sun.castShadow = mode !== 'title';
+    this.sun.castShadow = mode !== 'title' && this.quality < 2;
     if (!this.raf) { this.last = performance.now(); this.loop(); }
   }
   private dropGiant() {
@@ -313,6 +316,21 @@ export class Stage {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Qualidade adaptativa: se o telemóvel não aguenta, baixa a resolução, depois o bloom e as sombras. Só desce. */
+  private adapt(dt: number) {
+    if (this.frames < 90 || this.quality >= 3) return;
+    this.ema += (dt - this.ema) * 0.06;
+    this.slow = this.ema > 1 / 34 ? this.slow + 1 : 0;
+    if (this.slow < 100) return;
+    this.slow = 0; this.quality++;
+    const dpr = window.devicePixelRatio || 1;
+    if (this.quality === 1) this.renderer.setPixelRatio(Math.min(dpr, 1.25));
+    else if (this.quality === 2) { this.bloom.enabled = false; this.sun.castShadow = false; }
+    else this.renderer.setPixelRatio(1);
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.sync(true);
+  }
+
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
     const now = performance.now();
@@ -320,6 +338,7 @@ export class Stage {
     this.last = now;
     this.t += dt;
     this.frames++;
+    this.adapt(dt);
     this.fx.uniforms.time.value = (this.t * 37) % 100;
     this.sync();
     this.step(dt);

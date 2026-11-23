@@ -201,12 +201,12 @@ export function drawFrame(px = 1080): HTMLCanvasElement {
 
 // ═════════════════════════ LOGÓTIPO ═════════════════════════
 /** UliDUli em metal cromado com extrusão, brilho elétrico e riscos. 1440x420. */
-export function drawLogo(w = 1440, h = 420): HTMLCanvasElement {
+export function drawChrome(text: string, w: number, h: number, fontPx: number, bolts = true): HTMLCanvasElement {
   const [c, g] = canvas(w, h);
   const R = mkRnd(31337);
-  const FONT = '900 290px "Bebas Neue","Oswald",Impact,"Haettenschweiler","Arial Narrow Bold",sans-serif';
+  const FONT = `900 ${fontPx}px "Bebas Neue","Oswald",Impact,"Haettenschweiler","Arial Narrow Bold",sans-serif`;
+  const ex = fontPx / 290;
   g.font = FONT; g.textBaseline = 'middle'; g.textAlign = 'center';
-  const text = 'UliDUli';
   const tw = g.measureText(text).width, sc = Math.min(1, (w - 150) / (tw + 30));
   const cx = w / 2 - 14, cy = h / 2 - 6;
   const skew = (ctx: Ctx) => { ctx.translate(cx, cy); ctx.transform(1, 0, -0.17, 1, 0, 0); ctx.scale(sc, sc); };
@@ -218,18 +218,18 @@ export function drawLogo(w = 1440, h = 420): HTMLCanvasElement {
   g.restore();
   // extrusão (profundidade)
   g.save(); skew(g); g.font = FONT; g.textBaseline = 'middle'; g.textAlign = 'center';
-  for (let i = 26; i >= 1; i--) { const t = i / 26; g.fillStyle = `rgb(${Math.round(24 + 26 * (1 - t))},${Math.round(26 + 24 * (1 - t))},${Math.round(44 + 36 * (1 - t))})`; g.fillText(text, i * 0.95, i * 1.25); }
-  g.lineWidth = 7; g.strokeStyle = '#03040a'; g.strokeText(text, 26 * 0.95, 26 * 1.25);
+  for (let i = 26; i >= 1; i--) { const t = i / 26; g.fillStyle = `rgb(${Math.round(24 + 26 * (1 - t))},${Math.round(26 + 24 * (1 - t))},${Math.round(44 + 36 * (1 - t))})`; g.fillText(text, i * 0.95 * ex, i * 1.25 * ex); }
+  g.lineWidth = 7; g.strokeStyle = '#03040a'; g.strokeText(text, 26 * 0.95 * ex, 26 * 1.25 * ex);
   g.restore();
   // fuchsia na aresta inferior da extrusão
   g.save(); skew(g); g.font = FONT; g.textBaseline = 'middle'; g.textAlign = 'center';
-  g.shadowColor = '#e02bc0'; g.shadowBlur = 14; g.strokeStyle = 'rgba(224,43,192,.85)'; g.lineWidth = 2.5; g.strokeText(text, 27 * 0.95, 27 * 1.25);
+  g.shadowColor = '#e02bc0'; g.shadowBlur = 14; g.strokeStyle = 'rgba(224,43,192,.85)'; g.lineWidth = 2.5; g.strokeText(text, 27 * 0.95 * ex, 27 * 1.25 * ex);
   g.restore();
 
   // face cromada, numa camada à parte para poder riscar
   const [fc, fg] = canvas(w, h);
   fg.save(); skew(fg); fg.font = FONT; fg.textBaseline = 'middle'; fg.textAlign = 'center';
-  const gr = fg.createLinearGradient(0, -170, 0, 150);
+  const gr = fg.createLinearGradient(0, -170 * ex, 0, 150 * ex);
   gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.28, '#dbe6ff'); gr.addColorStop(0.46, '#8da2d6'); gr.addColorStop(0.5, '#1c264a'); gr.addColorStop(0.6, '#5d71aa'); gr.addColorStop(0.82, '#c4d2f4'); gr.addColorStop(1, '#6a77a3');
   fg.fillStyle = gr; fg.fillText(text, 0, 0);
   fg.lineWidth = 6; fg.strokeStyle = '#02030a'; fg.strokeText(text, 0, 0);
@@ -252,13 +252,15 @@ export function drawLogo(w = 1440, h = 420): HTMLCanvasElement {
     pts.push([x1, y1]);
     for (const [lw, col] of [[10, 'rgba(90,150,255,.25)'], [4.5, 'rgba(130,180,255,.7)'], [1.8, '#ffffff']] as const) { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); }
   }
-  bolt(80, 40, 340, 210, 26); bolt(1380, 60, 1090, 250, 26); bolt(700, 12, 760, 120, 14); bolt(240, 400, 420, 330, 16); bolt(1180, 410, 1020, 330, 16);
+  if (bolts) { bolt(80, 40, 340, 210, 26); bolt(1380, 60, 1090, 250, 26); bolt(700, 12, 760, 120, 14); bolt(240, 400, 420, 330, 16); bolt(1180, 410, 1020, 330, 16); }
   return c;
 }
 
+export const drawLogo = (w = 1440, h = 420) => drawChrome('UliDUli', w, h, 290, true);
+
 // ═════════════════════════ PLACAS DE BOTÃO ═════════════════════════
 /** Placa de metal rebitada e riscada. `hot`: aço em brasa, com línguas de fogo no topo. Devolve canvas com folga de 44 px em cima. */
-export function drawPlate(w: number, h: number, hot: boolean, scale = 2): HTMLCanvasElement {
+export function drawPlate(w: number, h: number, hot: boolean, scale = 2, accent?: string): HTMLCanvasElement {
   const PAD = 44, [c, g] = canvas(Math.round(w * scale), Math.round((h + PAD) * scale));
   g.scale(scale, scale); g.translate(0, PAD);
   const R = mkRnd(w * 13 + h * 7 + (hot ? 99 : 0));
@@ -297,9 +299,10 @@ export function drawPlate(w: number, h: number, hot: boolean, scale = 2): HTMLCa
   g.restore();
 
   // contorno
-  const st = g.createLinearGradient(0, 0, w, h); st.addColorStop(0, '#3b74f2'); st.addColorStop(0.55, '#8a4bea'); st.addColorStop(1, '#e02bc0');
+  let st: string | CanvasGradient = g.createLinearGradient(0, 0, w, h); st.addColorStop(0, '#3b74f2'); st.addColorStop(0.55, '#8a4bea'); st.addColorStop(1, '#e02bc0');
+  if (accent) st = accent;
   g.lineWidth = 6; g.strokeStyle = '#05060b'; shape(1); g.stroke();
-  g.lineWidth = hot ? 4 : 3; g.strokeStyle = st; g.shadowColor = hot ? 'rgba(255,90,160,.9)' : 'rgba(80,130,255,.8)'; g.shadowBlur = hot ? 16 : 9; shape(3.5); g.stroke(); g.shadowBlur = 0;
+  g.lineWidth = hot ? 4 : 3; g.strokeStyle = st; g.shadowColor = accent ?? (hot ? 'rgba(255,90,160,.9)' : 'rgba(80,130,255,.8)'); g.shadowBlur = hot ? 16 : 9; shape(3.5); g.stroke(); g.shadowBlur = 0;
   g.lineWidth = 1.2; g.strokeStyle = 'rgba(255,255,255,.25)'; shape(8); g.stroke();
 
   // rebites
@@ -313,5 +316,21 @@ export function drawPlate(w: number, h: number, hot: boolean, scale = 2): HTMLCa
   for (const [x, y, d] of [[w - 4, 4, 1], [w - 4, h - cut - 4, 1]] as const) { g.beginPath(); g.moveTo(x - 4, y - 5); g.lineTo(x + 18 * d, y + 2); g.lineTo(x - 4, y + 12); g.closePath(); g.fill(); g.stroke(); }
   // marcas técnicas
   g.fillStyle = '#ff4fd8'; g.fillRect(cut + 22, h - 13, 34, 3); g.fillStyle = '#5b92ff'; g.fillRect(cut + 60, h - 13, 12, 3);
+  return c;
+}
+
+/** O herói (cabeça-chama) para ecrãs vazios. 400x520. */
+export function drawFlameHero(): HTMLCanvasElement {
+  const [c, g] = canvas(400, 520);
+  const halo = g.createRadialGradient(200, 230, 10, 200, 230, 200); halo.addColorStop(0, 'rgba(255,150,60,.5)'); halo.addColorStop(1, 'rgba(255,90,40,0)'); g.fillStyle = halo; g.fillRect(0, 0, 400, 520);
+  g.fillStyle = '#2b3a52'; g.beginPath(); g.moveTo(80, 520); g.bezierCurveTo(90, 400, 140, 370, 200, 370); g.bezierCurveTo(260, 370, 310, 400, 320, 520); g.closePath(); g.fill(); g.lineWidth = 5; g.strokeStyle = '#05070d'; g.stroke();
+  g.fillStyle = '#f2b73c'; g.beginPath(); g.moveTo(135, 372); g.quadraticCurveTo(200, 412, 265, 372); g.lineTo(265, 400); g.quadraticCurveTo(200, 438, 135, 400); g.closePath(); g.fill(); g.stroke();
+  const fl = g.createLinearGradient(0, 360, 0, 20); fl.addColorStop(0, '#ff6a14'); fl.addColorStop(0.6, '#ffa63a'); fl.addColorStop(1, '#ffe2a0');
+  g.shadowColor = '#ff8a30'; g.shadowBlur = 30; g.fillStyle = fl;
+  g.beginPath(); g.moveTo(206, 20); g.bezierCurveTo(226, 80, 290, 120, 290, 220); g.bezierCurveTo(290, 310, 250, 370, 200, 370); g.bezierCurveTo(150, 370, 110, 310, 110, 220); g.bezierCurveTo(110, 160, 150, 120, 176, 70); g.bezierCurveTo(184, 100, 196, 106, 206, 20); g.closePath(); g.fill();
+  g.shadowBlur = 0; g.lineWidth = 4; g.strokeStyle = 'rgba(80,20,0,.7)'; g.stroke();
+  g.fillStyle = '#fff1c4'; g.beginPath(); g.moveTo(202, 130); g.bezierCurveTo(222, 175, 256, 205, 256, 250); g.bezierCurveTo(256, 300, 232, 336, 200, 336); g.bezierCurveTo(168, 336, 144, 300, 144, 250); g.bezierCurveTo(144, 210, 176, 186, 190, 160); g.closePath(); g.fill();
+  g.fillStyle = '#1a0c05'; for (const x of [172, 228]) { g.beginPath(); g.ellipse(x, 260, 15, 28, 0, 0, 6.28); g.fill(); }
+  g.fillStyle = '#fff'; for (const x of [177, 233]) { g.beginPath(); g.arc(x, 249, 4.5, 0, 6.28); g.fill(); }
   return c;
 }

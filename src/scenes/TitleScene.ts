@@ -64,7 +64,7 @@ export class TitleScene extends Phaser.Scene {
     const full = 'ESCAPA. OU SOBREVIVE.';
     let ci = 0;
     this.time.addEvent({ delay: 55, repeat: full.length - 1, callback: () => { sub.setText(full.slice(0, ++ci) + (ci < full.length ? '_' : '')); } });
-    const sub2 = this.add.text(W / 2, 100, 'OS ADULTOS CRESCERAM. TU NÃO.', { fontFamily: FONT, fontSize: '18px', color: '#ff4fd8' }).setOrigin(0.5);
+    const sub2 = this.add.text(W / 2, 100, 'OS ADULTOS CRESCERAM. TU NÃO.', { fontFamily: FONT, fontSize: '19px', color: '#ff86e8', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5);
     sub2.setStyle({ letterSpacing: 6 } as any);
     this.tweens.add({ targets: sub2, alpha: 0.25, duration: 90, yoyo: true, repeat: -1, repeatDelay: 1700 + Math.random() * 1200 });
     this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 380, 380, 4);

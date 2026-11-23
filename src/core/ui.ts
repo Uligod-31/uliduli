@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT, FONT_HEAD, UI, W, H, toHex } from './theme';
 import { sfx } from './audio';
-import { drawPlate } from '../three/menuArt';
+import { drawPlate, drawSky, drawFrame, drawChrome } from '../three/menuArt';
 
 export interface Btn extends Phaser.GameObjects.Container { txt: Phaser.GameObjects.Text }
 
@@ -17,33 +17,11 @@ export type Variant = 'primary' | 'ghost';
 
 export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: number, label: string,
   cb: () => void, variant: Variant = 'primary', fontSize = 32): Btn {
-  const key = `btn_${variant}_${w}_${h}`;
-  if (!scene.textures.exists(key)) {
-    const tex = scene.textures.createCanvas(key, w, h)!;
-    const ctx = tex.getContext();
-    const c = Math.round(h * 0.3);
-    const cut = (x: number, y: number, ww: number, hh: number) => {   // cantos cortados, estilo industrial
-      ctx.beginPath();
-      ctx.moveTo(x + c, y); ctx.lineTo(x + ww, y); ctx.lineTo(x + ww, y + hh - c); ctx.lineTo(x + ww - c, y + hh);
-      ctx.lineTo(x, y + hh); ctx.lineTo(x, y + c); ctx.closePath();
-    };
-    if (variant === 'primary') {
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, '#3b74f2'); g.addColorStop(0.55, '#8a4bea'); g.addColorStop(1, '#e02bc0');
-      ctx.fillStyle = g; cut(0, 0, w, h); ctx.fill();
-      const hl = ctx.createLinearGradient(0, 0, 0, h);
-      hl.addColorStop(0, 'rgba(255,255,255,.24)'); hl.addColorStop(0.45, 'rgba(255,255,255,0)'); hl.addColorStop(1, 'rgba(0,0,0,.25)');
-      ctx.fillStyle = hl; cut(0, 0, w, h); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2; cut(2, 2, w - 4, h - 4); ctx.stroke();
-    } else {
-      ctx.fillStyle = 'rgba(12,13,18,.82)'; cut(0, 0, w, h); ctx.fill();
-      ctx.strokeStyle = '#5b92ff'; ctx.lineWidth = 2.5; cut(1.5, 1.5, w - 3, h - 3); ctx.stroke();
-      ctx.fillStyle = '#ff4fd8'; ctx.fillRect(0, h * 0.3, 6, h * 0.4);   // risca de acento
-    }
-    tex.refresh();
-  }
-  const img = scene.add.image(0, 0, key);
-  const txt = scene.add.text(0, -1, label.toUpperCase(), { fontFamily: FONT_HEAD, fontSize: `${Math.round(fontSize * 1.12)}px`, color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+  const PAD = 44, hot = variant === 'primary';
+  const key = `plate_${w}_${h}_${hot ? 1 : 0}`;
+  if (!scene.textures.exists(key)) scene.textures.addCanvas(key, drawPlate(w, h, hot, 2));
+  const img = scene.add.image(0, -PAD / 2, key).setScale(0.5);
+  const txt = scene.add.text(0, -1, label.toUpperCase(), { fontFamily: FONT_HEAD, fontSize: `${Math.round(fontSize * 1.12)}px`, color: '#f4f7ff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: Math.max(4, Math.round(fontSize / 5)) }).setOrigin(0.5);
   txt.setStyle({ letterSpacing: 2 } as any);
   const orig = txt.setText.bind(txt);
   (txt as any).setText = (v: any) => orig(String(v).toUpperCase());
@@ -57,6 +35,22 @@ export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: 
     cb();
   });
   return c;
+}
+
+/** Fundo pintado (céu com lua) escurecido, com a moldura de ramos por cima. */
+export function paintedBg(scene: Phaser.Scene, dim = 0.5) {
+  if (!scene.textures.exists('skyArt')) scene.textures.addCanvas('skyArt', drawSky(720));
+  if (!scene.textures.exists('frameArt2')) scene.textures.addCanvas('frameArt2', drawFrame(720));
+  scene.add.image(W / 2, H / 2, 'skyArt').setDisplaySize(W, H);
+  scene.add.rectangle(W / 2, H / 2, W, H, 0x05070d, dim);
+  scene.add.image(W / 2, H / 2, 'frameArt2').setDisplaySize(W, H).setAlpha(0.85);
+}
+
+/** Título em metal cromado, com extrusão e brilho (imagem desenhada à parte). */
+export function chromeHeading(scene: Phaser.Scene, x: number, y: number, text: string, width = 480): Phaser.GameObjects.Image {
+  const key = `chrome_${text}`;
+  if (!scene.textures.exists(key)) scene.textures.addCanvas(key, drawChrome(text.toUpperCase(), 1100, 260, 200, false));
+  return scene.add.image(x, y, key).setDisplaySize(width, (width * 260) / 1100);
 }
 
 /** Botão redondo de vidro (semitransparente), com legenda pequena opcional. */
