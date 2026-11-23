@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { Pal, mix } from '../core/theme';
 import { glowSprite, glowTexture, makeCheckerTexture, makeClockTexture, disposeTree } from './common';
 import { mulberry32 } from '../core/rng';
@@ -10,9 +10,9 @@ export interface SceneTheme { top: number; mid: number; horizon: number; ground:
 /** Tema do céu/solo de cada mundo (Jardim: crepúsculo dalinesco ouro e verde-azulado). */
 export function themeFor(id: string, pal: Pal): SceneTheme {
   // Asteroide B-612: noite fria, névoa verde-ardósia, lua pálida (pesadelo em miniatura)
-  if (id === 'b612') return { top: 0x04070a, mid: 0x101c20, horizon: 0x2c3f3e, ground: 0x0a0e10, ground2: 0x060809, sun: 0xcfe6d8, planet: true, fogNear: 14, fogFar: 80, grade: 1, sunC: 0xb9d0c8, sunI: 1.5, hemiI: 0.62, rimI: 0.9, lampI: 1.5, lampD: 8, expo: 1.15 };
+  if (id === 'b612') return { top: 0x04070a, mid: 0x101c20, horizon: 0x2c3f3e, ground: 0x0a0e10, ground2: 0x060809, sun: 0xcfe6d8, planet: true, fogNear: 14, fogFar: 80, grade: 1, sunC: 0xb9d0c8, sunI: 2.3, hemiI: 1.0, rimI: 1.1, lampI: 2.2, lampD: 9, expo: 1.32 };
   // Jardim Sebe: entardecer doente, névoa verde-oliva, sebes apodrecidas e um sol pálido a morrer
-  if (id === 'jardim') return { top: 0x040604, mid: 0x1a281c, horizon: 0x56613f, ground: 0x1b2014, ground2: 0x0c0f09, sun: 0xd9cf94, fogNear: 16, fogFar: 150, grade: 0.9, sunC: 0xd6cc9c, sunI: 1.8, hemiI: 0.72, rimI: 1.0, lampI: 1.5, lampD: 8, expo: 1.2, dim: 0.5 };
+  if (id === 'jardim') return { top: 0x040604, mid: 0x1a281c, horizon: 0x56613f, ground: 0x1b2014, ground2: 0x0c0f09, sun: 0xd9cf94, fogNear: 16, fogFar: 150, grade: 0.9, sunC: 0xd6cc9c, sunI: 2.7, hemiI: 1.2, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
   return {
     top: mix(pal.bgBot, 0x000000, 0.2), mid: mix(pal.bgTop, pal.accent, 0.35), horizon: mix(pal.accent, 0xffffff, 0.25),
     ground: mix(pal.floorA, pal.accent, 0.3), ground2: mix(pal.floorB, pal.bgBot, 0.4), sun: mix(pal.accent, 0xffffff, 0.5),

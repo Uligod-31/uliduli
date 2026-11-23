@@ -1,11 +1,13 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Maze } from '../core/maze';
 import { Pal } from '../core/theme';
 import { mulberry32 } from '../core/rng';
 import { collectWalls } from '../art/render';
-import { grimeTexture, hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
+import { hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
 import { buildPlanetBody } from './planet';
+import { stonePBR, flagPBR } from './pbr';
+import { buildDecor } from './decor';
 
 export const WALL_H = 0.52;
 export const WALL_T = 0.27;
@@ -45,12 +47,19 @@ function wallParts(len: number, rng: () => number) {
     const n = vnoise(x * 2.4 + ph);
     pos.setY(i, y - topDrop(x) * smooth(0.4, 1, u));
     pos.setZ(i, z + Math.sign(z) * 0.045 * smooth(0.35, 0.95, u) * (0.4 + n));
-    const v = (0.3 + 0.7 * Math.pow(u, 0.85)) * (0.88 + 0.12 * n);
+    const v = (0.46 + 0.54 * Math.pow(u, 0.85)) * (0.88 + 0.12 * n);
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.translate(0, h / 2, 0);
   g.computeVertexNormals();
+  {
+    const uv = g.attributes.uv, nrm = g.attributes.normal, off = ph * 0.37;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), nx = Math.abs(nrm.getX(i)), ny = Math.abs(nrm.getY(i));
+      if (ny > 0.6) uv.setXY(i, x * 1.1 + off, z * 1.1); else if (nx > 0.6) uv.setXY(i, z * 1.1 + off, y * 1.1); else uv.setXY(i, x * 1.1 + off, y * 1.1);
+    }
+  }
 
   const parts: THREE.BufferGeometry[] = [g];
   const drips = rng() < 0.6 ? 1 + Math.floor(rng() * 2) : 0;
@@ -91,13 +100,13 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Is
   let R = 0;
   for (const i of open) R = Math.max(R, Math.hypot(px(i), pz(i)));
 
-  const floorTex = grimeTexture();
+  const flag = flagPBR();
   // chão em xadrez (o plano de xadrez surreal de Dalí)
   const boxG = new THREE.BoxGeometry(0.985, FLOOR_T, 0.985);
   const nA = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 0);
   const nB = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 1);
   const mk = (list: number[], color: number) => {
-    const mesh = new THREE.InstancedMesh(boxG, new THREE.MeshStandardMaterial({ color, map: floorTex, bumpMap: floorTex, bumpScale: 1.6, roughness: planet ? 0.9 : 0.55, metalness: 0.04 }), list.length);
+    const mesh = new THREE.InstancedMesh(boxG, new THREE.MeshStandardMaterial({ color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.32), map: flag.map, normalMap: flag.normal, normalScale: new THREE.Vector2(1.1, 1.1), roughness: planet ? 0.92 : 0.62, metalness: 0.03, envMapIntensity: 0.7 }), list.length);
     const mat = new THREE.Matrix4();
     list.forEach((i, k) => mesh.setMatrixAt(k, mat.makeTranslation(px(i), -FLOOR_T / 2, pz(i))));
     mesh.receiveShadow = true;
@@ -140,11 +149,12 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Is
     for (const g of solid) { g.applyMatrix4(m4); solids.push(g); }
     strip.applyMatrix4(m4); strips.push(strip);
   });
-  const hedgeMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(pal.wall).lerp(new THREE.Color(0xffffff), 0.28), map: hedgeTexture(), bumpMap: hedgeTexture(), bumpScale: 2, roughness: 0.88, vertexColors: true });
+  const stone = stonePBR();
+  const hedgeMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(pal.wall).lerp(new THREE.Color(0xffffff), 0.82), map: stone.map, normalMap: stone.normal, normalScale: new THREE.Vector2(1.3, 1.3), roughness: 0.92, vertexColors: true, envMapIntensity: 0.6 });
   const walls = new THREE.Mesh(mergeGeometries(solids, false)!, hedgeMat);
   walls.castShadow = true; walls.receiveShadow = true;
   group.add(walls);
-  const stripMat = new THREE.MeshBasicMaterial({ color: hdr(pal.accent, planet ? 0.9 : 1.5), toneMapped: false });
+  const stripMat = new THREE.MeshBasicMaterial({ color: hdr(pal.accent, planet ? 0.8 : 1.05), toneMapped: false });
   group.add(new THREE.Mesh(mergeGeometries(strips, false)!, stripMat));
   const stripBase = stripMat.color.clone();
   solids.forEach((g) => g.dispose()); strips.forEach((g) => g.dispose());
@@ -175,6 +185,11 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Is
     dyn.push({ group: g, closed: true, cur: 1, vel: 0, target: 1 });
   });
 
+  // detalhe de cenário: musgo, poças, ossos, lápides, velas, archotes
+  const reserved = new Set<number>([m.start, m.exit, ...m.rosas]);
+  const decor = buildDecor({ cols, rows, open, reserved, segs, rng: mulberry32(seed * 71 + 5), style: planet ? 'planet' : 'garden', accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
+  group.add(decor.group);
+
   return {
     group, dyn, radius: R,
     pulse(p: number) { stripMat.color.copy(stripBase).multiplyScalar(1 + 1.1 * p); },
@@ -182,6 +197,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Is
     gridPos: (gx, gy, out = new THREE.Vector3()) => out.set(gx - cols / 2, 0, gy - rows / 2),
     update(dt: number, t = 0) {
       planetAnim?.(t);
+      decor.update(t);
       for (const d of dyn) {
         d.vel += (d.target - d.cur) * 190 * dt;
         d.vel *= Math.exp(-9 * dt);

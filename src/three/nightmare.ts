@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { glowSprite, hdr } from './common';
+import { noiseNormal } from './pbr';
 
 const cast = <T extends THREE.Mesh>(m: T) => { m.castShadow = true; return m; };
 
@@ -13,7 +14,7 @@ export function makeUli(): THREE.Group {
   const fig = new THREE.Group();
   root.add(fig);
   const skin = new THREE.MeshStandardMaterial({ color: 0xeedccb, roughness: 0.7 });
-  const coat = new THREE.MeshStandardMaterial({ color: 0x2b3a52, roughness: 0.92, side: THREE.DoubleSide });
+  const coat = new THREE.MeshStandardMaterial({ color: 0x2b3a52, roughness: 0.92, side: THREE.DoubleSide, normalMap: noiseNormal(1.2), normalScale: new THREE.Vector2(0.9, 0.9) });
   const coatD = new THREE.MeshStandardMaterial({ color: 0x1b2638, roughness: 0.95 });
   const boot = new THREE.MeshStandardMaterial({ color: 0x15130f, roughness: 0.6 });
   const gold = new THREE.MeshStandardMaterial({ color: 0xf2b73c, emissive: 0x7a4e0c, emissiveIntensity: 0.7, roughness: 0.75 });
@@ -34,6 +35,9 @@ export function makeUli(): THREE.Group {
   const collar = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.07, 14, 1, true), coatD)); collar.position.y = 0.55;
   const patch = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.06), new THREE.MeshStandardMaterial({ color: 0x5a4a32, roughness: 1 })); patch.position.set(0.07, 0.3, 0.19); patch.rotation.set(0.1, 0.25, 0.2);
   const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.026), new THREE.MeshBasicMaterial({ color: hdr(0xffd36a, 2.2), toneMapped: false })); star.scale.set(1, 1, 0.3); star.position.set(-0.07, 0.43, 0.125);
+  // botões de latão e bolso remendado
+  for (const [by, bz] of [[0.46, 0.15], [0.38, 0.165], [0.3, 0.18], [0.22, 0.195]] as const) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 6), gold); b.position.set(0, by, bz); b.scale.z = 0.6; fig.add(b); }
+  const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.012), coatD); pocket.position.set(-0.08, 0.24, 0.2); pocket.rotation.set(0.12, -0.3, 0); fig.add(pocket);
   fig.add(bell, hem, shoulders, collar, patch, star);
 
   // mangas compridas: as mãos mal espreitam

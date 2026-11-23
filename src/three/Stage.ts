@@ -11,6 +11,7 @@ import { Scenery, themeFor } from './scenery';
 import { makeRose, makePortal, Trail } from './actors';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
 import { makeTitleGiant, TitleGiant } from './titlegiant';
+import { Rain } from './rain';
 import { sfx } from '../core/audio';
 import { mix, brandAt } from '../core/theme';
 import { glowSprite, hdr, disposeTree } from './common';
@@ -70,6 +71,7 @@ export class Stage {
   quality = 0;
   private planet = false;
   private giant?: TitleGiant;
+  private rain = new Rain();
   private th: ReturnType<typeof themeFor> = { top: 0, mid: 0, horizon: 0, ground: 0, ground2: 0, sun: 0 };
   private fogNear = 90;
   private fogFar = 900;
@@ -98,21 +100,23 @@ export class Stage {
     this.composer.addPass(this.bloom);
     // grão, vinheta e aberração cromática: ar de filme sujo / punk
     this.fx = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 } },
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 }, tilt: { value: 0 }, res: { value: new THREE.Vector2(1 / 400, 1 / 700) } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; uniform float tilt; uniform vec2 res; varying vec2 vUv;
+        vec3 smp(vec2 uv, vec2 bp){ vec3 a = texture2D(tDiffuse, uv).rgb * 0.36; a += texture2D(tDiffuse, uv + vec2(bp.x, 0.0)).rgb * 0.16; a += texture2D(tDiffuse, uv - vec2(bp.x, 0.0)).rgb * 0.16; a += texture2D(tDiffuse, uv + vec2(0.0, bp.y)).rgb * 0.16; a += texture2D(tDiffuse, uv - vec2(0.0, bp.y)).rgb * 0.16; return a; }
         float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
         void main(){
           vec2 c = vUv - 0.5; float d = dot(c,c);
-          vec2 off = c * (d * 0.028 + pulse * 0.012 + danger * 0.02);
-          vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+          vec2 off = c * (d * 0.016 + pulse * 0.012 + danger * 0.02);
+          float bl = smoothstep(0.28, 0.52, abs(vUv.y - 0.5)) * tilt; vec2 bp = res * bl * 4.5;
+          vec3 col = bl > 0.02 ? vec3(smp(vUv + off, bp).r, smp(vUv, bp).g, smp(vUv - off, bp).b) : vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
           col *= 1.0 - smoothstep(0.12, 0.62, d) * (0.6 + 0.3 * grade);
           float lu = dot(col, vec3(0.299, 0.587, 0.114));
           col = mix(col, vec3(lu), 0.4 * grade);
           col *= mix(vec3(1.0), vec3(0.93, 1.03, 1.02), grade);
           col = mix(col, col * col * 1.6, 0.25 * grade);
           col += vec3(0.55, 0.0, 0.06) * danger * smoothstep(0.08, 0.5, d) * (0.65 + 0.35 * sin(time * 0.6));
-          col += (h(vUv * 900.0 + time) - 0.5) * 0.07;
+          col += (h(vUv * 900.0 + time) - 0.5) * 0.045;
           col *= 0.97 + 0.03 * sin(vUv.y * 900.0);
           gl_FragColor = vec4(col, 1.0);
         }`,
@@ -125,7 +129,7 @@ export class Stage {
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 0.03;
     this.scene.add(this.hemi, this.sun, this.sun.target, this.rim, this.lamp);
-    this.scene.add(this.uli, this.portal, this.trail.mesh, this.trail.dots);
+    this.scene.add(this.uli, this.portal, this.trail.mesh, this.trail.dots, this.rain.mesh);
   }
 
   // ───────────────────────── carregar um nível ─────────────────────────
@@ -288,6 +292,8 @@ export class Stage {
     this.sync(true);
     if (mode === 'title') this.placeCamera(0, true);
     this.sun.castShadow = mode !== 'title' && this.quality < 2;
+    this.fx.uniforms.tilt.value = mode === 'title' || this.quality >= 2 ? 0 : 0.5;
+    this.rain.mesh.visible = mode !== 'title' && this.quality < 3;
     if (!this.raf) { this.last = performance.now(); this.loop(); }
   }
   private dropGiant() {
@@ -312,6 +318,7 @@ export class Stage {
     s.left = `${r.left}px`; s.top = `${r.top}px`; s.width = `${r.width}px`; s.height = `${r.height}px`;
     this.renderer.setSize(r.width, r.height, false);
     this.composer.setSize(r.width, r.height);
+    this.fx.uniforms.res.value.set(1 / (r.width * this.renderer.getPixelRatio()), 1 / (r.height * this.renderer.getPixelRatio()));
     this.camera.aspect = r.width / Math.max(1, r.height);
     this.camera.updateProjectionMatrix();
   }
@@ -325,8 +332,8 @@ export class Stage {
     this.slow = 0; this.quality++;
     const dpr = window.devicePixelRatio || 1;
     if (this.quality === 1) this.renderer.setPixelRatio(Math.min(dpr, 1.25));
-    else if (this.quality === 2) { this.bloom.enabled = false; this.sun.castShadow = false; }
-    else this.renderer.setPixelRatio(1);
+    else if (this.quality === 2) { this.bloom.enabled = false; this.sun.castShadow = false; this.fx.uniforms.tilt.value = 0; }
+    else { this.renderer.setPixelRatio(1); this.rain.mesh.visible = false; }
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.sync(true);
   }
@@ -400,6 +407,7 @@ export class Stage {
     if (this.giant) this.giant.update(this.t, this.worldPlayer(new THREE.Vector3()).setY(0.4));
     this.placeCamera(dt);
     this.scenery.update(this.t, this.camera.position);
+    this.rain.update(this.t, this.camLook);
 
     // jogador
     const wp = this.worldPlayer(this.tmp);
