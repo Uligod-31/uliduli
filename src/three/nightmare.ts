@@ -87,17 +87,18 @@ export function makeUli(): THREE.Group {
  * cabeça minúscula e pálida, mãos enormes.
  * variant: 0 = Rei (coroa e capa), 1 = Vaidoso (chapéu-alto), 2 = Homem de Negócios (chapéu de coco e pasta).
  */
-export function makeGuard(variant = 0): THREE.Group {
+export function makeGuard(variant = 0, style = 0): THREE.Group {
   const root = new THREE.Group();
   const fig = new THREE.Group();
   root.add(fig);
   const v = variant % 3;
-  const cloth = new THREE.MeshStandardMaterial({ color: [0x2a2224, 0x23262d, 0x1f2a25][v], roughness: 0.95 });
-  const clothL = new THREE.MeshStandardMaterial({ color: [0x4a2f2c, 0x3a3f4a, 0x2d3d35][v], roughness: 0.95 });
-  const skin = new THREE.MeshStandardMaterial({ color: 0xcdbfa6, roughness: 0.85 });
+  const S = style >= 3 ? style - 3 : -1;   // 0 Carcereiro, 1 Sentinela de gelo, 2 Autómato, 3 Livro vivo
+  const cloth = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x140a0a, 0x7fa8c4, 0x5a4220, 0x2a1c14][S] : [0x2a2224, 0x23262d, 0x1f2a25][v], roughness: S === 1 ? 0.25 : S === 2 ? 0.4 : 0.95, metalness: S === 2 ? 0.8 : S === 1 ? 0.15 : 0 });
+  const clothL = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x3a1612, 0xaed4ea, 0x8a6a2f, 0x4a2a1a][S] : [0x4a2f2c, 0x3a3f4a, 0x2d3d35][v], roughness: S === 1 ? 0.2 : S === 2 ? 0.35 : 0.95, metalness: S === 2 ? 0.85 : 0 });
+  const skin = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0xcdbfa6, 0xcfe6f2, 0xb98a3a, 0xcdbfa6][S] : 0xcdbfa6, roughness: S === 1 ? 0.2 : 0.85, metalness: S === 2 ? 0.8 : 0 });
   const darkM = new THREE.MeshStandardMaterial({ color: 0x0d0c0b, roughness: 0.7 });
   const goldM = new THREE.MeshStandardMaterial({ color: 0xc9a13a, emissive: 0x5a3c08, emissiveIntensity: 0.8, roughness: 0.4, metalness: 0.6 });
-  const eyeM = new THREE.MeshBasicMaterial({ color: hdr(0xffd36a, 2.6), toneMapped: false });
+  const eyeM = new THREE.MeshBasicMaterial({ color: hdr(S >= 0 ? [0xff4a1a, 0x7fd8ff, 0xff3030, 0xffa040][S] : 0xffd36a, 2.6), toneMapped: false });
 
   const mkLeg = (x: number) => {
     const p = new THREE.Group(); p.position.set(x, 0.66, 0);
@@ -134,7 +135,26 @@ export function makeGuard(variant = 0): THREE.Group {
   }
   const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.008, 0.01), darkM); mouth.position.set(0, -0.055, 0.1); head.add(mouth);
 
-  if (v === 0) {
+  if (S >= 0) {
+    if (S === 0) {            // Carcereiro: chifres de carneiro e correntes
+      for (const sd of [-1, 1]) { const horn = cast(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(sd * 0.06, 0.1, 0), new THREE.Vector3(sd * 0.17, 0.17, -0.02), new THREE.Vector3(sd * 0.22, 0.02, 0.02), new THREE.Vector3(sd * 0.18, -0.08, 0.06)]), 14, 0.025, 6), skin)); head.add(horn); }
+      for (let k = 0; k < 5; k++) { const l = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.008, 5, 10), goldM); l.position.set(-0.1 + k * 0.05, 0.05 - (k % 2) * 0.03, 0.2); up.add(l); }
+    } else if (S === 1) {     // Sentinela de gelo: cristais nos ombros e na cabeça
+      for (let k = 0; k < 7; k++) { const c = cast(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12 + (k % 3) * 0.06, 5), new THREE.MeshBasicMaterial({ color: hdr(0x8fe0ff, 1.6), toneMapped: false }))); const a = (k / 7) * Math.PI * 2; c.position.set(Math.cos(a) * 0.06, 0.12, Math.sin(a) * 0.06); c.rotation.z = -Math.cos(a) * 0.5; c.rotation.x = Math.sin(a) * 0.5; head.add(c); }
+      for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) { const c = cast(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.22, 5), cloth)); c.position.set(sd * (0.2 + k * 0.05), 0.6 + k * 0.03, 0.03); c.rotation.z = -sd * (0.9 + k * 0.15); up.add(c); }
+    } else if (S === 2) {     // Autómato: cabeça cilíndrica com uma lente e engrenagem às costas
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 14), eyeM); lens.rotation.x = Math.PI / 2; lens.position.set(0, 0.01, 0.1); head.add(lens);
+      const tube = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.07, 14), goldM)); tube.rotation.x = Math.PI / 2; tube.position.set(0, 0.01, 0.12); head.add(tube);
+      const gg = new THREE.Group(); gg.position.set(0, 0.35, -0.2); up.add(gg); gg.add(cast(new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.025, 6, 18), goldM)));
+      for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2, t = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.03), goldM); t.position.set(Math.cos(a) * 0.17, Math.sin(a) * 0.17, 0); t.rotation.z = a; gg.add(t); }
+    } else {                  // Livro vivo: um livro aberto no lugar da cara
+      skull.visible = false;
+      for (const sd of [-1, 1]) {
+        const cov = cast(new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.02), new THREE.MeshStandardMaterial({ color: 0x4a2a1a, roughness: 0.7 }))); cov.position.set(sd * 0.075, 0, -0.01); cov.rotation.y = sd * 0.5; head.add(cov);
+        const pg = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.18), new THREE.MeshBasicMaterial({ color: hdr(0xffe9b0, 1.4), toneMapped: false, side: THREE.DoubleSide })); pg.position.set(sd * 0.07, 0, 0.0); pg.rotation.y = sd * 0.5; head.add(pg);
+      }
+    }
+  } else if (v === 0) {
     // Rei: coroa e capa de arminho
     const crown = new THREE.Group(); crown.position.y = 0.12;
     for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const c = cast(new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.07, 5), goldM)); c.position.set(Math.cos(a) * 0.07, 0.03, Math.sin(a) * 0.07); crown.add(c); }
@@ -156,10 +176,10 @@ export function makeGuard(variant = 0): THREE.Group {
     const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.075), goldM); clasp.position.set(0, -0.93, 0); armR.add(clasp);
   }
 
-  const glow = glowSprite(0xffb347, 1.4, 0.32); glow.position.set(0, 0.95, 0); fig.add(glow);
+  const glow = glowSprite(S >= 0 ? [0xff5a2a, 0x7fd8ff, 0xffb347, 0xffd98a][S] : 0xffb347, 1.4, 0.32); glow.position.set(0, 0.95, 0); fig.add(glow);
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.3, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.012; root.add(shadow);
-  root.userData = { body: fig, legL, legR, armL, armR, head };
+  root.userData = { body: fig, legL, legR, armL, armR, head, glow };
   return root;
 }
 

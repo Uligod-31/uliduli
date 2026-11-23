@@ -4,6 +4,7 @@ import { CHAR_NAMES, CHAR_COLORS } from '../art/characters';
 import { portraitImage } from '../art/thumb';
 import { FONT, UI, W, H, toHex } from '../core/theme';
 import { sfx } from '../core/audio';
+import { drawPlate } from '../three/menuArt';
 
 /** Diálogo curto com retrato 3D + balão. Toca para avançar. */
 export function playDialogue(scene: Phaser.Scene, lines: Line[], onDone: () => void) {
@@ -11,13 +12,16 @@ export function playDialogue(scene: Phaser.Scene, lines: Line[], onDone: () => v
   const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setInteractive();
   root.add(dim);
 
-  const card = scene.add.graphics();
-  card.fillStyle(0x14151a, 0.92); card.fillRoundedRect(40, 880, W - 80, 290, 34);
-  card.lineStyle(3, UI.line, 1); card.strokeRoundedRect(40, 880, W - 80, 290, 34);
+  const plateFor = (c: number) => {
+    const key = `dlg_${c}`;
+    if (!scene.textures.exists(key)) scene.textures.addCanvas(key, drawPlate(W - 80, 290, false, 1.5, toHex(c)));
+    return key;
+  };
+  const card = scene.add.image(40, 880 - 44, plateFor(CHAR_COLORS[lines[0].who])).setOrigin(0, 0).setScale(1 / 1.5);
   root.add(card);
 
-  const name = scene.add.text(80, 910, '', { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#fff' });
-  const text = scene.add.text(80, 962, '', { fontFamily: FONT, fontSize: '32px', color: UI.text, wordWrap: { width: W - 160 }, lineSpacing: 8 });
+  const name = scene.add.text(84, 910, '', { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: '#fff', stroke: '#05060b', strokeThickness: 6 });
+  const text = scene.add.text(84, 962, '', { fontFamily: FONT, fontSize: '32px', color: UI.text, wordWrap: { width: W - 170 }, lineSpacing: 8, stroke: '#05060b', strokeThickness: 5 });
   const next = scene.add.text(W - 80, 1136, 'tocar ▸', { fontFamily: FONT, fontSize: '24px', color: toHex(UI.blue) }).setOrigin(1, 0.5);
   root.add([name, text, next]);
   scene.tweens.add({ targets: next, alpha: 0.35, duration: 600, yoyo: true, repeat: -1 });
@@ -33,8 +37,10 @@ export function playDialogue(scene: Phaser.Scene, lines: Line[], onDone: () => v
     const left = l.who !== 'uli';
     const pw = 340, ph = 425;
     const img = portraitImage(scene, l.who, pw, ph);
+    card.setTexture(plateFor(CHAR_COLORS[l.who]));
     const frame = scene.add.graphics();
-    frame.lineStyle(4, CHAR_COLORS[l.who], 0.9); frame.strokeRoundedRect(0, 0, pw, ph, 40);
+    frame.lineStyle(5, CHAR_COLORS[l.who], 0.95); frame.strokeRoundedRect(0, 0, pw, ph, 40);
+    frame.lineStyle(2, 0x05060b, 0.9); frame.strokeRoundedRect(-3, -3, pw + 6, ph + 6, 43);
     pic = scene.add.container(left ? 40 : W - 40 - pw, 430, [img, frame]);
     root.add(pic);
     scene.tweens.add({ targets: pic, y: { from: 470, to: 430 }, alpha: { from: 0, to: 1 }, duration: 260, ease: 'Back.Out' });

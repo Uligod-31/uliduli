@@ -10,7 +10,8 @@ import { buildIsland } from './island';
 import { themeFor } from './scenery';
 import { Trail } from './actors';
 import { buildPortrait } from './characters3d';
-import { disposeTree } from './common';
+import { disposeTree, glowTexture } from './common';
+import { noiseNormal } from './pbr';
 
 /** Renderizador "fotográfico": miniaturas 3D (mundos, níveis, galeria) e retratos das personagens. */
 class Snap {
@@ -62,7 +63,7 @@ class Snap {
     gg.fillStyle = gr; gg.fillRect(0, 0, 4, 256);
     const bg = new THREE.CanvasTexture(bgc); bg.colorSpace = THREE.SRGBColorSpace;
     scene.background = bg;
-    const isl = buildIsland(m, wd.pal, seed, !!wd.planet);
+    const isl = buildIsland(m, wd.pal, seed, !!wd.planet, wd.look);
     scene.add(isl.group);
     scene.add(new THREE.HemisphereLight(theme.mid, theme.ground, 1.2));
     const sun = new THREE.DirectionalLight(0xffe2b0, 2.6);
@@ -103,6 +104,20 @@ class Snap {
 
     const { group, center, dist } = buildPortrait(kind);
     scene.add(group);
+    // aspeto de ilustração: contorno de tinta + pele/tecido com relevo
+    const inkMat = (th: number) => { const m = new THREE.MeshBasicMaterial({ color: 0x04050a, side: THREE.BackSide }); m.onBeforeCompile = (sh) => { sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = position + normal * ${th.toFixed(4)};`); }; return m; };
+    const th = kind === 'uli' ? 0.006 : 0.022, ink = inkMat(th), hulls: THREE.Mesh[] = [];
+    group.traverse((o) => {
+      const me = o as THREE.Mesh;
+      if (!me.isMesh || me.userData.noInk) return;
+      const mat = me.material as THREE.Material & { transparent?: boolean; isMeshStandardMaterial?: boolean };
+      if (mat.isMeshStandardMaterial && !mat.transparent) { const st = mat as THREE.MeshStandardMaterial; if (!st.normalMap) { st.normalMap = noiseNormal(1.3); st.normalScale.set(0.7, 0.7); } if (me.geometry.attributes.normal) hulls.push(me); }
+    });
+    for (const me of hulls) { const hull = new THREE.Mesh(me.geometry, ink); hull.userData.noInk = true; me.add(hull); }
+    scene.fog = new THREE.Fog(0x05080c, dist * 0.9, dist * 2.4);
+    const dm = new Float32Array(90 * 3); for (let i = 0; i < 90; i++) { dm[i * 3] = (Math.random() - 0.5) * 9; dm[i * 3 + 1] = Math.random() * 6; dm[i * 3 + 2] = (Math.random() - 0.5) * 6; }
+    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(dm, 3));
+    scene.add(new THREE.Points(dg, new THREE.PointsMaterial({ map: glowTexture(), color: 0xcfe0ff, size: 0.11, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })));
     // plano de xadrez sob a personagem
     const cv = document.createElement('canvas'); cv.width = cv.height = 128;
     const cg = cv.getContext('2d')!;

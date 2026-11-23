@@ -1,8 +1,8 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { CharKind } from '../art/characters';
 import { glowSprite, hdr, makeClockTexture } from './common';
 import { makeUli } from './nightmare';
-import { pimpa as pimpaD, lagarta as lagartaD, sorriso as sorrisoD, rainha as rainhaD } from './chars_dark';
+import { pimpa as pimpaD, lagarta as lagartaD, sorriso as sorrisoD, rainha as rainhaD, carcereiro as carcereiroD, geada as geadaD, relojoeiro as relojoeiroD, bibliotecario as bibliotecarioD } from './chars_dark';
 
 const gloss = (color: number, rough = 0.22, extra: Partial<THREE.MeshPhysicalMaterialParameters> = {}) =>
   new THREE.MeshPhysicalMaterial({ color, roughness: rough, clearcoat: 1, clearcoatRoughness: 0.1, ...extra });
@@ -246,6 +246,10 @@ function buildPortraitRaw(kind: CharKind): { group: THREE.Group; center: THREE.V
     case 'raposa': return { group: raposa(), center: new THREE.Vector3(-0.1, 1.45, 0), dist: 8.6 };
     case 'rei': return { group: rei(), center: new THREE.Vector3(0.2, 1.9, 0), dist: 9.2 };
     case 'acendedor': return { group: acendedor(), center: new THREE.Vector3(0.4, 2.0, 0), dist: 10.6 };
+    case 'carcereiro': return { group: carcereiroD(), center: new THREE.Vector3(0, 2.55, 0), dist: 8.4 };
+    case 'geada': return { group: geadaD(), center: new THREE.Vector3(0.2, 2.4, 0), dist: 8.8 };
+    case 'relojoeiro': return { group: relojoeiroD(), center: new THREE.Vector3(0, 2.2, 0), dist: 8.2 };
+    case 'bibliotecario': return { group: bibliotecarioD(), center: new THREE.Vector3(0, 2.5, 0), dist: 8.6 };
     case 'rainha': return { group: rainhaD(), center: new THREE.Vector3(0.5, 2.35, 0), dist: 10.5 };
   }
 }

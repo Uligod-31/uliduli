@@ -4,7 +4,7 @@ import { button, gradText, label, roundBtn, Btn } from '../core/ui';
 import { Maze, DIRS, OPP, canPass, neighbor, pathTo, distFrom } from '../core/maze';
 import { mulberry32, shuffle } from '../core/rng';
 import { levelMaze } from '../art/thumb';
-import { LevelDef, WorldDef, getWorld } from '../worlds';
+import { LevelDef, WorldDef, getWorld, isUnlocked } from '../worlds';
 import { sfx } from '../core/audio';
 import { save } from '../core/save';
 import { playDialogue } from './dialogue';
@@ -35,6 +35,7 @@ export class GameScene extends Phaser.Scene {
   private guardPrev: number[] = [];
 
   private pips!: Phaser.GameObjects.Graphics;
+  private guardPips!: Phaser.GameObjects.Graphics;
   private movesTxt!: Phaser.GameObjects.Text;
   private rosaTxt!: Phaser.GameObjects.Text;
   private hintBtn!: Btn;
@@ -74,7 +75,8 @@ export class GameScene extends Phaser.Scene {
       this.guardPrev = this.guards.map(() => -1);
     }
     stage.load(m, this.wd, def.seed, { intro: !this.skipIntro });
-    stage.setGuards(this.guards);
+    stage.setGuards(this.guards, this.wd.guardStyle ?? 0);
+    stage.setWeather(def.weather ?? this.wd.weather ?? 'none');
     stage.start('game');
     if (def.fog) stage.setDark(def.fog * 1.0);
     this.events.once('shutdown', () => stage.stop());
@@ -83,7 +85,7 @@ export class GameScene extends Phaser.Scene {
     this.setupInput();
     this.updateHud();
 
-    if (this.skipIntro) this.blocked = false;
+    if (this.skipIntro || !def.intro.length) this.blocked = false;
     else this.time.delayedCall(1300, () => playDialogue(this, def.intro, () => { this.blocked = false; }));
   }
 
@@ -98,7 +100,7 @@ export class GameScene extends Phaser.Scene {
     bot.fillRect(0, H - 520, W, 520);
 
     this.add.text(W / 2, 54, wd.name.toUpperCase(), { fontFamily: FONT, fontSize: '22px', color: toHex(lighten(wd.pal.accent, 0.35)), fontStyle: 'bold' }).setOrigin(0.5).setDepth(30).setStyle({ letterSpacing: 5 } as any);
-    this.add.text(W / 2, 96, `Nível ${this.li + 1} · ${def.title}`, { fontFamily: FONT, fontSize: '30px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(30);
+    this.add.text(W / 2, 96, `${def.bonus ? '★ Bónus' : 'Nível ' + (this.li + 1)} · ${def.title}`, { fontFamily: FONT, fontSize: '30px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(30);
     const line = this.add.graphics().setDepth(30);
     line.fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1); line.fillRect(0, 132, W, 4);
 
@@ -110,6 +112,7 @@ export class GameScene extends Phaser.Scene {
     this.rosaTxt = this.add.text(50, 176, '', { fontFamily: FONT, fontSize: '30px', color: '#ff9ecb', fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(30);
     this.movesTxt = this.add.text(W - 50, 176, '', { fontFamily: FONT, fontSize: '25px', color: '#fff', fontStyle: 'bold' }).setOrigin(1, 0.5).setDepth(30);
     this.pips = this.add.graphics().setDepth(30);
+    this.guardPips = this.add.graphics().setDepth(30);
     if (this.m.dyn.length) label(this, W / 2, 160, 'as sebes mudam em', 18, UI.textDim as string).setDepth(30);
 
     // rodapé: três botões numa linha; o joystick fica por cima deles
@@ -205,6 +208,13 @@ export class GameScene extends Phaser.Scene {
         this.pips.fillCircle(x0 + i * gap, 188, 7);
       }
     }
+    // ritmo dos guardas: com o primeiro ponto aceso, o teu próximo passo faz os guardas mexerem-se
+    this.guardPips.clear();
+    if (this.guards.length) {
+      const armed = this.moves % 2 === 1;
+      stage.setGuardsArmed(armed);
+      for (let i = 0; i < 2; i++) { this.guardPips.fillStyle(i < this.moves % 2 ? 0xff3040 : UI.line, 1); this.guardPips.fillCircle(W - 80 + i * 26, 206, 8); }
+    }
     this.hintBtn.txt.setText(`Vagalume ✦${this.hints}`);
     this.hintBtn.setAlpha(this.hints > 0 ? 1 : 0.45);
   }
@@ -240,7 +250,7 @@ export class GameScene extends Phaser.Scene {
     const k = this.keys;
     let dir = -1;
     // joystick segurado: continua a andar (sem repetir o "toc" na parede)
-    if (this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 200 && canPass(this.m, this.idx, this.pad.dir, this.phase)) this.queued = { dir: this.pad.dir, run: false };
+    if (this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 150 && canPass(this.m, this.idx, this.pad.dir, this.phase)) this.queued = { dir: this.pad.dir, run: false };
     if (k.UP.isDown || k.W.isDown) dir = 0;
     else if (k.RIGHT.isDown || k.D.isDown) dir = 1;
     else if (k.DOWN.isDown || k.S.isDown) dir = 2;
@@ -259,7 +269,7 @@ export class GameScene extends Phaser.Scene {
     const m = this.m;
     stage.player.dir = Math.atan2(DIRS[dir].dx, DIRS[dir].dy);
     if (!canPass(m, this.idx, dir, this.phase)) {
-      sfx.bump(); this.run = false;
+      sfx.bump(); this.run = false; navigator.vibrate?.(8);
       const a = { t: 0 };
       this.tweens.add({ targets: a, t: 1, duration: 120, onUpdate: () => { stage.player.h = Math.sin(a.t * Math.PI) * 0.25; } });
       return;
@@ -271,7 +281,7 @@ export class GameScene extends Phaser.Scene {
     const toX = (ni % m.cols) + 0.5, toY = ((ni / m.cols) | 0) + 0.5;
     const a = { t: 0 };
     this.tweens.add({
-      targets: a, t: 1, duration: 120, ease: 'Sine.InOut',
+      targets: a, t: 1, duration: 112, ease: (this.pad.dir >= 0 || this.queued || this.run) ? 'Linear' : 'Sine.InOut',
       onUpdate: () => {
         stage.player.x = fromX + (toX - fromX) * a.t; stage.player.y = fromY + (toY - fromY) * a.t; stage.player.h = a.t;
       },
@@ -289,13 +299,13 @@ export class GameScene extends Phaser.Scene {
     let stop = false;
     if (this.rosas.has(ni)) {
       this.rosas.delete(ni); this.collected++; stop = true;
-      sfx.collect(); stage.removeRose(ni);
+      sfx.collect(); stage.removeRose(ni); navigator.vibrate?.(18);
     }
     if (ni === m.exit) { this.updateHud(); this.finish(); return; }
     if (this.guards.includes(ni)) { this.caught(); return; }
     if (m.dyn.length && this.moves % this.def.shift === 0) {
       this.phase ^= 1; stage.setPhase(this.phase, true); stop = true;
-      sfx.shift(); stage.shake(0.35);
+      sfx.shift(); stage.shake(0.35); navigator.vibrate?.(26);
     }
     if (this.guards.length && this.moves % 2 === 0) { this.tickGuards(); if (this.done) return; }
     this.updateHud();
@@ -303,6 +313,13 @@ export class GameScene extends Phaser.Scene {
     if (this.queued) {
       const q = this.queued; this.queued = null;
       if (canPass(m, ni, q.dir, this.phase)) { this.run = q.run; this.step(q.dir); return; }
+    }
+    // joystick segurado: fluxo contínuo, sem pausas, e dobra sozinho nas esquinas de um corredor
+    if (!stop && this.pad.dir >= 0 && this.time.now - this.padSince > 150) {
+      if (canPass(m, ni, this.pad.dir, this.phase)) { this.step(this.pad.dir); return; }
+      const opts: number[] = [];
+      for (let d = 0; d < 4; d++) if (d !== OPP[this.lastDir] && canPass(m, ni, d, this.phase)) opts.push(d);
+      if (opts.length === 1) { this.step(opts[0]); return; }
     }
     if (this.run && !stop) {
       const opts: number[] = [];
@@ -341,7 +358,7 @@ export class GameScene extends Phaser.Scene {
   private caught() {
     if (this.done) return;
     this.done = true;
-    sfx.bump(); sfx.shift();
+    sfx.bump(); sfx.shift(); navigator.vibrate?.([60, 40, 120]);
     stage.shake(1.1);
     const p = stage.worldPos(this.idx);
     stage.burst(p.x, p.z, [0xff2030, 0xff7a3a, 0xffffff], 40, 0.5);
@@ -400,11 +417,17 @@ export class GameScene extends Phaser.Scene {
     }
     root.add(this.add.text(cx, cy - 10, `Passos ${this.moves} (par ${this.m.par})  ·  Rosas ${this.collected}/${this.m.rosas.length}`, { fontFamily: FONT, fontSize: '24px', color: UI.text }).setOrigin(0.5));
 
-    const hasNext = this.li + 1 < this.wd.levels.length;
-    root.add(button(this, cx, cy + 66, 480, 88, hasNext ? 'Próximo nível' : 'Voltar aos mundos', () =>
-      hasNext ? this.scene.start('Game', { world: this.wd.id, level: this.li + 1 }) : this.scene.start('Worlds'), 'primary', 32));
-    root.add(button(this, cx - 125, cy + 162, 230, 72, 'Repetir', () => this.scene.restart({ world: this.wd.id, level: this.li, skipIntro: true }), 'ghost', 24));
-    root.add(button(this, cx + 125, cy + 162, 230, 72, 'Galeria', () => this.scene.start('Gallery'), 'ghost', 24));
+    const nextIdx = this.li + 1, levels = this.wd.levels;
+    const hasNext = nextIdx < levels.length && isUnlocked(this.wd, nextIdx, save);
+    const bonusNow = hasNext && !!levels[nextIdx].bonus;
+    if (bonusNow) root.add(this.add.text(cx, cy + 14, '★ Nível bónus desbloqueado! ★', { fontFamily: FONT, fontSize: '26px', color: '#ffe28a', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5));
+    const lastNormal = nextIdx === levels.length - 1 && !!levels[nextIdx].bonus && !hasNext;
+    if (lastNormal) root.add(this.add.text(cx, cy + 14, 'Bónus: precisas de todas as ★ do mundo', { fontFamily: FONT, fontSize: '22px', color: UI.textDim as string, stroke: '#05060b', strokeThickness: 4 }).setOrigin(0.5));
+    const label = hasNext ? (bonusNow ? 'Nível bónus' : 'Próximo nível') : this.def.bonus ? 'Voltar aos mundos' : 'Voltar aos níveis';
+    root.add(button(this, cx, cy + 76, 480, 84, label, () =>
+      hasNext ? this.scene.start('Game', { world: this.wd.id, level: nextIdx }) : this.def.bonus ? this.scene.start('Worlds') : this.scene.start('Levels', { world: this.wd.id }), 'primary', 32));
+    root.add(button(this, cx - 125, cy + 170, 230, 72, 'Repetir', () => this.scene.restart({ world: this.wd.id, level: this.li, skipIntro: true }), 'ghost', 24));
+    root.add(button(this, cx + 125, cy + 170, 230, 72, 'Galeria', () => this.scene.start('Gallery'), 'ghost', 24));
     root.setAlpha(0);
     this.tweens.add({ targets: root, alpha: 1, duration: 300 });
   }

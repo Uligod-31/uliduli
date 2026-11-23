@@ -2,6 +2,8 @@ import { MaskKind } from '../core/maze';
 import { Pal, mkPal } from '../core/theme';
 import { CharKind } from '../art/characters';
 
+export type Weather = 'none' | 'rain' | 'snow' | 'embers' | 'ash' | 'dust' | 'pages' | 'mist';
+
 export interface Line { who: CharKind; text: string }
 
 export interface LevelDef {
@@ -14,7 +16,9 @@ export interface LevelDef {
   shift: number;   // passos entre mudanças das sebes dinâmicas
   loops: number;
   fog: number;     // 0 = sem nevoeiro; senão raio de visão em células
-  guards?: number; // Espadas: guardas que perseguem o jogador
+  guards?: number; // guardas que perseguem o jogador
+  weather?: Weather; // clima deste nível (por cima do do mundo)
+  bonus?: boolean; // nível bónus: só abre com todas as estrelas dos outros
   intro: Line[];
   outro?: Line[];
 }
@@ -28,13 +32,19 @@ export interface WorldDef {
   ready: boolean;
   preview: { mask: MaskKind; cols: number; rows: number; seed: number };
   levels: LevelDef[];
+  weather?: Weather; // clima base do mundo
   planet?: boolean; // visual de asteroide (Pequenos Pesadelos)
+  guardStyle?: number; // aspeto dos guardas (0-2 Crescidos, 3 Carcereiro, 4 Sentinela de gelo, 5 Autómato, 6 Livro vivo)
+  look?: { wall: string; floor: string; decor: string }; // texturas e adereços do mundo
 }
 
 const soon = (id: string, name: string, tagline: string, rule: string, pal: Pal, mask: MaskKind, seed: number): WorldDef => ({
   id, name, tagline, rule, pal, ready: false, levels: [],
   preview: { mask, cols: mask === 'rect' ? 7 : 9, rows: mask === 'rect' ? 7 : 9, seed },
 });
+
+const lv = (title: string, cols: number, rows: number, mask: MaskKind, seed: number, o: Partial<LevelDef> = {}, intro: Line[] = [], outro?: Line[]): LevelDef =>
+  ({ title, cols, rows, mask, seed, dyn: 0, shift: 8, loops: 0.05, fog: 0, intro, outro, ...o });
 
 // ───────────────────────── Mundo 0: Asteroide B-612 ─────────────────────────
 // Pequenos planetas à deriva, no espírito do pequeno príncipe, vistos por um pesadelo:
@@ -46,7 +56,7 @@ const b612: WorldDef = {
   rule: 'Os Crescidos caçam-te. Foge-lhes de lado.',
   pal: mkPal(0x0a1012, 0x6e6452, 0x34452f, 0xf0b44a),
   ready: true,
-  planet: true,
+  planet: true, weather: 'dust',
   preview: { mask: 'circle', cols: 9, rows: 9, seed: 12 },
   levels: [
     {
@@ -105,6 +115,15 @@ const b612: WorldDef = {
         { who: 'acendedor', text: 'Há mais mundos. E nenhum acende sozinho.' },
       ],
     },
+    lv('O Planeta Esquecido', 11, 13, 'circle', 107, { dyn: 5, shift: 6, loops: 0.08, fog: 3.6, guards: 2 }, [
+      { who: 'acendedor', text: 'Este planeta ninguém visita. Os Crescidos esqueceram-se dele.' },
+      { who: 'raposa', text: 'Esqueceram-se do planeta, não de ti. Cuidado com o escuro.' },
+    ]),
+    lv('A Rosa Sob o Vidro', 13, 15, 'circle', 108, { dyn: 8, shift: 6, loops: 0.09, fog: 4, guards: 3, bonus: true }, [
+      { who: 'raposa', text: 'Só chega aqui quem apanhou todas as estrelas. O Pequeno Príncipe teria orgulho.' },
+      { who: 'uli', text: 'Quero a minha rosa.' },
+      { who: 'raposa', text: 'Então cativa-a. Três Crescidos, névoa e sebes que mentem. Boa sorte.' },
+    ], [{ who: 'raposa', text: 'És o único que cativou a rosa sem a apanhar. Isso sim é magia.' }]),
   ],
 };
 
@@ -117,7 +136,7 @@ const jardim: WorldDef = {
   tagline: 'Sebes que mordem, relógios que derretem e uma rainha com mau perder.',
   rule: 'Sebes rebeldes: mudam de lugar de N em N passos.',
   pal: mkPal(0x070a06, 0x6a6650, 0x2c4a30, 0xd98aae),
-  ready: true,
+  ready: true, weather: 'ash',
   preview: { mask: 'heart', cols: 9, rows: 9, seed: 5 },
   levels: [
     {
@@ -131,7 +150,7 @@ const jardim: WorldDef = {
       outro: [{ who: 'pimpa', text: 'Hm. Nada mau para um principiante. Não te habitues.' }],
     },
     {
-      title: 'Sebes Rebeldes', cols: 6, rows: 9, mask: 'rect', seed: 22, dyn: 3, shift: 8, loops: 0.06, fog: 0,
+      title: 'Sebes Rebeldes', weather: 'rain', cols: 6, rows: 9, mask: 'rect', seed: 22, dyn: 3, shift: 8, loops: 0.06, fog: 0,
       intro: [
         { who: 'lagarta', text: 'Quem... és... tu?' },
         { who: 'uli', text: 'Ninguém que precises de conhecer.' },
@@ -159,7 +178,7 @@ const jardim: WorldDef = {
       ],
     },
     {
-      title: 'Coração de Roseira', cols: 10, rows: 12, mask: 'heart', seed: 55, dyn: 4, shift: 7, loops: 0.08, fog: 0, guards: 2,
+      title: 'Coração de Roseira', weather: 'rain', cols: 10, rows: 12, mask: 'heart', seed: 55, dyn: 4, shift: 7, loops: 0.08, fog: 0, guards: 2,
       intro: [
         { who: 'lagarta', text: 'Um labirinto em forma de coração. Alguém desenhou isto a sofrer.' },
         { who: 'uli', text: 'Gosto.' },
@@ -179,6 +198,128 @@ const jardim: WorldDef = {
         { who: 'sorriso', text: 'O próximo mundo roda, Uli. Aperta o cinto.' },
       ],
     },
+    lv('A Roseira Infinita', 12, 12, 'ring', 67, { weather: 'rain', dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [
+      { who: 'sorriso', text: 'Rodas, rodas, e a saída não aparece. Divertido, não?' },
+      { who: 'lagarta', text: 'A roseira não acaba. Quem entra, pergunta-se se saiu.' },
+    ]),
+    lv('O Trono da Rainha', 13, 17, 'cross', 68, { dyn: 9, shift: 5, loops: 0.09, fog: 4, guards: 4, bonus: true }, [
+      { who: 'rainha', text: 'APANHASTE TODAS AS ESTRELAS?! Ninguém me tira as estrelas!' },
+      { who: 'uli', text: 'Já tirei.' },
+      { who: 'rainha', text: 'Então chega ao meu trono, rebelde. Quatro Crescidos a guardá-lo. Corta-te a cabeça quem lá chegar... ou quase.' },
+    ], [{ who: 'rainha', text: 'Hmpf! Está bem. O jardim é teu. Mas a roseira fica comigo.' }]),
+  ],
+};
+
+
+// ───────────────────────── Mundo 2: Abismo Demoníaco ─────────────────────────
+const demoniaco: WorldDef = {
+  id: 'demoniaco', name: 'Abismo Demoníaco',
+  tagline: 'Brasas, correntes e um carcereiro que guarda chaves de portas que já ninguém abre.',
+  rule: 'Os Carcereiros caçam-te. As sebes de ferro mudam com as brasas.',
+  pal: mkPal(0x1a0508, 0x5a4a48, 0x4a2a2a, 0xff6a2a), ready: true, guardStyle: 3, weather: 'embers',
+  look: { wall: 'obsidian', floor: 'obsidian', decor: 'hell' },
+  preview: { mask: 'diamond', cols: 9, rows: 9, seed: 15 },
+  levels: [
+    lv('Portões de Cinza', 7, 9, 'rect', 201, {}, [
+      { who: 'carcereiro', text: 'Mais um. Entras por vontade? Tens graça. Sais por vontade? Não tem nenhuma.' },
+      { who: 'uli', text: 'Venho buscar a chama que me roubaram.' },
+      { who: 'carcereiro', text: 'Todas as chamas me pertencem. Mas deixo-te tentar.' },
+    ]),
+    lv('Rio de Brasas', 8, 10, 'rect', 202, { dyn: 3, shift: 8, loops: 0.05 }, [{ who: 'carcereiro', text: 'As grades sobem e descem com o calor. Quem não sabe esperar, queima.' }]),
+    lv('A Sala das Correntes', 9, 12, 'diamond', 203, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'carcereiro', text: 'Os meus ajudantes têm fome. Fome de passos teus.' }]),
+    lv('Fornalha', 10, 12, 'circle', 204, { dyn: 4, shift: 7, loops: 0.07, fog: 4.2, guards: 1 }, [{ who: 'carcereiro', text: 'Fumo. Escuridão. Só vês o que arde perto de ti.' }]),
+    lv('O Coração Negro', 10, 13, 'heart', 205, { dyn: 4, shift: 7, loops: 0.08, guards: 2 }, [{ who: 'carcereiro', text: 'Dizem que o inferno tem um coração. Eu comi-o.' }]),
+    lv('Escadaria Invertida', 11, 15, 'rect', 206, { dyn: 6, shift: 6, loops: 0.08, fog: 4.5, guards: 2 }),
+    lv('O Trono do Carcereiro', 12, 15, 'cross', 207, { dyn: 6, shift: 6, loops: 0.08, fog: 3.6, guards: 3 }, [
+      { who: 'carcereiro', text: 'Chegaste ao meu trono. Ninguém chega ao meu trono.' },
+      { who: 'uli', text: 'Estou aqui.' },
+    ]),
+    lv('O Último Círculo', 14, 17, 'circle', 208, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [
+      { who: 'carcereiro', text: 'Todas as estrelas. Quem és tu, pequeno?' },
+      { who: 'uli', text: 'Uma chama que não quer apagar.' },
+      { who: 'carcereiro', text: 'Então arde até ao fim.' },
+    ], [{ who: 'carcereiro', text: 'Leva a tua chama. Ou queres antes ficar? Há sempre lugar para mais um.' }]),
+  ],
+};
+
+// ───────────────────────── Mundo 3: Glaciar Espelhado ─────────────────────────
+const glaciar: WorldDef = {
+  id: 'glaciar', name: 'Glaciar Espelhado',
+  tagline: 'Gelo tão liso que vês o teu fim refletido, e uma rainha que sorri sem calor.',
+  rule: 'Sentinelas de gelo caçam-te. O gelo fecha e abre as passagens.',
+  pal: mkPal(0x06151f, 0xbfdcec, 0x6aa5c8, 0x9be7ff), ready: true, guardStyle: 4, weather: 'snow',
+  look: { wall: 'ice', floor: 'ice', decor: 'ice' },
+  preview: { mask: 'circle', cols: 9, rows: 9, seed: 21 },
+  levels: [
+    lv('Primeira Geada', 7, 9, 'rect', 301, {}, [
+      { who: 'geada', text: 'Que pequeno e quente. Vais derreter nos meus corredores.' },
+      { who: 'uli', text: 'Sou uma chama.' },
+      { who: 'geada', text: 'Então a minha casa será a tua extinção.' },
+    ]),
+    lv('Cristais', 8, 10, 'rect', 302, { dyn: 3, loops: 0.05 }, [{ who: 'geada', text: 'O gelo fecha as passagens quando respiro.' }]),
+    lv('Lago Espelhado', 9, 11, 'circle', 303, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'geada', text: 'As minhas sentinelas não sentem frio. Nem pena.' }]),
+    lv('Tempestade Branca', 9, 12, 'rect', 304, { dyn: 3, loops: 0.07, fog: 3.4, guards: 1 }),
+    lv('Caverna Azul', 10, 13, 'diamond', 305, { dyn: 4, shift: 7, loops: 0.08, guards: 1 }),
+    lv('Palácio de Gelo', 11, 14, 'rect', 306, { dyn: 5, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'geada', text: 'O meu palácio nunca derrete. É o único amor que me restou.' }]),
+    lv('O Trono Congelado', 12, 12, 'ring', 307, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'geada', text: 'Cada passo teu aquece o meu trono. Não gosto.' }]),
+    lv('Coração de Inverno', 13, 15, 'heart', 308, { dyn: 8, shift: 5, loops: 0.09, fog: 3.4, guards: 3, bonus: true }, [
+      { who: 'geada', text: 'Todas as estrelas... és mesmo teimoso.' },
+      { who: 'uli', text: 'Tenho de ser.' },
+    ], [{ who: 'geada', text: 'Vai. O inverno acaba quando alguém tem a coragem de o atravessar.' }]),
+  ],
+};
+
+// ───────────────────────── Mundo 4: Cidade-Relógio ─────────────────────────
+const relogio: WorldDef = {
+  id: 'relogio', name: 'Cidade-Relógio',
+  tagline: 'Engrenagens, latão e um tique-taque que decide as paredes.',
+  rule: 'As paredes seguem o tempo: mudam depressa. Autómatos vigiam as ruas.',
+  pal: mkPal(0x1f1710, 0x7a6a48, 0x8a6a2f, 0xffb347), ready: true, guardStyle: 5, weather: 'dust',
+  look: { wall: 'brass', floor: 'brass', decor: 'clock' },
+  preview: { mask: 'rect', cols: 8, rows: 8, seed: 24 },
+  levels: [
+    lv('Ponteiros', 7, 9, 'rect', 401, {}, [
+      { who: 'relojoeiro', text: 'Chegas tarde. Ou cedo. Aqui nunca se sabe.' },
+      { who: 'uli', text: 'Procuro a saída.' },
+      { who: 'relojoeiro', text: 'A saída é só mais uma hora. Dá-me os teus segundos.' },
+    ]),
+    lv('Engrenagens', 8, 10, 'rect', 402, { dyn: 4, shift: 6 }, [{ who: 'relojoeiro', text: 'As paredes giram de seis em seis passos. Conta comigo.' }]),
+    lv('Torre do Sino', 9, 13, 'diamond', 403, { dyn: 5, shift: 5, loops: 0.07, guards: 1 }, [{ who: 'relojoeiro', text: 'Os autómatos nunca se atrasam. Tu vais atrasar-te.' }]),
+    lv('Fumo e Vapor', 10, 12, 'circle', 404, { dyn: 3, loops: 0.07, fog: 3.4 }),
+    lv('Oficina Infinita', 10, 14, 'rect', 405, { dyn: 6, shift: 5, loops: 0.08, guards: 2 }),
+    lv('O Pêndulo', 11, 13, 'heart', 406, { dyn: 6, shift: 4, loops: 0.08, guards: 2 }, [{ who: 'relojoeiro', text: 'Tic. Tac. Tic. Tac. Já ouves?' }]),
+    lv('Meia-Noite', 12, 15, 'ring', 407, { dyn: 8, shift: 4, loops: 0.09, fog: 4, guards: 3 }, [{ who: 'relojoeiro', text: 'À meia-noite tudo reinicia. Menos eu.' }]),
+    lv('O Relógio Mestre', 14, 16, 'circle', 408, { dyn: 10, shift: 4, loops: 0.09, fog: 3.4, guards: 3, bonus: true }, [
+      { who: 'relojoeiro', text: 'Todas as estrelas. Tens tempo de sobra.' },
+      { who: 'uli', text: 'Nunca tenho.' },
+    ], [{ who: 'relojoeiro', text: 'Pára o relógio, rapaz. Pára-o ou fica comigo para sempre.' }]),
+  ],
+};
+
+// ───────────────────────── Mundo 5: Biblioteca Infinita ─────────────────────────
+const biblioteca: WorldDef = {
+  id: 'biblioteca', name: 'Biblioteca Infinita',
+  tagline: 'Estantes que se reorganizam quando ninguém olha, e livros que olham de volta.',
+  rule: 'As estantes trocam de lugar. Os Livros Vivos seguem-te.',
+  pal: mkPal(0x1c120c, 0x8a6a48, 0x5a3a22, 0xffc86b), ready: true, guardStyle: 6, weather: 'pages',
+  look: { wall: 'shelves', floor: 'wood', decor: 'library' },
+  preview: { mask: 'rect', cols: 8, rows: 8, seed: 26 },
+  levels: [
+    lv('Entrada', 7, 9, 'rect', 501, {}, [
+      { who: 'bibliotecario', text: 'Silêncio. Aqui lê-se, escreve-se... e perde-se.' },
+      { who: 'uli', text: 'Procuro uma saída.' },
+      { who: 'bibliotecario', text: 'Saídas são capítulos finais. Ninguém os lê até ao fim.' },
+    ]),
+    lv('Corredor dos Atlas', 8, 11, 'rect', 502, { dyn: 3 }, [{ who: 'bibliotecario', text: 'Os mapas mentem. Os caminhos também.' }]),
+    lv('Estantes Móveis', 9, 12, 'rect', 503, { dyn: 6, shift: 6, loops: 0.07 }, [{ who: 'bibliotecario', text: 'Quando fechas os olhos, as estantes dançam.' }]),
+    lv('Sala Sem Luz', 9, 12, 'rect', 504, { dyn: 3, loops: 0.07, fog: 3, guards: 1 }, [{ who: 'bibliotecario', text: 'Os Livros Vivos preferem o escuro. Lêem-te devagar.' }]),
+    lv('Cripta de Pergaminhos', 10, 13, 'diamond', 505, { dyn: 4, shift: 7, loops: 0.08, guards: 2 }),
+    lv('Labirinto de Capas', 11, 14, 'cross', 506, { dyn: 7, shift: 5, loops: 0.08, guards: 2 }),
+    lv('Índice Proibido', 12, 15, 'rect', 507, { dyn: 6, shift: 6, loops: 0.09, fog: 3.8, guards: 3 }, [{ who: 'bibliotecario', text: 'Este corredor não vem no índice. Foi apagado.' }]),
+    lv('O Livro Final', 14, 17, 'heart', 508, { dyn: 9, shift: 5, loops: 0.09, fog: 3.4, guards: 3, bonus: true }, [
+      { who: 'bibliotecario', text: 'O último capítulo, só para quem leu tudo. Todas as estrelas.' },
+      { who: 'uli', text: 'Quero acabar a história.' },
+    ], [{ who: 'bibliotecario', text: 'Escreve tu o final, então. Eu fico a ler-te.' }]),
   ],
 };
 
@@ -186,11 +327,12 @@ const jardim: WorldDef = {
 export const WORLDS: WorldDef[] = [
   b612,
   jardim,
+  demoniaco,
+  glaciar,
+  relogio,
+  biblioteca,
   soon('mandala', 'Mandala Solar', 'Anéis de luz que giram devagar, sem pressa e sem piedade.', 'Os anéis rodam: sincroniza as aberturas.', mkPal(0x2a1608, 0xffe2a8, 0xd9822b, 0xffd24a), 'circle', 3),
-  soon('relogio', 'Cidade-Relógio', 'Engrenagens, latão e um tique-taque que decide as paredes.', 'As paredes seguem o tempo.', mkPal(0x1f1710, 0xe8d3a8, 0xa8742f, 0xffb347), 'rect', 4),
   soon('tinta', 'Oceano de Tinta', 'Nadas às cegas: só a tinta revela o caminho.', 'As paredes só aparecem quando lá tocas.', mkPal(0x06162e, 0x9fd3ff, 0x1d4f9c, 0x44e0ff), 'diamond', 5),
-  soon('biblioteca', 'Biblioteca Infinita', 'Estantes que se reorganizam quando ninguém olha.', 'Os livros trocam de lugar.', mkPal(0x1c120c, 0xeed9b5, 0x7a4a26, 0xffc86b), 'rect', 6),
-  soon('glaciar', 'Glaciar Espelhado', 'Gelo liso onde se desliza até bater na parede.', 'Deslizas até ao obstáculo.', mkPal(0x08202b, 0xdcf6ff, 0x4aa7c9, 0x9be7ff), 'diamond', 7),
   soon('neon', 'Neon Glitch', 'Uma cidade que se reescreve a cada passo errado.', 'Certas casas reescrevem o labirinto.', mkPal(0x0b0714, 0x1b1530, 0x27d3ff, 0xff2bd6), 'cross', 8),
   soon('escher', 'Sonho Escher', 'Escadas impossíveis e gravidade que se dobra.', 'A gravidade muda de lado.', mkPal(0x1b1830, 0xe9e2ff, 0x7a6bd6, 0xffa6e0), 'circle', 9),
   soon('galactico', 'Intergaláctico', 'Estações perdidas entre nebulosas e buracos negros.', 'Portais ligam salas distantes.', mkPal(0x070a1f, 0x1a1f4a, 0x5a3fd6, 0x39f2d0), 'ring', 10),
@@ -198,7 +340,6 @@ export const WORLDS: WorldDef[] = [
   soon('abstrato', 'Abstrato', 'Linhas, cor e geometria pura: o labirinto é uma pintura.', 'As cores definem as regras.', mkPal(0x101010, 0xf4f0e6, 0x161616, 0xe63a2a), 'cross', 12),
   soon('estelar', 'Estelar', 'Constelações que se desenham enquanto andas.', 'Ligas estrelas para abrir o caminho.', mkPal(0x070d24, 0x16224f, 0xc8a34a, 0xffe08a), 'ring', 13),
   soon('elfico', 'Floresta Élfica', 'Luz dourada, raízes vivas e cantos de arco.', 'Raízes crescem e fecham passagens.', mkPal(0x0a1f16, 0xdff5c9, 0x2d9b6a, 0xffd98a), 'heart', 14),
-  soon('demoniaco', 'Abismo Demoníaco', 'Brasas, correntes e portas que riem de ti.', 'Lava avança de trás para a frente.', mkPal(0x1a0508, 0x3a1218, 0xd62a2a, 0xff8a2b), 'diamond', 15),
   soon('angelico', 'Céu Angélico', 'Nuvens, harpas e escadas de luz.', 'Nuvens sustentam-te só por instantes.', mkPal(0x1b2440, 0xfff7e0, 0xc9b6ff, 0xffd86b), 'circle', 16),
   soon('elementais', 'Reino dos Elementos', 'Fogo, água, terra e ar: quatro povos, quatro regras.', 'Mudas de elemento para atravessar.', mkPal(0x0d1c24, 0xe6f2e0, 0x2c8f8f, 0xff8a3b), 'cross', 17),
   soon('animal', 'Reino Animal', 'Savana, selva e quintal: cada bicho tem o seu caminho.', 'Cada animal tem uma habilidade.', mkPal(0x1c1408, 0xf3e0a8, 0x8a6a2b, 0x7be08f), 'rect', 18),
@@ -206,3 +347,10 @@ export const WORLDS: WorldDef[] = [
 ];
 
 export const getWorld = (id: string) => WORLDS.find((w) => w.id === id)!;
+
+/** Um nível está aberto se o anterior foi concluído; o bónus só abre com todas as estrelas dos restantes. */
+export function isUnlocked(wd: WorldDef, i: number, st: { level(w: string, i: number): { stars: number } | undefined; unlocked(w: string, i: number): boolean }): boolean {
+  if (!wd.levels[i]?.bonus) return st.unlocked(wd.id, i);
+  for (let k = 0; k < i; k++) if ((st.level(wd.id, k)?.stars ?? 0) < 3) return false;
+  return true;
+}

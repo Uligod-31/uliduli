@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-export type CharKind = 'uli' | 'pimpa' | 'lagarta' | 'sorriso' | 'rainha' | 'raposa' | 'rei' | 'acendedor';
+export type CharKind = 'uli' | 'pimpa' | 'lagarta' | 'sorriso' | 'rainha' | 'raposa' | 'rei' | 'acendedor' | 'carcereiro' | 'geada' | 'relojoeiro' | 'bibliotecario';
 
 export const CHAR_NAMES: Record<CharKind, string> = {
   uli: 'Uli',
@@ -11,6 +11,10 @@ export const CHAR_NAMES: Record<CharKind, string> = {
   raposa: 'A Raposa',
   rei: 'O Rei Sem Súbditos',
   acendedor: 'O Acendedor',
+  carcereiro: 'O Carcereiro',
+  geada: 'Dona Geada',
+  relojoeiro: 'O Relojoeiro',
+  bibliotecario: 'O Bibliotecário',
 };
 export const CHAR_COLORS: Record<CharKind, number> = {
   uli: 0x5b92ff,
@@ -21,6 +25,10 @@ export const CHAR_COLORS: Record<CharKind, number> = {
   raposa: 0xe8873a,
   rei: 0xd9ad3c,
   acendedor: 0xffc060,
+  carcereiro: 0xff6a2a,
+  geada: 0x9be7ff,
+  relojoeiro: 0xe8b04a,
+  bibliotecario: 0xffd98a,
 };
 
 type G = Phaser.GameObjects.Graphics;

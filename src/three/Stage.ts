@@ -11,7 +11,8 @@ import { Scenery, themeFor } from './scenery';
 import { makeRose, makePortal, Trail } from './actors';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
 import { makeTitleGiant, TitleGiant } from './titlegiant';
-import { Rain } from './rain';
+import { Weather, Mist } from './weather';
+import type { Weather as WeatherMode } from '../worlds';
 import { sfx } from '../core/audio';
 import { mix, brandAt } from '../core/theme';
 import { glowSprite, hdr, disposeTree } from './common';
@@ -71,7 +72,9 @@ export class Stage {
   quality = 0;
   private planet = false;
   private giant?: TitleGiant;
-  private rain = new Rain();
+  private weather = new Weather();
+  private mist = new Mist();
+  private guardsArmed = false;
   private th: ReturnType<typeof themeFor> = { top: 0, mid: 0, horizon: 0, ground: 0, ground2: 0, sun: 0 };
   private fogNear = 90;
   private fogFar = 900;
@@ -129,7 +132,7 @@ export class Stage {
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 0.03;
     this.scene.add(this.hemi, this.sun, this.sun.target, this.rim, this.lamp);
-    this.scene.add(this.uli, this.portal, this.trail.mesh, this.trail.dots, this.rain.mesh);
+    this.scene.add(this.uli, this.portal, this.trail.mesh, this.trail.dots, this.weather.group, this.mist.group);
   }
 
   // ───────────────────────── carregar um nível ─────────────────────────
@@ -139,10 +142,11 @@ export class Stage {
     const pal = wd.pal;
     const theme = themeFor(wd.id, pal);
     this.planet = !!wd.planet;
-    this.island = buildIsland(m, pal, seed, this.planet);
+    this.island = buildIsland(m, pal, seed, this.planet, wd.look);
     this.scenery = new Scenery(theme, this.island.radius, pal.accent, m.cols / 2, m.rows / 2);
     this.scene.add(this.island.group, this.scenery.group);
     this.fogBase.set(theme.horizon);
+    this.mist.setColor(new THREE.Color(theme.horizon).lerp(new THREE.Color(0xffffff), 0.3).multiplyScalar(0.8));
     this.fogNear = theme.fogNear ?? 90; this.fogFar = theme.fogFar ?? 900;
     this.scene.fog = new THREE.Fog(theme.horizon, this.fogNear, this.fogFar);
     this.th = theme;
@@ -231,10 +235,10 @@ export class Stage {
     this.trail.add(pa.x, pa.z, pb.x, pb.z, k);
   }
 
-  setGuards(cells: number[]) {
+  setGuards(cells: number[], style = 0) {
     for (const G of this.guards) this.scene.remove(G.g), disposeTree(G.g);
     this.guards = cells.map((c, gi) => {
-      const g = makeGuard(gi);
+      const g = makeGuard(gi, style);
       const x = (c % this.maze!.cols) + 0.5, y = ((c / this.maze!.cols) | 0) + 0.5;
       this.scene.add(g);
       return { g, x, y, tx: x, ty: y, dir: 0, walk: Math.random() * 6 };
@@ -275,6 +279,8 @@ export class Stage {
     });
   }
 
+  setWeather(mode: WeatherMode) { this.weather.set(mode); }
+  setGuardsArmed(a: boolean) { this.guardsArmed = a; }
   setDark(radiusCells: number) { this.darkTarget = radiusCells > 0 ? 1 : 0; if (radiusCells > 0) this.darkR = radiusCells; }
   shake(s = 0.35) { this.shakeT = s; }
   setView(v: ViewMode) { this.view = v; }
@@ -293,7 +299,8 @@ export class Stage {
     if (mode === 'title') this.placeCamera(0, true);
     this.sun.castShadow = mode !== 'title' && this.quality < 2;
     this.fx.uniforms.tilt.value = mode === 'title' || this.quality >= 2 ? 0 : 0.5;
-    this.rain.mesh.visible = mode !== 'title' && this.quality < 3;
+    this.weather.visible = mode !== 'title' && this.quality < 3;
+    this.mist.group.visible = mode !== 'title';
     if (!this.raf) { this.last = performance.now(); this.loop(); }
   }
   private dropGiant() {
@@ -333,7 +340,7 @@ export class Stage {
     const dpr = window.devicePixelRatio || 1;
     if (this.quality === 1) this.renderer.setPixelRatio(Math.min(dpr, 1.25));
     else if (this.quality === 2) { this.bloom.enabled = false; this.sun.castShadow = false; this.fx.uniforms.tilt.value = 0; }
-    else { this.renderer.setPixelRatio(1); this.rain.mesh.visible = false; }
+    else { this.renderer.setPixelRatio(1); this.weather.visible = false; }
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.sync(true);
   }
@@ -407,7 +414,8 @@ export class Stage {
     if (this.giant) this.giant.update(this.t, this.worldPlayer(new THREE.Vector3()).setY(0.4));
     this.placeCamera(dt);
     this.scenery.update(this.t, this.camera.position);
-    this.rain.update(this.t, this.camLook);
+    this.weather.update(this.t, this.camLook);
+    this.mist.update(this.t, this.camLook, 0.25 + 0.75 * this.dark);
 
     // jogador
     const wp = this.worldPlayer(this.tmp);
@@ -457,6 +465,7 @@ export class Stage {
       (U.legL as THREE.Object3D).rotation.x = sw; (U.legR as THREE.Object3D).rotation.x = -sw;
       (U.armL as THREE.Object3D).rotation.x = -sw * 0.8; (U.armR as THREE.Object3D).rotation.x = sw * 0.8;
       (U.head as THREE.Object3D).rotation.y = Math.sin(this.t * 1.2 + G.walk) * 0.4;
+      if (U.glow) (U.glow as THREE.Sprite).material.opacity = this.guardsArmed ? 0.55 + 0.2 * Math.sin(this.t * 14) : 0.3;
       const dist = Math.hypot(G.x - this.player.x, G.y - this.player.y);
       danger = Math.max(danger, Math.max(0, 1 - dist / 4.5));
     }
@@ -485,15 +494,16 @@ export class Stage {
     this.dark += (this.darkTarget - this.dark) * (1 - Math.exp(-dt * 3));
     const d = this.dark;
     const T = this.th;
-    this.sun.intensity = (T.sunI ?? 2.4) * (1 - d); this.rim.intensity = (T.rimI ?? 1.4) * (1 - d); this.hemi.intensity = (T.hemiI ?? 1.05) * (1 - d) + 0.03 * d;
-    this.scene.environmentIntensity = 0.9 * (1 - d) + 0.04 * d;
+    this.sun.intensity = (T.sunI ?? 2.4) * (1 - 0.82 * d); this.rim.intensity = (T.rimI ?? 1.4) * (1 - 0.7 * d); this.hemi.intensity = (T.hemiI ?? 1.05) * (1 - 0.62 * d) + 0.08 * d;
+    this.scene.environmentIntensity = 0.9 * (1 - 0.8 * d) + 0.1 * d;
     this.scenery.setDark(d);
-    this.lamp.intensity = (T.lampI ?? 0.5) + d * 13;
-    this.lamp.distance = (T.lampD ?? 3) + (this.darkR * 1.15) * d + 2 * (1 - d);
-    this.scenery.skyMat.uniforms.dark.value = 1 - 0.97 * d;
-    (this.scene.fog as THREE.Fog).near = this.fogNear * (1 - d) + 10 * d;
-    (this.scene.fog as THREE.Fog).far = this.fogFar * (1 - d) + 60 * d;
-    (this.scene.fog as THREE.Fog).color.copy(this.fogBase).multiplyScalar(1 - 0.96 * d);
+    this.lamp.intensity = (T.lampI ?? 0.5) + d * 6.5;
+    this.lamp.decay = 1.25;
+    this.lamp.distance = (T.lampD ?? 3) + (this.darkR * 2.0) * d + 2 * (1 - d);
+    this.scenery.skyMat.uniforms.dark.value = 1 - 0.78 * d;
+    (this.scene.fog as THREE.Fog).near = this.fogNear * (1 - d) + 3 * d;
+    (this.scene.fog as THREE.Fog).far = this.fogFar * (1 - d) + 48 * d;
+    (this.scene.fog as THREE.Fog).color.copy(this.fogBase).multiplyScalar(1 - 0.62 * d);
 
     // orbes de pista
     for (let i = this.orbs.length - 1; i >= 0; i--) {

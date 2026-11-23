@@ -6,7 +6,7 @@ import { mulberry32 } from '../core/rng';
 import { collectWalls } from '../art/render';
 import { hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
 import { buildPlanetBody } from './planet';
-import { stonePBR, flagPBR } from './pbr';
+import { wallPBR, floorPBR } from './pbr2';
 import { buildDecor } from './decor';
 
 export const WALL_H = 0.52;
@@ -89,7 +89,8 @@ function wallParts(len: number, rng: () => number) {
   return { solid: parts, strip: s };
 }
 
-export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Island {
+export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, look?: { wall: string; floor: string; decor: string }): Island {
+  const L = look ?? { wall: 'stone', floor: 'flag', decor: planet ? 'planet' : 'garden' };
   const group = new THREE.Group();
   const { cols, rows } = m;
   const rng = mulberry32(seed * 977 + 13);
@@ -100,13 +101,19 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Is
   let R = 0;
   for (const i of open) R = Math.max(R, Math.hypot(px(i), pz(i)));
 
-  const flag = flagPBR();
+  const flag = floorPBR(L.floor);
+  const fk = L.floor;
   // chão em xadrez (o plano de xadrez surreal de Dalí)
   const boxG = new THREE.BoxGeometry(0.985, FLOOR_T, 0.985);
   const nA = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 0);
   const nB = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 1);
   const mk = (list: number[], color: number) => {
-    const mesh = new THREE.InstancedMesh(boxG, new THREE.MeshStandardMaterial({ color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.32), map: flag.map, normalMap: flag.normal, normalScale: new THREE.Vector2(1.1, 1.1), roughness: planet ? 0.92 : 0.62, metalness: 0.03, envMapIntensity: 0.7 }), list.length);
+    const mesh = new THREE.InstancedMesh(boxG, new THREE.MeshStandardMaterial({
+      color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), fk === 'flag' ? 0.32 : 0.86), map: flag.map, normalMap: flag.normal, normalScale: new THREE.Vector2(1.1, 1.1),
+      roughness: fk === 'ice' ? 0.12 : fk === 'obsidian' ? 0.3 : fk === 'wood' ? 0.8 : fk === 'metal' ? 0.5 : planet ? 0.92 : 0.62,
+      metalness: fk === 'metal' ? 0.55 : 0.03, envMapIntensity: fk === 'ice' ? 1.8 : 0.7,
+      emissiveMap: flag.emissive, emissive: flag.emissive ? new THREE.Color(0xffffff) : new THREE.Color(0x000000), emissiveIntensity: flag.emissive ? 1.4 : 0,
+    }), list.length);
     const mat = new THREE.Matrix4();
     list.forEach((i, k) => mesh.setMatrixAt(k, mat.makeTranslation(px(i), -FLOOR_T / 2, pz(i))));
     mesh.receiveShadow = true;
@@ -149,8 +156,14 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Is
     for (const g of solid) { g.applyMatrix4(m4); solids.push(g); }
     strip.applyMatrix4(m4); strips.push(strip);
   });
-  const stone = stonePBR();
-  const hedgeMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(pal.wall).lerp(new THREE.Color(0xffffff), 0.82), map: stone.map, normalMap: stone.normal, normalScale: new THREE.Vector2(1.3, 1.3), roughness: 0.92, vertexColors: true, envMapIntensity: 0.6 });
+  const stone = wallPBR(L.wall);
+  const wk = L.wall;
+  const hedgeMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(pal.wall).lerp(new THREE.Color(0xffffff), wk === 'stone' ? 0.82 : 0.93), map: stone.map, normalMap: stone.normal, normalScale: new THREE.Vector2(1.3, 1.3),
+    roughness: wk === 'ice' ? 0.22 : wk === 'brass' ? 0.5 : wk === 'obsidian' ? 0.4 : wk === 'shelves' ? 0.85 : 0.92,
+    metalness: wk === 'brass' ? 0.6 : wk === 'ice' ? 0.1 : 0, vertexColors: true, envMapIntensity: wk === 'ice' ? 1.7 : 0.6,
+    emissiveMap: stone.emissive, emissive: stone.emissive ? new THREE.Color(0xffffff) : new THREE.Color(0x000000), emissiveIntensity: stone.emissive ? 1.6 : 0,
+  });
   const walls = new THREE.Mesh(mergeGeometries(solids, false)!, hedgeMat);
   walls.castShadow = true; walls.receiveShadow = true;
   group.add(walls);
@@ -187,7 +200,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Is
 
   // detalhe de cenário: musgo, poças, ossos, lápides, velas, archotes
   const reserved = new Set<number>([m.start, m.exit, ...m.rosas]);
-  const decor = buildDecor({ cols, rows, open, reserved, segs, rng: mulberry32(seed * 71 + 5), style: planet ? 'planet' : 'garden', accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
+  const decor = buildDecor({ cols, rows, open, reserved, segs, rng: mulberry32(seed * 71 + 5), style: L.decor as 'garden' | 'planet' | 'ice' | 'hell' | 'clock' | 'library', accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
   group.add(decor.group);
 
   return {
