@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+﻿import Phaser from 'phaser';
 import { W, H, UI, FONT, FONT_HEAD } from '../core/theme';
 import { neoButton } from '../core/ui';
 import { generate, pathTo, DIRS } from '../core/maze';
@@ -26,7 +26,7 @@ export class TitleScene extends Phaser.Scene {
 
     // logótipo com falhas: três camadas (ciano, magenta, branco-gelo) que se desalinham
     const mk = (col: string | null, a: number, blend = false) => {
-      const t = this.add.text(W / 2, 250, 'UliDUli', { fontFamily: FONT_HEAD, fontSize: '190px', fontStyle: 'bold', color: col ?? '#ffffff' }).setOrigin(0.5).setAlpha(a);
+      const t = this.add.text(W / 2, 196, 'UliDUli', { fontFamily: FONT_HEAD, fontSize: '190px', fontStyle: 'bold', color: col ?? '#ffffff' }).setOrigin(0.5).setAlpha(a);
       t.setStyle({ letterSpacing: 6 } as any);
       if (blend) t.setBlendMode(Phaser.BlendModes.ADD);
       return t;
@@ -35,7 +35,7 @@ export class TitleScene extends Phaser.Scene {
     const gr = main.context.createLinearGradient(0, 40, 0, main.height);
     gr.addColorStop(0, '#f4f7ff'); gr.addColorStop(0.55, '#b9c6ee'); gr.addColorStop(1, '#7a6ad8');
     main.setFill(gr);
-    const slice = this.add.rectangle(W / 2, 250, W, 10, 0xffffff, 0).setBlendMode(Phaser.BlendModes.ADD);
+    const slice = this.add.rectangle(W / 2, 196, W, 10, 0xffffff, 0).setBlendMode(Phaser.BlendModes.ADD);
     const glitch = () => {
       const n = 3 + ((Math.random() * 4) | 0);
       let k = 0;
@@ -45,8 +45,8 @@ export class TitleScene extends Phaser.Scene {
         cy.x = W / 2 - o * (Math.random() < 0.5 ? 1 : 0.4); mg.x = W / 2 + o;
         main.x = W / 2 + (j ? (Math.random() - 0.5) * 16 : 0);
         main.setAlpha(j && Math.random() < 0.3 ? 0.35 : 1);
-        cy.y = 250 + (j ? (Math.random() - 0.5) * 8 : 0);
-        slice.setAlpha(j ? 0.35 : 0).setY(190 + Math.random() * 120).setSize(W, 3 + Math.random() * 18);
+        cy.y = 196 + (j ? (Math.random() - 0.5) * 8 : 0);
+        slice.setAlpha(j ? 0.35 : 0).setY(140 + Math.random() * 120).setSize(W, 3 + Math.random() * 18);
         if (++k <= n + 1) this.time.delayedCall(45, step);
         else this.time.delayedCall(1400 + Math.random() * 2800, glitch);
       };
@@ -57,15 +57,15 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: [cy, mg, main], y: '+=8', duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
 
     // bandeira: ESCAPA. OU SOBREVIVE.
-    const sub = this.add.text(W / 2, 392, '', { fontFamily: FONT_HEAD, fontSize: '40px', color: '#eceef3', fontStyle: 'bold' }).setOrigin(0.5);
+    const sub = this.add.text(W / 2, 322, '', { fontFamily: FONT_HEAD, fontSize: '40px', color: '#eceef3', fontStyle: 'bold' }).setOrigin(0.5);
     sub.setStyle({ letterSpacing: 16 } as any);
     const full = 'ESCAPA. OU SOBREVIVE.';
     let ci = 0;
     this.time.addEvent({ delay: 55, repeat: full.length - 1, callback: () => { sub.setText(full.slice(0, ++ci) + (ci < full.length ? '_' : '')); } });
-    const sub2 = this.add.text(W / 2, 448, 'OS ADULTOS CRESCERAM. TU NÃO.', { fontFamily: FONT, fontSize: '22px', color: '#ff4fd8' }).setOrigin(0.5);
+    const sub2 = this.add.text(W / 2, 372, 'OS ADULTOS CRESCERAM. TU NÃO.', { fontFamily: FONT, fontSize: '22px', color: '#ff4fd8' }).setOrigin(0.5);
     sub2.setStyle({ letterSpacing: 8 } as any);
     this.tweens.add({ targets: sub2, alpha: 0.25, duration: 90, yoyo: true, repeat: -1, repeatDelay: 1700 + Math.random() * 1200 });
-    this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 486, 380, 4);
+    this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 408, 380, 4);
 
     neoButton(this, W / 2, 930, 600, 128, 'Jogar', '01', () => this.scene.start('Worlds'), true, 50);
     neoButton(this, W / 2, 1060, 600, 96, 'Galeria', '02', () => this.scene.start('Gallery'), false, 34);
@@ -137,3 +137,4 @@ export class TitleScene extends Phaser.Scene {
     this.ev = this.time.delayedCall(900, walk);
   }
 }
+
