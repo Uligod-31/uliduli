@@ -69,12 +69,12 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: sub2, alpha: 0.25, duration: 90, yoyo: true, repeat: -1, repeatDelay: 1700 + Math.random() * 1200 });
     this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 380, 380, 4);
 
-    neoButton(this, W / 2, 930, 600, 128, 'Jogar', '01', () => this.scene.start('Worlds'), true, 50);
-    neoButton(this, W / 2, 1060, 600, 96, 'Galeria', '02', () => this.scene.start('Gallery'), false, 34);
-    const snd = neoButton(this, W / 2, 1168, 600, 96, save.mute ? 'Som: off' : 'Som: on', '03', () => {
+    neoButton(this, W / 2, 1060, 620, 124, 'Jogar', '01', () => this.scene.start('Worlds'), true, 52);
+    neoButton(this, W / 2 - 160, 1178, 300, 88, 'Galeria', '02', () => this.scene.start('Gallery'), false, 30);
+    const snd = neoButton(this, W / 2 + 160, 1178, 300, 88, save.mute ? 'Som: off' : 'Som: on', '03', () => {
       sfx.setMute(!save.mute);
       snd.txt.setText(save.mute ? 'Som: off' : 'Som: on');
-    }, false, 34);
+    }, false, 30);
 
     // película: linhas de varrimento, faixa que desce e cantos de mira
     const lt = this.textures.createCanvas('scan', 4, 4)!;
@@ -139,9 +139,9 @@ export class TitleScene extends Phaser.Scene {
     const dot = this.add.circle(64, 50, 8, 0xff2030);
     this.tweens.add({ targets: dot, alpha: 0.1, duration: 600, yoyo: true, repeat: -1 });
     this.add.text(84, 38, 'REC  ·  SETOR B-612', { fontFamily: FONT, fontSize: '20px', color: '#eceef3' }).setAlpha(0.85);
-    this.add.text(W - 58, 38, 'v0.4', { fontFamily: FONT, fontSize: '20px', color: '#9aa0ae' }).setOrigin(1, 0);
-    const coord = this.add.text(58, H - 62, '', { fontFamily: FONT, fontSize: '18px', color: '#9aa0ae' });
-    this.time.addEvent({ delay: 140, loop: true, callback: () => { coord.setText(`X ${(Math.random() * 90 + 10).toFixed(2)}  Y ${(Math.random() * 90 + 10).toFixed(2)}  ·  SINAL ${(60 + Math.random() * 35) | 0}%`); } });
+    this.add.text(W - 58, 38, 'v0.9', { fontFamily: FONT, fontSize: '20px', color: '#9aa0ae' }).setOrigin(1, 0);
+    const coord = this.add.text(W - 58, 62, '', { fontFamily: FONT, fontSize: '16px', color: '#9aa0ae' }).setOrigin(1, 0);
+    this.time.addEvent({ delay: 140, loop: true, callback: () => { coord.setText(`SINAL ${(60 + Math.random() * 35) | 0}%`); } });
     const v = this.add.text(W - 40, 640, 'NÃO OLHES PARA CIMA', { fontFamily: FONT_HEAD, fontSize: '22px', color: '#ffffff' }).setOrigin(0.5).setAngle(90).setAlpha(0.35);
     v.setStyle({ letterSpacing: 10 } as any);
   }

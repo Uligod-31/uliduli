@@ -338,8 +338,8 @@ export class Stage {
     if (this.mode === 'title') {
       this.titleAng += dt * 0.11;
       const d = R * (asp < 1 ? 4.1 : 2.8);
-      want.set(Math.sin(this.titleAng * 0.8) * d * 0.2, R * 1.05, d);
-      look.set(0, R * 0.7, 0);
+      want.set(Math.sin(this.titleAng * 0.8) * d * 0.2, R * 1.0, d);
+      look.set(0, R * 0.98, 0);
     } else if (this.view === 'overview') {
       const d = R * (asp < 1 ? 2.3 : 1.75);
       want.set(0, d * 0.82, d * 0.72);
