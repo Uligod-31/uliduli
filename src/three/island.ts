@@ -5,6 +5,7 @@ import { Pal } from '../core/theme';
 import { mulberry32 } from '../core/rng';
 import { collectWalls } from '../art/render';
 import { hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
+import { buildPlanetBody } from './planet';
 
 export const WALL_H = 0.52;
 export const WALL_T = 0.27;
@@ -18,7 +19,7 @@ export interface Island {
   radius: number;
   cellPos(i: number, out?: THREE.Vector3): THREE.Vector3;
   gridPos(gx: number, gy: number, out?: THREE.Vector3): THREE.Vector3;
-  update(dt: number): void;
+  update(dt: number, t?: number): void;
   pulse(p: number): void;
   dispose(): void;
 }
@@ -79,7 +80,7 @@ function wallParts(len: number, rng: () => number) {
   return { solid: parts, strip: s };
 }
 
-export function buildIsland(m: Maze, pal: Pal, seed: number): Island {
+export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Island {
   const group = new THREE.Group();
   const { cols, rows } = m;
   const rng = mulberry32(seed * 977 + 13);
@@ -103,20 +104,27 @@ export function buildIsland(m: Maze, pal: Pal, seed: number): Island {
   };
   group.add(mk(nA, pal.floorA), mk(nB, pal.floorB));
 
-  // ventre rochoso (estalactites) — a ilha flutua
-  const cone = new THREE.ConeGeometry(0.72, 1, 4, 1, false).rotateY(Math.PI / 4).rotateX(Math.PI);
-  const rocks = new THREE.InstancedMesh(cone, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), open.length);
-  const mat = new THREE.Matrix4();
-  const cA = new THREE.Color(0x3a2a30), cB = new THREE.Color(0x6a4a3c), cc = new THREE.Color();
-  open.forEach((i, k) => {
-    const dn = Math.hypot(px(i), pz(i)) / Math.max(R, 1);
-    const depth = (1.5 + 6.5 * Math.pow(1 - dn, 1.4)) * (0.75 + 0.5 * rng());
-    mat.compose(new THREE.Vector3(px(i), -FLOOR_T - depth / 2, pz(i)), new THREE.Quaternion(), new THREE.Vector3(1, depth, 1));
-    rocks.setMatrixAt(k, mat);
-    rocks.setColorAt(k, cc.copy(cA).lerp(cB, rng()));
-  });
-  rocks.castShadow = false;
-  group.add(rocks);
+  let planetAnim: ((t: number) => void) | undefined;
+  if (planet) {
+    const pb = buildPlanetBody(open.map((i) => new THREE.Vector2(px(i), pz(i))), R, rng);
+    group.add(pb.group); planetAnim = pb.anim;
+  } else {
+    // ventre rochoso (estalactites) — a ilha flutua
+    const cone = new THREE.ConeGeometry(0.72, 1, 4, 1, false).rotateY(Math.PI / 4).rotateX(Math.PI);
+    const rocks = new THREE.InstancedMesh(cone, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), open.length);
+    const mat = new THREE.Matrix4();
+    const cA = new THREE.Color(0x3a2a30), cB = new THREE.Color(0x6a4a3c), cc = new THREE.Color();
+    open.forEach((i, k) => {
+      const dn = Math.hypot(px(i), pz(i)) / Math.max(R, 1);
+      const depth = (1.5 + 6.5 * Math.pow(1 - dn, 1.4)) * (0.75 + 0.5 * rng());
+      mat.compose(new THREE.Vector3(px(i), -FLOOR_T - depth / 2, pz(i)), new THREE.Quaternion(), new THREE.Vector3(1, depth, 1));
+      rocks.setMatrixAt(k, mat);
+      rocks.setColorAt(k, cc.copy(cA).lerp(cB, rng()));
+    });
+    rocks.castShadow = false;
+    group.add(rocks);
+
+  }
 
   // paredes fixas
   const segs = collectWalls(m);
@@ -135,7 +143,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number): Island {
   const walls = new THREE.Mesh(mergeGeometries(solids, false)!, hedgeMat);
   walls.castShadow = true; walls.receiveShadow = true;
   group.add(walls);
-  const stripMat = new THREE.MeshBasicMaterial({ color: hdr(pal.accent, 1.5), toneMapped: false });
+  const stripMat = new THREE.MeshBasicMaterial({ color: hdr(pal.accent, planet ? 0.9 : 1.5), toneMapped: false });
   group.add(new THREE.Mesh(mergeGeometries(strips, false)!, stripMat));
   const stripBase = stripMat.color.clone();
   solids.forEach((g) => g.dispose()); strips.forEach((g) => g.dispose());
@@ -171,7 +179,8 @@ export function buildIsland(m: Maze, pal: Pal, seed: number): Island {
     pulse(p: number) { stripMat.color.copy(stripBase).multiplyScalar(1 + 1.1 * p); },
     cellPos: (i, out = new THREE.Vector3()) => out.set(px(i), 0, pz(i)),
     gridPos: (gx, gy, out = new THREE.Vector3()) => out.set(gx - cols / 2, 0, gy - rows / 2),
-    update(dt: number) {
+    update(dt: number, t = 0) {
+      planetAnim?.(t);
       for (const d of dyn) {
         d.vel += (d.target - d.cur) * 190 * dt;
         d.vel *= Math.exp(-9 * dt);

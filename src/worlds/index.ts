@@ -28,12 +28,85 @@ export interface WorldDef {
   ready: boolean;
   preview: { mask: MaskKind; cols: number; rows: number; seed: number };
   levels: LevelDef[];
+  planet?: boolean; // visual de asteroide (Pequenos Pesadelos)
 }
 
 const soon = (id: string, name: string, tagline: string, rule: string, pal: Pal, mask: MaskKind, seed: number): WorldDef => ({
   id, name, tagline, rule, pal, ready: false, levels: [],
   preview: { mask, cols: mask === 'rect' ? 7 : 9, rows: mask === 'rect' ? 7 : 9, seed },
 });
+
+// ───────────────────────── Mundo 0: Asteroide B-612 ─────────────────────────
+// Pequenos planetas à deriva, no espírito do pequeno príncipe, vistos por um pesadelo:
+// adultos altos demais, uma rosa sob vidro e uma raposa que sabe mais do que diz.
+const b612: WorldDef = {
+  id: 'b612',
+  name: 'Asteroide B-612',
+  tagline: 'Planetas do tamanho de uma casa, uma rosa sob vidro e adultos demasiado altos.',
+  rule: 'Os Crescidos caçam-te. Foge-lhes de lado.',
+  pal: mkPal(0x0a1012, 0x6e6452, 0x34452f, 0xf0b44a),
+  ready: true,
+  planet: true,
+  preview: { mask: 'circle', cols: 9, rows: 9, seed: 12 },
+  levels: [
+    {
+      title: 'O Meu Planeta', cols: 7, rows: 7, mask: 'circle', seed: 101, dyn: 0, shift: 8, loops: 0.02, fog: 0,
+      intro: [
+        { who: 'raposa', text: 'Pequeno. Estás longe de casa. Toda a gente está.' },
+        { who: 'uli', text: '...' },
+        { who: 'raposa', text: 'Cativa o caminho e ele cativa-te. Dá um passo, depois outro. Aqui um toque é um passo, segurar é correr.' },
+        { who: 'raposa', text: 'As rosas sob vidro são tuas. Apanha-as, ninguém mais as quer.' },
+      ],
+      outro: [{ who: 'raposa', text: 'O essencial é invisível aos olhos. O resto são paredes.' }],
+    },
+    {
+      title: 'O Planeta do Rei', cols: 8, rows: 9, mask: 'circle', seed: 102, dyn: 3, shift: 8, loops: 0.05, fog: 0,
+      intro: [
+        { who: 'rei', text: 'Súbdito! Ordeno-te que passes por onde eu mandar!' },
+        { who: 'uli', text: 'Não tens súbditos.' },
+        { who: 'rei', text: 'Tenho-te a ti. Por isso as paredes mudam só quando eu quiser, de oito em oito passos. É uma ordem.' },
+      ],
+    },
+    {
+      title: 'O Planeta do Vaidoso', cols: 9, rows: 12, mask: 'diamond', seed: 103, dyn: 4, shift: 8, loops: 0.08, fog: 0, guards: 1,
+      intro: [
+        { who: 'raposa', text: 'Cuidado. Os Crescidos. Altos, curvados, e cheios de si.' },
+        { who: 'raposa', text: 'Mexem-se de dois em dois passos teus e cheiram-te a seis casas. Se te apanham, voltas ao início.' },
+        { who: 'uli', text: 'Então corro.' },
+        { who: 'raposa', text: 'Corre de lado. Eles só olham em frente.' },
+      ],
+    },
+    {
+      title: 'O Homem dos Números', cols: 9, rows: 11, mask: 'circle', seed: 104, dyn: 3, shift: 8, loops: 0.05, fog: 3.2, guards: 1,
+      intro: [
+        { who: 'acendedor', text: 'Não acendas nada. Ele conta tudo. As estrelas, os passos, os teus dias.' },
+        { who: 'acendedor', text: 'Fica escuro. Só vês o que está perto de ti. Eu só tenho duas centelhas para te dar.' },
+        { who: 'uli', text: 'O Vagalume.' },
+        { who: 'acendedor', text: 'Gasta-as bem.' },
+      ],
+    },
+    {
+      title: 'O Acendedor', cols: 10, rows: 12, mask: 'heart', seed: 105, dyn: 4, shift: 7, loops: 0.08, fog: 0, guards: 2,
+      intro: [
+        { who: 'acendedor', text: 'Acendo o candeeiro de manhã. Apago à noite. O meu planeta gira depressa. Nunca descanso.' },
+        { who: 'rei', text: 'Ordeno que ele descanse!' },
+        { who: 'acendedor', text: 'A ordem é a ordem. Foge, pequeno. Há dois Crescidos neste planeta.' },
+      ],
+    },
+    {
+      title: 'O Deserto da Raposa', cols: 11, rows: 14, mask: 'circle', seed: 106, dyn: 6, shift: 6, loops: 0.07, fog: 4.2, guards: 3,
+      intro: [
+        { who: 'raposa', text: 'Chegaste. Eu devia ter dito antes: o deserto é grande e as estrelas vigiam.' },
+        { who: 'raposa', text: 'Três Crescidos, névoa e sebes que mudam de ideias. Cativa-me ao chegar à saída.' },
+        { who: 'uli', text: 'Combinado.' },
+      ],
+      outro: [
+        { who: 'raposa', text: 'Foste cativado. Agora o trigo faz-me lembrar o teu cabelo.' },
+        { who: 'acendedor', text: 'Há mais mundos. E nenhum acende sozinho.' },
+      ],
+    },
+  ],
+};
 
 // ───────────────────────── Mundo 1: Jardim Sebe ─────────────────────────
 // Inspirado no imaginário dos jardins fantásticos de contos clássicos (relógios, chás, rainhas),
@@ -111,6 +184,7 @@ const jardim: WorldDef = {
 
 // ───────────────────── Próximos mundos (em desenvolvimento) ─────────────────────
 export const WORLDS: WorldDef[] = [
+  b612,
   jardim,
   soon('mandala', 'Mandala Solar', 'Anéis de luz que giram devagar, sem pressa e sem piedade.', 'Os anéis rodam: sincroniza as aberturas.', mkPal(0x2a1608, 0xffe2a8, 0xd9822b, 0xffd24a), 'circle', 3),
   soon('relogio', 'Cidade-Relógio', 'Engrenagens, latão e um tique-taque que decide as paredes.', 'As paredes seguem o tempo.', mkPal(0x1f1710, 0xe8d3a8, 0xa8742f, 0xffb347), 'rect', 4),

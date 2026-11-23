@@ -6,7 +6,7 @@ import { artFor, levelMaze } from '../art/thumb';
 import { save } from '../core/save';
 
 export class LevelsScene extends Phaser.Scene {
-  private worldId = 'jardim';
+  private worldId = 'b612';
   constructor() { super('Levels'); }
   init(d: { world: string }) { this.worldId = d.world; }
 

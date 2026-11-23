@@ -62,7 +62,7 @@ class Snap {
     gg.fillStyle = gr; gg.fillRect(0, 0, 4, 256);
     const bg = new THREE.CanvasTexture(bgc); bg.colorSpace = THREE.SRGBColorSpace;
     scene.background = bg;
-    const isl = buildIsland(m, wd.pal, seed);
+    const isl = buildIsland(m, wd.pal, seed, !!wd.planet);
     scene.add(isl.group);
     scene.add(new THREE.HemisphereLight(theme.mid, theme.ground, 1.2));
     const sun = new THREE.DirectionalLight(0xffe2b0, 2.6);
@@ -86,12 +86,13 @@ class Snap {
   /** Retrato 3D de uma personagem, com iluminação dramática. */
   portrait(kind: CharKind, w: number, h: number): HTMLCanvasElement {
     const accent = CHAR_COLORS[kind];
+    const ln = kind === 'raposa' || kind === 'rei' || kind === 'acendedor'; // Pequenos Pesadelos: fundo sujo e luz fria
     const scene = new THREE.Scene();
     const bgc = document.createElement('canvas'); bgc.width = 256; bgc.height = 320;
     const g = bgc.getContext('2d')!;
     const rg = g.createRadialGradient(128, 150, 10, 128, 160, 260);
-    rg.addColorStop(0, '#' + new THREE.Color(accent).multiplyScalar(0.42).getHexString());
-    rg.addColorStop(1, '#0c0d12');
+    rg.addColorStop(0, '#' + new THREE.Color(accent).multiplyScalar(ln ? 0.16 : 0.42).getHexString());
+    rg.addColorStop(1, ln ? '#05080a' : '#0c0d12');
     g.fillStyle = rg; g.fillRect(0, 0, 256, 320);
     // chão de xadrez dalinesco ao fundo
     g.globalAlpha = 0.18;
@@ -111,12 +112,12 @@ class Snap {
     floor.rotation.x = -Math.PI / 2; floor.position.y = -0.02; floor.receiveShadow = true;
     scene.add(floor);
 
-    scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x201830, 1.1));
-    const key = new THREE.DirectionalLight(0xfff0dc, 3.2); key.position.set(-4, 7, 6); key.castShadow = true; key.shadow.mapSize.set(1024, 1024);
+    scene.add(new THREE.HemisphereLight(ln ? 0x9db8b0 : 0xcfd8ff, ln ? 0x0a0f10 : 0x201830, ln ? 0.55 : 1.1));
+    const key = new THREE.DirectionalLight(ln ? 0xd8e8dc : 0xfff0dc, ln ? 2.2 : 3.2); key.position.set(-4, 7, 6); key.castShadow = true; key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.left = -5; key.shadow.camera.right = 5; key.shadow.camera.top = 6; key.shadow.camera.bottom = -2; key.shadow.camera.far = 30;
     scene.add(key);
-    const rim = new THREE.DirectionalLight(accent, 3.4); rim.position.set(5, 4, -5); scene.add(rim);
-    const rim2 = new THREE.DirectionalLight(0xff4fd8, 1.4); rim2.position.set(-6, 2, -4); scene.add(rim2);
+    const rim = new THREE.DirectionalLight(accent, ln ? 1.6 : 3.4); rim.position.set(5, 4, -5); scene.add(rim);
+    const rim2 = new THREE.DirectionalLight(ln ? 0x5a7a74 : 0xff4fd8, ln ? 0.8 : 1.4); rim2.position.set(-6, 2, -4); scene.add(rim2);
 
     const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
     cam.position.set(center.x + 0.8, center.y + 0.4, center.z + dist);

@@ -6,7 +6,7 @@ import { glowSprite, hdr } from './common';
  * Uli, rebelde: jaqueta de cabedal preta com neon, crista em gradiente, visor escuro, brinco e botas pesadas.
  * Toque característico: o CACHECOL NEON que flutua atrás dele. Pés em y = 0.
  */
-export function makeUli(): THREE.Group {
+export function makeUliRebel(): THREE.Group {
   const root = new THREE.Group();
   const fig = new THREE.Group();
   root.add(fig);
@@ -210,7 +210,7 @@ function makeUliOld(): THREE.Group {
 }
 
 /** Espada: guarda da Rainha — armadura negra, ombros com pontas, visor vermelho e alabarda. */
-export function makeGuard(): THREE.Group {
+export function makeGuardSpade(): THREE.Group {
   const root = new THREE.Group();
   const fig = new THREE.Group();
   root.add(fig);
@@ -271,7 +271,9 @@ export function makeRose(accent: number): THREE.Group {
   const core = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: hdr(0xffd0ec, 2), toneMapped: false }));
   core.position.y = 0.17;
   const halo = glowSprite(accent, 0.9, 0.8); halo.position.y = 0.12;
-  g.add(core, halo);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), new THREE.MeshPhysicalMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.16, roughness: 0.05, clearcoat: 1, depthWrite: false }));
+  dome.position.y = 0.02;
+  g.add(core, halo, dome);
   g.position.y = 0.45;
   const root = new THREE.Group();
   root.add(g);

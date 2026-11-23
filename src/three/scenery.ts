@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { Pal, mix } from '../core/theme';
-import { glowTexture, makeCheckerTexture, makeClockTexture, disposeTree } from './common';
+import { glowSprite, glowTexture, makeCheckerTexture, makeClockTexture, disposeTree } from './common';
 import { mulberry32 } from '../core/rng';
 
-export interface SceneTheme { top: number; mid: number; horizon: number; ground: number; ground2: number; sun: number }
+export interface SceneTheme { top: number; mid: number; horizon: number; ground: number; ground2: number; sun: number; planet?: boolean; fogNear?: number; fogFar?: number }
 
 /** Tema do céu/solo de cada mundo (Jardim: crepúsculo dalinesco ouro e verde-azulado). */
 export function themeFor(id: string, pal: Pal): SceneTheme {
+  // Asteroide B-612: noite fria, névoa verde-ardósia, lua pálida (pesadelo em miniatura)
+  if (id === 'b612') return { top: 0x04070a, mid: 0x101c20, horizon: 0x2c3f3e, ground: 0x0a0e10, ground2: 0x060809, sun: 0xcfe6d8, planet: true, fogNear: 14, fogFar: 80 };
   // Jardim em brasa: crepúsculo infernal, chão de cinza queimada
   if (id === 'jardim') return { top: 0x07030d, mid: 0x4a0f35, horizon: 0xff4a1f, ground: 0x3a2a2c, ground2: 0x1f1517, sun: 0xff7a3a };
   return {
@@ -45,16 +47,18 @@ export class Scenery {
   group = new THREE.Group();
   sky: THREE.Mesh;
   skyMat: THREE.ShaderMaterial;
-  ground: THREE.Mesh;
+  ground!: THREE.Mesh;
   clocks: { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; rot: number; base: THREE.Vector3; phase: number }[] = [];
   elephants: { g: THREE.Group; legs: THREE.Object3D[]; ang: number; speed: number; r: number; shadow: THREE.Mesh }[] = [];
   clouds: THREE.Sprite[] = [];
-  motes: THREE.Points;
-  islandShadow: THREE.Mesh;
+  motes!: THREE.Points;
+  islandShadow!: THREE.Mesh;
   cubes: THREE.Mesh[] = [];
   readonly groundY = -34;
   sunDir = new THREE.Vector3(0.35, 0.16, -1).normalize();
   private tex: THREE.Texture[] = [];
+  stars?: THREE.Points;
+  rocks: { g: THREE.Group; base: THREE.Vector3; ph: number }[] = [];
 
   constructor(theme: SceneTheme, islandR: number, accent: number, hx: number, hz: number) {
     const rng = mulberry32(7);
@@ -68,6 +72,11 @@ export class Scenery {
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), this.skyMat);
     this.sky.renderOrder = -10; this.sky.frustumCulled = false;
     this.group.add(this.sky);
+
+    if (theme.planet) {
+      this.buildPlanet(theme, islandR, accent, rng);
+      return;
+    }
 
     // plano de xadrez a fugir para o horizonte
     const chk = makeCheckerTexture('#' + c(theme.ground).getHexString(), '#' + c(theme.ground2).getHexString(), 8);
@@ -156,6 +165,63 @@ export class Scenery {
     this.group.add(this.motes);
   }
 
+  /** Céu do asteroide: estrelas, lua, névoa baixa, pequenos asteroides com adultos ridículos e pirilampos. */
+  private buildPlanet(theme: SceneTheme, islandR: number, accent: number, rng: () => number) {
+    const c = (x: number) => new THREE.Color(x);
+    // sem chão: o planeta flutua no vazio
+    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial()); this.ground.visible = false;
+    this.islandShadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial()); this.islandShadow.visible = false;
+    this.group.add(this.ground, this.islandShadow);
+
+    // estrelas
+    const N = 1100, sp = new Float32Array(N * 3), sc = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const a = rng() * Math.PI * 2, b = Math.acos(1 - rng() * 1.7), r = 1100;
+      sp[i * 3] = Math.sin(b) * Math.cos(a) * r; sp[i * 3 + 1] = Math.cos(b) * r; sp[i * 3 + 2] = Math.sin(b) * Math.sin(a) * r;
+      const k = 0.35 + rng() * 0.65, warm = rng() < 0.2;
+      sc[i * 3] = k * (warm ? 1 : 0.8); sc[i * 3 + 1] = k * (warm ? 0.85 : 0.95); sc[i * 3 + 2] = k * (warm ? 0.6 : 1);
+    }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.BufferAttribute(sc, 3));
+    const stars = new THREE.Points(sg, new THREE.PointsMaterial({ size: 3.2, vertexColors: true, sizeAttenuation: false, fog: false, depthWrite: false, transparent: true, opacity: 0.9, toneMapped: false }));
+    stars.frustumCulled = false; this.group.add(stars); this.stars = stars;
+
+    // névoa baixa: camadas de bruma à volta do planeta
+    const cm = (col: number, o: number) => new THREE.SpriteMaterial({ map: glowTexture(), color: col, transparent: true, opacity: o, depthWrite: false, fog: false });
+    for (let i = 0; i < 18; i++) {
+      const s = new THREE.Sprite(cm(i % 2 ? 0x3c5654 : 0x253538, 0.22));
+      const a = rng() * Math.PI * 2, d = islandR * 1.2 + 6 + rng() * 60;
+      s.position.set(Math.cos(a) * d, -islandR * 0.8 - 4 - rng() * 28, Math.sin(a) * d);
+      s.scale.set(70 + rng() * 120, 18 + rng() * 22, 1);
+      this.group.add(s); this.clouds.push(s);
+    }
+
+    // asteroides vizinhos, cada um com o seu adulto-peça
+    const rock = new THREE.MeshStandardMaterial({ color: 0x2e2a26, roughness: 1, flatShading: true });
+    const gold = new THREE.MeshStandardMaterial({ color: 0xc9a13a, emissive: 0x5a3c08, emissiveIntensity: 0.9, roughness: 0.4, metalness: 0.6 });
+    const defs: [number, number, number, number, number][] = [[-26, 8, -34, 5.5, 0], [34, 14, -48, 7.5, 1], [-44, -8, -64, 6.5, 2], [12, 22, -86, 9, 3], [52, 2, -32, 4, 4]];
+    for (const [x, y, z, r, k] of defs) {
+      const g = new THREE.Group(); g.position.set(x, y, z);
+      const geo = new THREE.IcosahedronGeometry(r, 1); const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const kk = 1 + (rng() - 0.5) * 0.28; p.setXYZ(i, p.getX(i) * kk, p.getY(i) * kk * 0.9, p.getZ(i) * kk); }
+      geo.computeVertexNormals();
+      g.add(new THREE.Mesh(geo, rock));
+      if (k === 0) { const cr = new THREE.Mesh(new THREE.ConeGeometry(r * 0.35, r * 0.4, 6), gold); cr.position.y = r * 1.05; g.add(cr); }
+      if (k === 1) { const lamp = glowSprite(0xffc060, r * 1.8, 0.6); lamp.position.y = r * 1.5; const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, r * 1.0, 6), rock); pole.position.y = r * 1.0; g.add(pole, lamp); }
+      if (k === 2) { const top = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.2, r * 0.26, r * 0.8, 8), new THREE.MeshStandardMaterial({ color: 0x0c0b0a, roughness: 0.7 })); top.position.y = r * 1.3; g.add(top); }
+      if (k === 3) { const bb = new THREE.Mesh(new THREE.SphereGeometry(r * 0.5, 9, 7), new THREE.MeshStandardMaterial({ color: 0x24301f, roughness: 1, flatShading: true })); bb.scale.set(1.3, 0.5, 1.3); bb.position.y = r * 1.1; const tr = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.1, r * 0.2, r * 0.9, 7), rock); tr.position.y = r * 0.8; g.add(tr, bb); }
+      this.group.add(g); this.rocks.push({ g, base: g.position.clone(), ph: rng() * 6 });
+    }
+
+    // pirilampos dourados
+    const M = 200, pos = new Float32Array(M * 3);
+    for (let i = 0; i < M; i++) { pos[i * 3] = (rng() - 0.5) * (islandR * 2 + 20); pos[i * 3 + 1] = -3 + rng() * 14; pos[i * 3 + 2] = (rng() - 0.5) * (islandR * 2 + 20); }
+    const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pm = new THREE.PointsMaterial({ map: glowTexture(), color: c(0xffd070).multiplyScalar(1.5), size: 0.3, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+    this.motes = new THREE.Points(pg, pm);
+    this.group.add(this.motes);
+    void theme; void accent;
+  }
+
   private makeElephant(theme: SceneTheme) {
     const g = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color: mix(theme.ground2, 0x1a0f16, 0.7), roughness: 0.7 });
@@ -188,6 +254,8 @@ export class Scenery {
   update(t: number, cam: THREE.Vector3) {
     this.sky.position.copy(cam);
     this.islandShadow.position.x = 0; this.islandShadow.position.z = 0;
+    if (this.stars) { this.stars.position.copy(cam); this.stars.rotation.y = t * 0.004; }
+    for (const r of this.rocks) { r.g.position.y = r.base.y + Math.sin(t * 0.3 + r.ph) * 0.6; r.g.rotation.y = t * 0.03 + r.ph; }
     for (const c of this.clocks) {
       c.mat.uniforms.time.value = t + c.phase;
       c.mesh.position.y = c.base.y + Math.sin(t * 0.5 + c.phase) * 0.35;

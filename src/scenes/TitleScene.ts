@@ -33,7 +33,7 @@ export class TitleScene extends Phaser.Scene {
       sfx.setMute(!save.mute);
       snd.txt.setText(save.mute ? 'Som: off' : 'Som: on');
     }, 'ghost', 28);
-    label(this, W / 2, 1236, 'v0.2 · Mundo 1: Jardim Sebe', 20, UI.textDim as string);
+    label(this, W / 2, 1236, 'v0.3 · Asteroide B-612 · Jardim Sebe', 20, UI.textDim as string);
     this.input.once('pointerdown', () => sfx.unlock());
 
     this.events.once('shutdown', () => { this.ev?.remove(); stage.stop(); });
@@ -42,8 +42,8 @@ export class TitleScene extends Phaser.Scene {
 
   /** Modo "vitrina": o Uli percorre a ilha, deixando o trilho de luz; depois nasce outro labirinto. */
   private attract() {
-    const wd = getWorld('jardim');
-    const m = generate({ cols: 9, rows: 11, mask: 'heart', seed: this.seed, loops: 0.06, dyn: 0, rosas: 3 });
+    const wd = getWorld('b612');
+    const m = generate({ cols: 9, rows: 11, mask: 'circle', seed: this.seed, loops: 0.06, dyn: 0, rosas: 3 });
     stage.load(m, wd, this.seed, { intro: false });
     stage.start('title');
     const path = pathTo(m, m.start, m.exit, 0);

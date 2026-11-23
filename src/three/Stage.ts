@@ -8,9 +8,10 @@ import { Maze } from '../core/maze';
 import { WorldDef } from '../worlds';
 import { buildIsland, Island } from './island';
 import { Scenery, themeFor } from './scenery';
-import { makeUli, makeRose, makePortal, makeGuard, Trail } from './actors';
+import { makeRose, makePortal, Trail } from './actors';
+import { makeUli, makeGuard } from './nightmare';
 import { sfx } from '../core/audio';
-import { mix } from '../core/theme';
+import { mix, brandAt } from '../core/theme';
 import { glowSprite, hdr, disposeTree } from './common';
 
 export type ViewMode = 'follow' | 'overview';
@@ -62,6 +63,9 @@ export class Stage {
   private dangerCur = 0;
   private pulseCur = 0;
   private fogBase = new THREE.Color();
+  private planet = false;
+  private fogNear = 90;
+  private fogFar = 900;
   private prevP = new THREE.Vector3();
   private speed = 0;
   private walkT = 0;
@@ -87,15 +91,19 @@ export class Stage {
     this.composer.addPass(this.bloom);
     // grão, vinheta e aberração cromática: ar de filme sujo / punk
     this.fx = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 } },
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; varying vec2 vUv;
         float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
         void main(){
           vec2 c = vUv - 0.5; float d = dot(c,c);
           vec2 off = c * (d * 0.028 + pulse * 0.012 + danger * 0.02);
           vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
-          col *= 1.0 - smoothstep(0.12, 0.62, d) * 0.6;
+          col *= 1.0 - smoothstep(0.12, 0.62, d) * (0.6 + 0.3 * grade);
+          float lu = dot(col, vec3(0.299, 0.587, 0.114));
+          col = mix(col, vec3(lu), 0.4 * grade);
+          col *= mix(vec3(1.0), vec3(0.93, 1.03, 1.02), grade);
+          col = mix(col, col * col * 1.6, 0.25 * grade);
           col += vec3(0.55, 0.0, 0.06) * danger * smoothstep(0.08, 0.5, d) * (0.65 + 0.35 * sin(time * 0.6));
           col += (h(vUv * 900.0 + time) - 0.5) * 0.07;
           col *= 0.97 + 0.03 * sin(vUv.y * 900.0);
@@ -119,15 +127,19 @@ export class Stage {
     this.maze = m;
     const pal = wd.pal;
     const theme = themeFor(wd.id, pal);
-    this.island = buildIsland(m, pal, seed);
+    this.planet = !!wd.planet;
+    this.island = buildIsland(m, pal, seed, this.planet);
     this.scenery = new Scenery(theme, this.island.radius, pal.accent, m.cols / 2, m.rows / 2);
     this.scene.add(this.island.group, this.scenery.group);
     this.fogBase.set(theme.horizon);
-    this.scene.fog = new THREE.Fog(theme.horizon, 90, 900);
+    this.fogNear = theme.fogNear ?? 90; this.fogFar = theme.fogFar ?? 900;
+    this.scene.fog = new THREE.Fog(theme.horizon, this.fogNear, this.fogFar);
+    this.fx.uniforms.grade.value = this.planet ? 1 : 0;
+    this.renderer.toneMappingExposure = this.planet ? 1.15 : 1.4;
 
     // luzes: sol-chave frontal-esquerda, contra-luz no horizonte
     this.hemi.color.set(mix(theme.mid, 0xffffff, 0.55)); this.hemi.groundColor.set(mix(theme.horizon, 0x553322, 0.4));
-    this.sun.color.set(0xffe2b0);
+    this.sun.color.set(this.planet ? 0xb9d0c8 : 0xffe2b0);
     const R = this.island.radius + 3;
     this.sun.position.set(-R * 1.1, R * 1.6, R * 0.9);
     this.sun.target.position.set(0, 0, 0);
@@ -149,6 +161,7 @@ export class Stage {
     this.trail.reset();
     const portalPos = this.island.cellPos(m.exit);
     this.portal.position.copy(portalPos);
+    this.tintPortal(this.planet);
     const accent = pal.accent;
     for (const ri of m.rosas) {
       const r = makeRose(accent);
@@ -165,6 +178,14 @@ export class Stage {
     this.setPhase(0, false);
     // câmara inicial
     this.placeCamera(0, true);
+  }
+
+  /** Saída: no asteroide é uma porta de luz quente; nos outros mundos, o gradiente de assinatura. */
+  private tintPortal(warm: boolean) {
+    const ch = this.portal.children as THREE.Mesh[];
+    const cols = warm ? [0xfff0c8, 0xffc968, 0xffe6a8, 0xffd27a, 0xffb347] : [brandAt(0), brandAt(0.5), brandAt(1), 0xa46bff, 0xe02bc0];
+    const ks = warm ? [2.2, 2.2, 2.2, 1.2, 1.6] : [2.4, 2.4, 2.4, 1.2, 1.6];
+    for (let i = 0; i < 5; i++) { const mat = ch[i].material as THREE.MeshBasicMaterial; mat.color.copy(hdr(cols[i], ks[i])); }
   }
 
   private clear() {
@@ -200,8 +221,8 @@ export class Stage {
 
   setGuards(cells: number[]) {
     for (const G of this.guards) this.scene.remove(G.g), disposeTree(G.g);
-    this.guards = cells.map((c) => {
-      const g = makeGuard();
+    this.guards = cells.map((c, gi) => {
+      const g = makeGuard(gi);
       const x = (c % this.maze!.cols) + 0.5, y = ((c / this.maze!.cols) | 0) + 0.5;
       this.scene.add(g);
       return { g, x, y, tx: x, ty: y, dir: 0, walk: Math.random() * 6 };
@@ -337,7 +358,7 @@ export class Stage {
     if (!this.island || !this.scenery) return;
     const I = this.island;
     if (this.introT < 1) this.introT = Math.min(1, this.introT + dt / 2.6);
-    I.update(dt);
+    I.update(dt, this.t);
     this.placeCamera(dt);
     this.scenery.update(this.t, this.camera.position);
 
@@ -415,14 +436,15 @@ export class Stage {
     // escuridão com lanterna (níveis de nevoeiro)
     this.dark += (this.darkTarget - this.dark) * (1 - Math.exp(-dt * 3));
     const d = this.dark;
-    this.sun.intensity = 2.4 * (1 - d); this.rim.intensity = 1.4 * (1 - d); this.hemi.intensity = 1.05 * (1 - d) + 0.03 * d;
+    const pl = this.planet;
+    this.sun.intensity = (pl ? 1.5 : 2.4) * (1 - d); this.rim.intensity = (pl ? 0.9 : 1.4) * (1 - d); this.hemi.intensity = (pl ? 0.62 : 1.05) * (1 - d) + 0.03 * d;
     this.scene.environmentIntensity = 0.9 * (1 - d) + 0.04 * d;
     this.scenery.setDark(d);
-    this.lamp.intensity = 0.5 + d * 13;
-    this.lamp.distance = 3 + (this.darkR * 1.15) * d + 2 * (1 - d);
+    this.lamp.intensity = (pl ? 1.5 : 0.5) + d * 13;
+    this.lamp.distance = (pl ? 8 : 3) + (this.darkR * 1.15) * d + 2 * (1 - d);
     this.scenery.skyMat.uniforms.dark.value = 1 - 0.97 * d;
-    (this.scene.fog as THREE.Fog).near = 90 * (1 - d) + 10 * d;
-    (this.scene.fog as THREE.Fog).far = 900 * (1 - d) + 60 * d;
+    (this.scene.fog as THREE.Fog).near = this.fogNear * (1 - d) + 10 * d;
+    (this.scene.fog as THREE.Fog).far = this.fogFar * (1 - d) + 60 * d;
     (this.scene.fog as THREE.Fog).color.copy(this.fogBase).multiplyScalar(1 - 0.96 * d);
 
     // orbes de pista

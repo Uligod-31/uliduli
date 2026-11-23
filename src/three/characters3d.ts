@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CharKind } from '../art/characters';
 import { glowSprite, hdr, makeClockTexture } from './common';
-import { makeUli } from './actors';
+import { makeUli } from './nightmare';
 
 const gloss = (color: number, rough = 0.22, extra: Partial<THREE.MeshPhysicalMaterialParameters> = {}) =>
   new THREE.MeshPhysicalMaterial({ color, roughness: rough, clearcoat: 1, clearcoatRoughness: 0.1, ...extra });
@@ -143,6 +143,74 @@ function rainha(): THREE.Group {
   return g;
 }
 
+
+/** A Raposa: magra, de olhos que não perdoam, cauda enorme. */
+function raposa(): THREE.Group {
+  const g = new THREE.Group();
+  const fur = gloss(0xb8602a, 0.85, { clearcoat: 0 }), cream = gloss(0xe9d9bd, 0.9, { clearcoat: 0 }), dk = gloss(0x1a110b, 0.8, { clearcoat: 0 });
+  g.add(mesh(sph(0.55, 0.8, 1.25, 0.8), fur, 0, 1.0, 0));
+  g.add(mesh(sph(0.3, 0.7, 1.1, 0.5), cream, 0, 0.95, 0.3));
+  const head = new THREE.Group(); head.position.set(0, 2.05, 0.05); g.add(head);
+  head.add(mesh(sph(0.42, 1.05, 0.9, 0.95), fur));
+  const snout = mesh(new THREE.ConeGeometry(0.2, 0.55, 8), cream, 0, -0.1, 0.45); snout.rotation.x = Math.PI / 2; head.add(snout);
+  head.add(mesh(sph(0.055), dk, 0, -0.04, 0.72));
+  for (const s of [-1, 1]) {
+    const ear = mesh(new THREE.ConeGeometry(0.17, 0.7, 4), fur, s * 0.27, 0.5, -0.02); ear.rotation.z = -s * 0.28; head.add(ear);
+    head.add(mesh(new THREE.ConeGeometry(0.09, 0.45, 4), dk, s * 0.28, 0.52, 0.04).rotateZ(-s * 0.28));
+    const eye = mesh(sph(0.065, 1.5, 0.7, 0.5), emit(0xffd24a, 2.4), s * 0.17, 0.09, 0.36); eye.rotation.z = -s * 0.35; head.add(eye);
+    head.add(mesh(sph(0.018, 0.4, 2, 0.4), new THREE.MeshBasicMaterial({ color: 0x000000 }), s * 0.17, 0.09, 0.4));
+    g.add(mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.0, 8), dk, s * 0.22, 0.5, 0.05));
+  }
+  const tail = mesh(sph(0.42, 0.7, 0.7, 2.0), fur, -0.55, 0.55, -0.8); tail.rotation.y = 0.5;
+  const tip = mesh(sph(0.3, 0.7, 0.7, 0.9), cream, -0.95, 0.62, -1.55);
+  g.add(tail, tip);
+  const scarf = mesh(new THREE.TorusGeometry(0.34, 0.07, 8, 24), gloss(0xf2b73c, 0.8, { clearcoat: 0 }), 0, 1.62, 0.03); scarf.rotation.x = Math.PI / 2; g.add(scarf);
+  return g;
+}
+
+/** O Rei Sem Súbditos: coroa maior do que a cabeça, manto vazio, dedo apontado. */
+function rei(): THREE.Group {
+  const g = new THREE.Group();
+  const robe = gloss(0x6a1a26, 0.9, { clearcoat: 0, side: THREE.DoubleSide }), ermine = gloss(0xe9e2d4, 0.95, { clearcoat: 0 }), skin = gloss(0xd0c0a6, 0.85, { clearcoat: 0 });
+  const goldM = gloss(0xd9ad3c, 0.35, { metalness: 0.7, emissive: 0x5a3c08, emissiveIntensity: 0.7 });
+  g.add(mesh(new THREE.CylinderGeometry(0.3, 1.2, 2.4, 20, 1, true), robe, 0, 1.2, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.48, 0.4, 0.34, 20), ermine, 0, 2.38, 0));
+  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.add(mesh(sph(0.04, 1, 2.4, 1), new THREE.MeshBasicMaterial({ color: 0x15100e }), Math.cos(a) * 0.46, 2.3, Math.sin(a) * 0.46)); }
+  g.add(mesh(sph(0.26, 0.9, 1.15, 0.95), skin, 0, 2.8, 0.04));
+  for (const s of [-1, 1]) {
+    g.add(mesh(sph(0.05, 1.4, 0.7, 0.5), emit(0xffd36a, 2.2), s * 0.09, 2.82, 0.26));
+    g.add(mesh(new THREE.BoxGeometry(0.14, 0.02, 0.02), new THREE.MeshBasicMaterial({ color: 0x20120c }), s * 0.09, 2.92, 0.27).rotateZ(s * 0.35));
+  }
+  g.add(mesh(new THREE.BoxGeometry(0.2, 0.012, 0.02), new THREE.MeshBasicMaterial({ color: 0x20120c }), 0, 2.68, 0.28));
+  const crown = new THREE.Group(); crown.position.y = 3.15;
+  crown.add(mesh(new THREE.CylinderGeometry(0.36, 0.3, 0.2, 16, 1, true), goldM, 0, 0, 0));
+  for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; crown.add(mesh(new THREE.ConeGeometry(0.075, 0.34, 5), goldM, Math.cos(a) * 0.33, 0.25, Math.sin(a) * 0.33)); }
+  crown.add(mesh(sph(0.06), emit(0xff2b50, 2.2), 0, 0.02, 0.36));
+  crown.rotation.z = 0.12; g.add(crown);
+  // braço comprido a apontar
+  const arm = mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.2, 8), robe, 0.75, 2.0, 0.35); arm.rotation.set(0.5, 0, -1.2); g.add(arm);
+  g.add(mesh(sph(0.09, 1, 1.4, 0.6), skin, 1.25, 1.75, 0.7));
+  const sc = mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.4, 8), goldM, -0.8, 1.3, 0.3); g.add(sc, mesh(sph(0.14), goldM, -0.8, 2.55, 0.3));
+  return g;
+}
+
+/** O Acendedor: fino como o próprio candeeiro, de costas curvadas, a segurar a única luz. */
+function acendedor(): THREE.Group {
+  const g = new THREE.Group();
+  const coat = gloss(0x1c1f26, 0.9, { clearcoat: 0 }), skin = gloss(0xd0c0a6, 0.85, { clearcoat: 0 }), dk = gloss(0x0c0b0a, 0.8, { clearcoat: 0 });
+  for (const s of [-1, 1]) g.add(mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.5, 8), dk, s * 0.14, 0.75, 0));
+  const torso = mesh(new THREE.CapsuleGeometry(0.28, 0.9, 6, 14), coat, 0, 1.9, 0); torso.rotation.x = 0.28; g.add(torso);
+  g.add(mesh(sph(0.19, 0.9, 1.15, 0.95), skin, 0, 2.95, 0.3));
+  for (const s of [-1, 1]) g.add(mesh(sph(0.04, 1.4, 0.8, 0.5), emit(0xffc060, 2.4), s * 0.07, 2.97, 0.46));
+  g.add(mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 16), dk, 0, 3.12, 0.3));
+  g.add(mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.32, 14), dk, 0, 3.3, 0.3));
+  const arm = mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.2, 8), coat, 0.38, 2.2, 0.2); arm.rotation.z = -0.5; g.add(arm);
+  const pole = mesh(new THREE.CylinderGeometry(0.025, 0.03, 3.6, 8), dk, 0.85, 1.8, 0.2); g.add(pole);
+  g.add(mesh(sph(0.16), emit(0xffd98a, 3), 0.85, 3.68, 0.2));
+  const gl = glowSprite(0xffc060, 3.4, 0.8); gl.position.set(0.85, 3.68, 0.2); g.add(gl);
+  return g;
+}
+
 export function buildPortrait(kind: CharKind): { group: THREE.Group; center: THREE.Vector3; dist: number } {
   switch (kind) {
     case 'uli': {
@@ -155,6 +223,9 @@ export function buildPortrait(kind: CharKind): { group: THREE.Group; center: THR
     case 'pimpa': return { group: pimpa(), center: new THREE.Vector3(0.3, 1.85, 0), dist: 7.4 };
     case 'lagarta': return { group: lagarta(), center: new THREE.Vector3(0.1, 2.15, 0), dist: 9.4 };
     case 'sorriso': return { group: sorriso(), center: new THREE.Vector3(0, 1.7, 0), dist: 6.4 };
+    case 'raposa': return { group: raposa(), center: new THREE.Vector3(-0.1, 1.45, 0), dist: 8.6 };
+    case 'rei': return { group: rei(), center: new THREE.Vector3(0.2, 1.9, 0), dist: 9.2 };
+    case 'acendedor': return { group: acendedor(), center: new THREE.Vector3(0.4, 2.0, 0), dist: 10.6 };
     case 'rainha': return { group: rainha(), center: new THREE.Vector3(0.3, 1.8, 0), dist: 8.0 };
   }
 }
