@@ -4,7 +4,7 @@ import { Maze } from '../core/maze';
 import { Pal } from '../core/theme';
 import { mulberry32 } from '../core/rng';
 import { collectWalls } from '../art/render';
-import { hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
+import { grimeTexture, hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
 import { buildPlanetBody } from './planet';
 
 export const WALL_H = 0.52;
@@ -45,7 +45,7 @@ function wallParts(len: number, rng: () => number) {
     const n = vnoise(x * 2.4 + ph);
     pos.setY(i, y - topDrop(x) * smooth(0.4, 1, u));
     pos.setZ(i, z + Math.sign(z) * 0.045 * smooth(0.35, 0.95, u) * (0.4 + n));
-    const v = (0.62 + 0.38 * Math.pow(u, 0.7)) * (0.9 + 0.1 * n);
+    const v = (0.3 + 0.7 * Math.pow(u, 0.85)) * (0.88 + 0.12 * n);
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -91,12 +91,13 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false): Is
   let R = 0;
   for (const i of open) R = Math.max(R, Math.hypot(px(i), pz(i)));
 
+  const floorTex = grimeTexture();
   // chão em xadrez (o plano de xadrez surreal de Dalí)
   const boxG = new THREE.BoxGeometry(0.985, FLOOR_T, 0.985);
   const nA = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 0);
   const nB = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 1);
   const mk = (list: number[], color: number) => {
-    const mesh = new THREE.InstancedMesh(boxG, new THREE.MeshStandardMaterial({ color, roughness: 0.28, metalness: 0.12 }), list.length);
+    const mesh = new THREE.InstancedMesh(boxG, new THREE.MeshStandardMaterial({ color, map: floorTex, bumpMap: floorTex, bumpScale: 1.6, roughness: planet ? 0.9 : 0.55, metalness: 0.04 }), list.length);
     const mat = new THREE.Matrix4();
     list.forEach((i, k) => mesh.setMatrixAt(k, mat.makeTranslation(px(i), -FLOOR_T / 2, pz(i))));
     mesh.receiveShadow = true;

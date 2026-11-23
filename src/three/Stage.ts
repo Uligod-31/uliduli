@@ -9,7 +9,7 @@ import { WorldDef } from '../worlds';
 import { buildIsland, Island } from './island';
 import { Scenery, themeFor } from './scenery';
 import { makeRose, makePortal, Trail } from './actors';
-import { makeUli, makeGuard } from './nightmare';
+import { makeUli, makeGuard, animateFlame } from './nightmare';
 import { sfx } from '../core/audio';
 import { mix, brandAt } from '../core/theme';
 import { glowSprite, hdr, disposeTree } from './common';
@@ -64,6 +64,8 @@ export class Stage {
   private pulseCur = 0;
   private fogBase = new THREE.Color();
   private planet = false;
+  private giant?: THREE.Group;
+  private th: ReturnType<typeof themeFor> = { top: 0, mid: 0, horizon: 0, ground: 0, ground2: 0, sun: 0 };
   private fogNear = 90;
   private fogFar = 900;
   private prevP = new THREE.Vector3();
@@ -134,12 +136,13 @@ export class Stage {
     this.fogBase.set(theme.horizon);
     this.fogNear = theme.fogNear ?? 90; this.fogFar = theme.fogFar ?? 900;
     this.scene.fog = new THREE.Fog(theme.horizon, this.fogNear, this.fogFar);
-    this.fx.uniforms.grade.value = this.planet ? 1 : 0;
-    this.renderer.toneMappingExposure = this.planet ? 1.15 : 1.4;
+    this.th = theme;
+    this.fx.uniforms.grade.value = theme.grade ?? 0;
+    this.renderer.toneMappingExposure = theme.expo ?? 1.4;
 
     // luzes: sol-chave frontal-esquerda, contra-luz no horizonte
     this.hemi.color.set(mix(theme.mid, 0xffffff, 0.55)); this.hemi.groundColor.set(mix(theme.horizon, 0x553322, 0.4));
-    this.sun.color.set(this.planet ? 0xb9d0c8 : 0xffe2b0);
+    this.sun.color.set(theme.sunC ?? 0xffe2b0);
     const R = this.island.radius + 3;
     this.sun.position.set(-R * 1.1, R * 1.6, R * 0.9);
     this.sun.target.position.set(0, 0, 0);
@@ -270,12 +273,22 @@ export class Stage {
 
   start(mode: 'game' | 'title') {
     this.mode = mode;
+    if (mode === 'title' && !this.giant) {
+      // um Crescido colossal a espreitar de trás do planeta
+      const g = makeGuard(1); g.scale.setScalar(15);
+      g.position.set(-4, -13, -32);
+      g.traverse((o) => { if ((o as THREE.Sprite).isSprite) o.visible = false; });
+      for (const m of [g.userData.armL, g.userData.armR]) (m as THREE.Object3D).rotation.x = 0.05;
+      this.scene.add(g); this.giant = g;
+    }
+    if (mode !== 'title' && this.giant) { this.scene.remove(this.giant); disposeTree(this.giant); this.giant = undefined; }
     this.el.style.display = 'block';
     this.sync(true);
     if (!this.raf) { this.last = performance.now(); this.loop(); }
   }
   stop() {
     this.mode = 'off';
+    if (this.giant) { this.scene.remove(this.giant); disposeTree(this.giant); this.giant = undefined; }
     this.el.style.display = 'none';
     cancelAnimationFrame(this.raf); this.raf = 0;
   }
@@ -318,9 +331,9 @@ export class Stage {
     const asp = this.camera.aspect;
     if (this.mode === 'title') {
       this.titleAng += dt * 0.11;
-      const d = R * (asp < 1 ? 3.1 : 2.3);
-      want.set(Math.sin(this.titleAng) * d * 0.5, R * 1.1, Math.cos(this.titleAng) * d);
-      look.set(0, R * 0.05, 0);
+      const d = R * (asp < 1 ? 3.3 : 2.4);
+      want.set(Math.sin(this.titleAng * 0.8) * d * 0.28, R * 0.95, d);
+      look.set(0, R * 0.5, 0);
     } else if (this.view === 'overview') {
       const d = R * (asp < 1 ? 2.3 : 1.75);
       want.set(0, d * 0.82, d * 0.72);
@@ -359,6 +372,13 @@ export class Stage {
     const I = this.island;
     if (this.introT < 1) this.introT = Math.min(1, this.introT + dt / 2.6);
     I.update(dt, this.t);
+    if (this.giant) {
+      const U = this.giant.userData;
+      (U.head as THREE.Object3D).rotation.y = Math.sin(this.t * 0.35) * 0.5 - 0.35;
+      (U.body as THREE.Object3D).position.y = Math.sin(this.t * 0.6) * 0.02;
+      (U.armL as THREE.Object3D).rotation.x = Math.sin(this.t * 0.5) * 0.06; (U.armR as THREE.Object3D).rotation.x = -Math.sin(this.t * 0.5) * 0.06;
+      this.giant.position.x = -4 + Math.sin(this.t * 0.12) * 4;
+    }
     this.placeCamera(dt);
     this.scenery.update(this.t, this.camera.position);
 
@@ -382,6 +402,7 @@ export class Stage {
     const celeb = this.celebrate > 0;
     if (celeb) { (U.armL as THREE.Object3D).rotation.z = 2.6 + Math.sin(this.t * 9) * 0.3; (U.armR as THREE.Object3D).rotation.z = -2.6 - Math.sin(this.t * 9) * 0.3; (U.armL as THREE.Object3D).rotation.x = 0; (U.armR as THREE.Object3D).rotation.x = 0; body.position.y = Math.abs(Math.sin(this.t * 6)) * 0.12; }
     (U.head as THREE.Object3D).rotation.z = Math.sin(this.t * 1.3) * 0.04;
+    animateFlame(U.head as THREE.Object3D, this.t, this.speed, Math.sin(this.walkT * 0.5) * 0.15 * this.speed, celeb ? 1 : Math.min(1, this.player.h));
     // cachecol neon a flutuar atrás
     (U.scarf as THREE.Mesh[]).forEach((s, i) => {
       const lift = this.speed * 0.05 * i;
@@ -436,12 +457,12 @@ export class Stage {
     // escuridão com lanterna (níveis de nevoeiro)
     this.dark += (this.darkTarget - this.dark) * (1 - Math.exp(-dt * 3));
     const d = this.dark;
-    const pl = this.planet;
-    this.sun.intensity = (pl ? 1.5 : 2.4) * (1 - d); this.rim.intensity = (pl ? 0.9 : 1.4) * (1 - d); this.hemi.intensity = (pl ? 0.62 : 1.05) * (1 - d) + 0.03 * d;
+    const T = this.th;
+    this.sun.intensity = (T.sunI ?? 2.4) * (1 - d); this.rim.intensity = (T.rimI ?? 1.4) * (1 - d); this.hemi.intensity = (T.hemiI ?? 1.05) * (1 - d) + 0.03 * d;
     this.scene.environmentIntensity = 0.9 * (1 - d) + 0.04 * d;
     this.scenery.setDark(d);
-    this.lamp.intensity = (pl ? 1.5 : 0.5) + d * 13;
-    this.lamp.distance = (pl ? 8 : 3) + (this.darkR * 1.15) * d + 2 * (1 - d);
+    this.lamp.intensity = (T.lampI ?? 0.5) + d * 13;
+    this.lamp.distance = (T.lampD ?? 3) + (this.darkR * 1.15) * d + 2 * (1 - d);
     this.scenery.skyMat.uniforms.dark.value = 1 - 0.97 * d;
     (this.scene.fog as THREE.Fog).near = this.fogNear * (1 - d) + 10 * d;
     (this.scene.fog as THREE.Fog).far = this.fogFar * (1 - d) + 60 * d;

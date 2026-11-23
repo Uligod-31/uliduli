@@ -114,9 +114,9 @@ const b612: WorldDef = {
 const jardim: WorldDef = {
   id: 'jardim',
   name: 'Jardim Sebe',
-  tagline: 'Sebes que mordem, relógios que mentem e uma rainha com mau perder.',
+  tagline: 'Sebes que mordem, relógios que derretem e uma rainha com mau perder.',
   rule: 'Sebes rebeldes: mudam de lugar de N em N passos.',
-  pal: mkPal(0x0a0710, 0x4b4f58, 0x1c6a40, 0xff4fd8),
+  pal: mkPal(0x070a06, 0x6a6650, 0x2c4a30, 0xd98aae),
   ready: true,
   preview: { mask: 'heart', cols: 9, rows: 9, seed: 5 },
   levels: [

@@ -110,3 +110,27 @@ export function makeCheckerTexture(a: string, b: string, n = 8): THREE.CanvasTex
   t.anisotropy = 8;
   return t;
 }
+
+let _grime: THREE.CanvasTexture | undefined;
+/** Chão sujo: manchas, riscos e fendas em tons de cinzento (a cor vem do material). */
+export function grimeTexture(): THREE.CanvasTexture {
+  if (_grime) return _grime;
+  const c = canvas(256), g = c.getContext('2d')!;
+  g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, 256, 256);
+  let s = 777;
+  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 160; i++) {
+    const v = 120 + Math.floor(r() * 100);
+    g.fillStyle = `rgba(${v},${v},${v},${0.1 + r() * 0.22})`;
+    g.beginPath(); g.ellipse(r() * 256, r() * 256, 6 + r() * 30, 4 + r() * 20, r() * 3, 0, 6.28); g.fill();
+  }
+  g.strokeStyle = 'rgba(40,40,40,.55)'; g.lineWidth = 1.4;
+  for (let i = 0; i < 7; i++) {
+    let x = r() * 256, y = r() * 256; g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 60; y += (r() - 0.5) * 60; g.lineTo(x, y); }
+    g.stroke();
+  }
+  g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 6; g.strokeRect(0, 0, 256, 256);   // juntas entre lajes
+  _grime = new THREE.CanvasTexture(c); _grime.colorSpace = THREE.SRGBColorSpace;
+  return _grime;
+}

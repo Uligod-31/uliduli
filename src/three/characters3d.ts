@@ -211,7 +211,26 @@ function acendedor(): THREE.Group {
   return g;
 }
 
+/** Pesadelo: tira cor e brilho de plástico a tudo o que não seja luz própria. */
+function grimy(g: THREE.Group, k = 0.5) {
+  g.traverse((o) => {
+    const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+    if (!m || (m as THREE.MeshBasicMaterial).isMeshBasicMaterial) return;
+    const sm = m as THREE.MeshPhysicalMaterial;
+    if (sm.color) { const hsl = { h: 0, s: 0, l: 0 }; sm.color.getHSL(hsl); sm.color.setHSL(hsl.h, hsl.s * (1 - k), hsl.l * 0.8); }
+    if ('roughness' in sm) sm.roughness = Math.max(sm.roughness, 0.8);
+    if ('clearcoat' in sm) sm.clearcoat = 0;
+    if ('emissiveIntensity' in sm) sm.emissiveIntensity *= 0.5;
+  });
+}
+
 export function buildPortrait(kind: CharKind): { group: THREE.Group; center: THREE.Vector3; dist: number } {
+  const r = buildPortraitRaw(kind);
+  if (kind === 'pimpa' || kind === 'lagarta' || kind === 'rainha' || kind === 'sorriso') grimy(r.group, kind === 'sorriso' ? 0.2 : 0.55);
+  return r;
+}
+
+function buildPortraitRaw(kind: CharKind): { group: THREE.Group; center: THREE.Vector3; dist: number } {
   switch (kind) {
     case 'uli': {
       const u = makeUli(); u.scale.setScalar(3.4);

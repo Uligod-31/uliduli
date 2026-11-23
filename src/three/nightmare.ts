@@ -17,8 +17,7 @@ export function makeUli(): THREE.Group {
   const coatD = new THREE.MeshStandardMaterial({ color: 0x1b2638, roughness: 0.95 });
   const boot = new THREE.MeshStandardMaterial({ color: 0x15130f, roughness: 0.6 });
   const gold = new THREE.MeshStandardMaterial({ color: 0xf2b73c, emissive: 0x7a4e0c, emissiveIntensity: 0.7, roughness: 0.75 });
-  const hair = new THREE.MeshStandardMaterial({ color: 0xe6b84e, roughness: 0.8 });
-
+  
   const mkLeg = (x: number) => {
     const p = new THREE.Group(); p.position.set(x, 0.2, 0);
     const l = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.04, 0.14, 8), new THREE.MeshStandardMaterial({ color: 0xd9c9b4, roughness: 0.8 }))); l.position.y = -0.07;
@@ -47,20 +46,22 @@ export function makeUli(): THREE.Group {
   };
   const armL = mkArm(-0.155), armR = mkArm(0.155);
 
-  // cabeça grande, pálida; olhos enormes e escuros; cabelo bravo
-  const head = new THREE.Group(); head.position.y = 0.67; fig.add(head);
-  head.add(cast(new THREE.Mesh(new THREE.SphereGeometry(0.15, 28, 20), skin)));
-  for (const s of [-1, 1]) {
-    const e = new THREE.Mesh(new THREE.SphereGeometry(0.036, 14, 10), new THREE.MeshStandardMaterial({ color: 0x07080b, roughness: 0.2, metalness: 0.2 }));
-    e.scale.set(0.9, 1.3, 0.5); e.position.set(s * 0.058, -0.01, 0.13); head.add(e);
-    const sp = new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffffff })); sp.position.set(s * 0.058 + 0.012, 0.012, 0.145); head.add(sp);
-    const blush = new THREE.Mesh(new THREE.CircleGeometry(0.022, 10), new THREE.MeshBasicMaterial({ color: 0xd98a7a, transparent: true, opacity: 0.35 })); blush.position.set(s * 0.09, -0.06, 0.12); blush.rotation.y = s * 0.6; head.add(blush);
+  // cabeça: uma CHAMA DE VELA viva (dobra-se com o movimento, ver animateFlame)
+  const head = new THREE.Group(); head.position.y = 0.57; fig.add(head);
+  const prof = [[0, 0], [0.07, 0.01], [0.115, 0.07], [0.13, 0.15], [0.112, 0.23], [0.07, 0.31], [0.028, 0.39], [0, 0.47]].map(([r, y]) => new THREE.Vector2(r, y));
+  const outerGeo = new THREE.LatheGeometry(prof, 20);
+  const outer = new THREE.Mesh(outerGeo, new THREE.MeshBasicMaterial({ color: hdr(0xff7a1a, 1.5), transparent: true, opacity: 0.92, toneMapped: false }));
+  const coreGeo = new THREE.LatheGeometry(prof.map((v) => new THREE.Vector2(v.x * 0.6, v.y * 0.82 + 0.015)), 16);
+  const core = new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: hdr(0xffe6a0, 1.9), toneMapped: false }));
+  const base = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: hdr(0x3a6bff, 1.6), transparent: true, opacity: 0.8, toneMapped: false }));
+  base.scale.set(1.2, 0.5, 1.2); base.position.y = 0.025;
+  head.add(outer, core, base);
+  for (const sd of [-1, 1]) {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10), new THREE.MeshBasicMaterial({ color: 0x1a0c05 }));
+    e.scale.set(0.8, 1.35, 0.5); e.position.set(sd * 0.05, 0.17, 0.112); head.add(e);
   }
-  const cap = cast(new THREE.Mesh(new THREE.SphereGeometry(0.158, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.46), hair)); cap.position.y = 0.012; cap.rotation.x = -0.18; head.add(cap);
-  const tufts = [[-0.1, 0.1, 0.05, 0.9], [0.0, 0.15, 0.0, 0.0], [0.1, 0.1, 0.04, -0.9], [-0.06, 0.12, -0.08, 0.6], [0.07, 0.12, -0.08, -0.5], [0.0, 0.1, 0.1, 0.0]];
-  for (const [x, y, z, r] of tufts) {
-    const t = cast(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 6), hair)); t.position.set(x, y + 0.03, z); t.rotation.set(z > 0.05 ? 0.9 : -0.2, 0, r); head.add(t);
-  }
+  const flameGlow = glowSprite(0xffa040, 1.4, 0.55); flameGlow.position.y = 0.2; head.add(flameGlow);
+  head.userData = { outerGeo, coreGeo, outerBase: Float32Array.from(outerGeo.attributes.position.array as ArrayLike<number>), coreBase: Float32Array.from(coreGeo.attributes.position.array as ArrayLike<number>), glow: flameGlow, outer, core };
 
   // cachecol dourado (marca registada)
   const neck = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.03, 8, 20), gold); neck.rotation.x = Math.PI / 2; neck.position.y = 0.55; fig.add(neck);
@@ -69,7 +70,7 @@ export function makeUli(): THREE.Group {
     const seg = new THREE.Mesh(new THREE.BoxGeometry(0.095 - i * 0.004, 0.02, 0.1), new THREE.MeshStandardMaterial({ color: i % 3 === 2 ? 0xc98a24 : 0xf2b73c, emissive: 0x7a4e0c, emissiveIntensity: 0.65 - i * 0.04, roughness: 0.8 }));
     seg.castShadow = true; fig.add(seg); scarf.push(seg);
   }
-  const halo = glowSprite(0xffc866, 0.5, 0.28); halo.position.set(0, 0.5, -0.2); fig.add(halo);
+  const halo = glowSprite(0xffc866, 0.5, 0.2); halo.position.set(0, 0.5, -0.2); fig.add(halo);
 
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.2, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.012; root.add(shadow);
@@ -156,4 +157,31 @@ export function makeGuard(variant = 0): THREE.Group {
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.012; root.add(shadow);
   root.userData = { body: fig, legL, legR, armL, armR, head };
   return root;
+}
+
+/**
+ * Anima a chama-cabeça: dobra a ponta contra o movimento, oscila, estica ao saltar e tremeluz.
+ * lean = velocidade (0..1) para trás da direção do corpo; side = inclinação lateral (curvas); lift = salto/celebração.
+ */
+export function animateFlame(head: THREE.Object3D, t: number, lean: number, side = 0, lift = 0) {
+  const U = head.userData;
+  if (!U.outerGeo) return;
+  const apply = (geo: THREE.BufferGeometry, base: Float32Array, k: number, ph: number) => {
+    const p = geo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < p.count; i++) {
+      const x = base[i * 3], y = base[i * 3 + 1], z = base[i * 3 + 2];
+      const u = Math.min(1, Math.max(0, y / 0.47)), w = u * u;
+      const wob = Math.sin(t * 9 + ph + y * 11) * 0.012 * w + Math.sin(t * 5.3 + ph * 2) * 0.02 * w;
+      p.setXYZ(i,
+        x * (1 - 0.18 * lean * u) + (side * 0.12 + wob) * w * k,
+        y * (1 + 0.1 * lean + 0.22 * lift + 0.04 * Math.sin(t * 13 + ph)) ,
+        z - lean * 0.2 * w * k + Math.cos(t * 7 + ph) * 0.01 * w);
+    }
+    p.needsUpdate = true;
+  };
+  apply(U.outerGeo, U.outerBase, 1, 0);
+  apply(U.coreGeo, U.coreBase, 0.8, 1.3);
+  const fl = 0.9 + 0.1 * Math.sin(t * 19) + 0.06 * Math.sin(t * 31 + 1);
+  (U.glow as THREE.Sprite).material.opacity = 0.45 * fl + 0.1 * lean;
+  (U.glow as THREE.Sprite).scale.setScalar(1.4 * (0.95 + 0.1 * fl));
 }

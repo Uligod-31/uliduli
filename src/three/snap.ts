@@ -86,7 +86,7 @@ class Snap {
   /** Retrato 3D de uma personagem, com iluminação dramática. */
   portrait(kind: CharKind, w: number, h: number): HTMLCanvasElement {
     const accent = CHAR_COLORS[kind];
-    const ln = kind === 'raposa' || kind === 'rei' || kind === 'acendedor'; // Pequenos Pesadelos: fundo sujo e luz fria
+    const ln = true; // Pequenos Pesadelos: fundo sujo e luz fria
     const scene = new THREE.Scene();
     const bgc = document.createElement('canvas'); bgc.width = 256; bgc.height = 320;
     const g = bgc.getContext('2d')!;

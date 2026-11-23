@@ -3,17 +3,20 @@ import { Pal, mix } from '../core/theme';
 import { glowSprite, glowTexture, makeCheckerTexture, makeClockTexture, disposeTree } from './common';
 import { mulberry32 } from '../core/rng';
 
-export interface SceneTheme { top: number; mid: number; horizon: number; ground: number; ground2: number; sun: number; planet?: boolean; fogNear?: number; fogFar?: number }
+export interface SceneTheme { top: number; mid: number; horizon: number; ground: number; ground2: number; sun: number; planet?: boolean; fogNear?: number; fogFar?: number;
+  /** luz e grading (Pequenos Pesadelos): cor/intensidades por mundo */
+  grade?: number; sunC?: number; sunI?: number; hemiI?: number; rimI?: number; lampI?: number; lampD?: number; expo?: number; dim?: number }
 
 /** Tema do céu/solo de cada mundo (Jardim: crepúsculo dalinesco ouro e verde-azulado). */
 export function themeFor(id: string, pal: Pal): SceneTheme {
   // Asteroide B-612: noite fria, névoa verde-ardósia, lua pálida (pesadelo em miniatura)
-  if (id === 'b612') return { top: 0x04070a, mid: 0x101c20, horizon: 0x2c3f3e, ground: 0x0a0e10, ground2: 0x060809, sun: 0xcfe6d8, planet: true, fogNear: 14, fogFar: 80 };
-  // Jardim em brasa: crepúsculo infernal, chão de cinza queimada
-  if (id === 'jardim') return { top: 0x07030d, mid: 0x4a0f35, horizon: 0xff4a1f, ground: 0x3a2a2c, ground2: 0x1f1517, sun: 0xff7a3a };
+  if (id === 'b612') return { top: 0x04070a, mid: 0x101c20, horizon: 0x2c3f3e, ground: 0x0a0e10, ground2: 0x060809, sun: 0xcfe6d8, planet: true, fogNear: 14, fogFar: 80, grade: 1, sunC: 0xb9d0c8, sunI: 1.5, hemiI: 0.62, rimI: 0.9, lampI: 1.5, lampD: 8, expo: 1.15 };
+  // Jardim Sebe: entardecer doente, névoa verde-oliva, sebes apodrecidas e um sol pálido a morrer
+  if (id === 'jardim') return { top: 0x040604, mid: 0x1a281c, horizon: 0x56613f, ground: 0x1b2014, ground2: 0x0c0f09, sun: 0xd9cf94, fogNear: 16, fogFar: 150, grade: 0.9, sunC: 0xd6cc9c, sunI: 1.8, hemiI: 0.72, rimI: 1.0, lampI: 1.5, lampD: 8, expo: 1.2, dim: 0.5 };
   return {
     top: mix(pal.bgBot, 0x000000, 0.2), mid: mix(pal.bgTop, pal.accent, 0.35), horizon: mix(pal.accent, 0xffffff, 0.25),
     ground: mix(pal.floorA, pal.accent, 0.3), ground2: mix(pal.floorB, pal.bgBot, 0.4), sun: mix(pal.accent, 0xffffff, 0.5),
+    fogNear: 30, fogFar: 260, grade: 0.55, sunI: 2.0, hemiI: 0.85, rimI: 1.1, lampI: 1.0, lampD: 6, expo: 1.3, dim: 0.7,
   };
 }
 
@@ -58,11 +61,26 @@ export class Scenery {
   sunDir = new THREE.Vector3(0.35, 0.16, -1).normalize();
   private tex: THREE.Texture[] = [];
   stars?: THREE.Points;
+  mist = new THREE.Group();
+  private dimBase = 1;
   rocks: { g: THREE.Group; base: THREE.Vector3; ph: number }[] = [];
 
   constructor(theme: SceneTheme, islandR: number, accent: number, hx: number, hz: number) {
     const rng = mulberry32(7);
     const c = (x: number) => new THREE.Color(x);
+    this.dimBase = theme.dim ?? 1;
+    this.group.add(this.mist);
+    // bruma baixa a rodear a ilha (profundidade e ameaça)
+    {
+      const mm = (col: number) => new THREE.SpriteMaterial({ map: glowTexture(), color: col, transparent: true, opacity: theme.planet ? 0.16 : 0.2, depthWrite: false, fog: false });
+      for (let i = 0; i < 16; i++) {
+        const sp = new THREE.Sprite(mm(mix(theme.horizon, 0xffffff, 0.1)));
+        const a = (i / 16) * Math.PI * 2 + rng(), d = islandR * (0.9 + rng() * 0.9) + 2;
+        sp.position.set(Math.cos(a) * d, -1.2 - rng() * 2.5, Math.sin(a) * d);
+        sp.scale.set(14 + rng() * 14, 3 + rng() * 3, 1);
+        this.mist.add(sp);
+      }
+    }
 
     // céu
     this.skyMat = new THREE.ShaderMaterial({
@@ -111,7 +129,7 @@ export class Scenery {
     spots.forEach(([x, y, z, s], k) => {
       const mat = new THREE.ShaderMaterial({
         vertexShader: CLOCK_V, fragmentShader: CLOCK_F, side: THREE.DoubleSide,
-        uniforms: { map: { value: clockTex }, time: { value: 0 }, size: { value: s }, droop: { value: 0.32 + (k % 3) * 0.12 }, dark: { value: 1 } },
+        uniforms: { map: { value: clockTex }, time: { value: 0 }, size: { value: s }, droop: { value: 0.32 + (k % 3) * 0.12 }, dark: { value: this.dimBase } },
       });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(s, s, 28, 28), mat);
       mesh.position.set(x, y, z);
@@ -247,13 +265,14 @@ export class Scenery {
   setDark(d: number) {
     const v = 1 - 0.96 * d;
     this.skyMat.uniforms.dark.value = v;
-    for (const c of this.clocks) c.mat.uniforms.dark.value = v;
+    for (const c of this.clocks) c.mat.uniforms.dark.value = v * this.dimBase;
     (this.ground.material as THREE.MeshStandardMaterial).color.setScalar(1 - 0.9 * d);
   }
 
   update(t: number, cam: THREE.Vector3) {
     this.sky.position.copy(cam);
     this.islandShadow.position.x = 0; this.islandShadow.position.z = 0;
+    this.mist.rotation.y = t * 0.012;
     if (this.stars) { this.stars.position.copy(cam); this.stars.rotation.y = t * 0.004; }
     for (const r of this.rocks) { r.g.position.y = r.base.y + Math.sin(t * 0.3 + r.ph) * 0.6; r.g.rotation.y = t * 0.03 + r.ph; }
     for (const c of this.clocks) {
