@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FONT, FONT_HEAD, UI, W, H, toHex } from './theme';
 import { sfx } from './audio';
+import { drawPlate } from '../three/menuArt';
 
 export interface Btn extends Phaser.GameObjects.Container { txt: Phaser.GameObjects.Text }
 
@@ -135,44 +136,20 @@ export function burst(scene: Phaser.Scene, x: number, y: number, colors: number[
   }
 }
 
-/** Botão "neo": vidro negro, contorno em gradiente, cantos cortados, número de índice e setas a pulsar. */
+/** Botão "neo": placa de metal rebitada e riscada (desenhada em canvas), contorno em gradiente, número e setas a pulsar. */
 export function neoButton(scene: Phaser.Scene, x: number, y: number, w: number, h: number, label: string, idx: string,
   cb: () => void, hot = false, fontSize = 40): Btn {
-  const key = `neo_${w}_${h}_${hot ? 1 : 0}`;
-  if (!scene.textures.exists(key)) {
-    const tex = scene.textures.createCanvas(key, w, h)!;
-    const ctx = tex.getContext();
-    const c = Math.round(h * 0.34);
-    const shape = (i: number) => {
-      ctx.beginPath();
-      ctx.moveTo(i + c, i); ctx.lineTo(w - i, i); ctx.lineTo(w - i, h - c - i); ctx.lineTo(w - c - i, h - i);
-      ctx.lineTo(i, h - i); ctx.lineTo(i, c + i); ctx.closePath();
-    };
-    shape(0);
-    const fill = ctx.createLinearGradient(0, 0, w, 0);
-    if (hot) { fill.addColorStop(0, 'rgba(59,116,242,.55)'); fill.addColorStop(0.6, 'rgba(138,75,234,.35)'); fill.addColorStop(1, 'rgba(224,43,192,.5)'); }
-    else { fill.addColorStop(0, 'rgba(8,10,14,.86)'); fill.addColorStop(1, 'rgba(18,14,24,.8)'); }
-    ctx.fillStyle = fill; ctx.fill();
-    // brilho em diagonal
-    ctx.save(); shape(0); ctx.clip();
-    ctx.fillStyle = 'rgba(255,255,255,.05)';
-    for (let k = -h; k < w; k += 26) { ctx.beginPath(); ctx.moveTo(k, h); ctx.lineTo(k + 10, h); ctx.lineTo(k + 10 + h, 0); ctx.lineTo(k + h, 0); ctx.closePath(); ctx.fill(); }
-    ctx.restore();
-    const st = ctx.createLinearGradient(0, 0, w, h);
-    st.addColorStop(0, '#3b74f2'); st.addColorStop(0.55, '#8a4bea'); st.addColorStop(1, '#e02bc0');
-    ctx.strokeStyle = st; ctx.lineWidth = hot ? 4 : 3; shape(2); ctx.stroke();
-    // marcas técnicas
-    ctx.fillStyle = '#ff4fd8'; ctx.fillRect(14, h - 14, 34, 3); ctx.fillStyle = '#5b92ff'; ctx.fillRect(52, h - 14, 12, 3);
-    ctx.fillStyle = 'rgba(255,255,255,.5)'; for (let k = 0; k < 4; k++) ctx.fillRect(w - 70 + k * 9, 12, 4, 4);
-    tex.refresh();
-  }
-  const img = scene.add.image(0, 0, key);
-  const tag = scene.add.text(-w / 2 + 28, -h / 2 + 12, idx, { fontFamily: FONT_HEAD, fontSize: '20px', color: '#ff4fd8' });
-  const txt = scene.add.text(-w / 2 + 28, 6, label.toUpperCase(), { fontFamily: FONT_HEAD, fontSize: `${Math.round(fontSize * 1.12)}px`, color: '#ffffff', fontStyle: 'bold' }).setOrigin(0, 0.5);
+  const PAD = 44;
+  const key = `plate_${w}_${h}_${hot ? 1 : 0}`;
+  if (!scene.textures.exists(key)) scene.textures.addCanvas(key, drawPlate(w, h, hot, 2));
+  const img = scene.add.image(0, -PAD / 2, key).setScale(0.5);
+  const tag = scene.add.text(-w / 2 + 30, -h / 2 + 14, idx, { fontFamily: FONT_HEAD, fontSize: '20px', color: '#ff4fd8' });
+  const txt = scene.add.text(-w / 2 + 30, 6, label.toUpperCase(), { fontFamily: FONT_HEAD, fontSize: `${Math.round(fontSize * 1.12)}px`, color: '#f4f7ff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 7 }).setOrigin(0, 0.5);
   txt.setStyle({ letterSpacing: 6 } as any);
+  try { (txt as any).postFX?.addGlow(hot ? 0xff4fd8 : 0x5b92ff, 2.5, 0, false, 0.1, 8); } catch { /* sem FX */ }
   const orig = txt.setText.bind(txt);
   (txt as any).setText = (v: any) => orig(String(v).toUpperCase());
-  const arrows = scene.add.text(w / 2 - 54, 6, '»', { fontFamily: FONT_HEAD, fontSize: `${Math.round(fontSize * 1.3)}px`, color: '#ffffff' }).setOrigin(0.5);
+  const arrows = scene.add.text(w / 2 - 54, 6, '»', { fontFamily: FONT_HEAD, fontSize: `${Math.round(fontSize * 1.3)}px`, color: '#ffffff', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5);
   scene.tweens.add({ targets: arrows, x: arrows.x + 12, alpha: 0.3, duration: hot ? 520 : 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
   const c = scene.add.container(x, y, [img, tag, txt, arrows]) as Btn;
   c.txt = txt;

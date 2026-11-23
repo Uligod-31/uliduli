@@ -1,6 +1,7 @@
 ﻿import * as THREE from 'three';
 import { hdr, glowTexture } from './common';
 import { drawMummy, MUMMY_W, MUMMY_H, MUMMY_EYES } from './mummyArt';
+import { drawSky } from './menuArt';
 
 export interface TitleGiant {
   group: THREE.Group;
@@ -9,6 +10,7 @@ export interface TitleGiant {
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 let mummyTex: THREE.CanvasTexture | undefined;
+let skyTex: THREE.CanvasTexture | undefined;
 
 /**
  * O gigante do menu: uma múmia horrenda desenhada à mão (ilustração em canvas, alta resolução),
@@ -19,6 +21,11 @@ export function makeTitleGiant(Rd: number): TitleGiant {
   const cloth = new THREE.MeshStandardMaterial({ color: 0x15131a, roughness: 0.95 });
   const dark = new THREE.MeshBasicMaterial({ color: 0x070405 });
   const cast = <T extends THREE.Mesh>(m: T) => { m.castShadow = true; return m; };
+
+  // ───────── céu pintado, muito ao fundo ─────────
+  if (!skyTex) { skyTex = new THREE.CanvasTexture(drawSky(1080)); skyTex.colorSpace = THREE.SRGBColorSpace; skyTex.anisotropy = 4; }
+  const skyP = new THREE.Mesh(new THREE.PlaneGeometry(76, 135), new THREE.MeshBasicMaterial({ map: skyTex, depthWrite: false, fog: false, toneMapped: false }));
+  skyP.position.set(0, 14, -62); skyP.renderOrder = -5; group.add(skyP);
 
   // ───────── a ilustração ─────────
   if (!mummyTex) {

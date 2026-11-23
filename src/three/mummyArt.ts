@@ -106,6 +106,18 @@ export function drawMummy(px = 1536): HTMLCanvasElement {
     if (rnd() < 0.6) bolt((x0 + x1) / 2, (y0 + y1) / 2, (x0 + x1) / 2 + R(-90, 90), (y0 + y1) / 2 + R(60, 150), 22, 'rgba(110,160,255,A)');
   }
 
+  // ───── cabelo grisalho em madeixas, a escorrer por trás da cabeça ─────
+  const HAIR = ['#d9dce2', '#b5b9c4', '#8d92a0', '#eef0f4', '#6a6f7e'];
+  const hw = (y: number) => (y < 440 ? 242 * Math.sin(((Math.max(168, y) - 168) / 272) * (Math.PI / 2)) : 242 - (y - 440) * 0.28);
+  for (let k = 0; k < 230; k++) {
+    const sd = k % 2 ? 1 : -1, y0 = R(210, 560), x0 = 500 + sd * (hw(y0) - 26);
+    const c1: [number, number] = [x0 + sd * R(40, 120), y0 + R(30, 120)], c2: [number, number] = [x0 + sd * R(30, 160), y0 + R(160, 340)], e: [number, number] = [x0 + sd * R(0, 190), Math.min(980, y0 + R(300, 540))];
+    g.beginPath(); g.moveTo(x0, y0); g.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], e[0], e[1]);
+    const lw = R(0.9, 2.6);
+    g.strokeStyle = 'rgba(8,8,14,.75)'; g.lineWidth = lw + 1.6; g.stroke();
+    g.strokeStyle = HAIR[(R(0, HAIR.length)) | 0]; g.globalAlpha = R(0.55, 0.98); g.lineWidth = lw; g.stroke(); g.globalAlpha = 1;
+  }
+
   // ───────── tronco e ombros enfaixados ─────────
   const torso = () => {
     g.beginPath();
@@ -121,6 +133,17 @@ export function drawMummy(px = 1536): HTMLCanvasElement {
   g.globalCompositeOperation = 'source-over';
   g.restore();
   g.lineWidth = 5; g.strokeStyle = INK; torso(); g.stroke();
+
+  // ombreiras com espigões de aço
+  for (const sd of [-1, 1]) {
+    const bx = 500 + sd * 335, by = 960;
+    g.save(); g.translate(bx, by); g.scale(sd, 1);
+    const sg = g.createLinearGradient(-30, 0, 30, 0); sg.addColorStop(0, '#2d3548'); sg.addColorStop(0.45, '#d4dcf0'); sg.addColorStop(1, '#3a4358');
+    g.fillStyle = '#6b7690'; g.strokeStyle = INK; g.lineWidth = 4;
+    g.beginPath(); g.ellipse(0, 20, 44, 20, 0, 0, 6.28); g.fill(); g.stroke();
+    for (let k = 0; k < 3; k++) { const kx = -22 + k * 22, kh = 70 + (k === 1 ? 40 : 0); g.fillStyle = sg; g.beginPath(); g.moveTo(kx - 14, 14); g.lineTo(kx + 4 - k * 3, -kh); g.lineTo(kx + 14, 14); g.closePath(); g.fill(); g.stroke(); g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(kx - 4, 8); g.lineTo(kx + 2 - k * 3, -kh + 14); g.stroke(); g.strokeStyle = INK; g.lineWidth = 4; }
+    g.restore();
+  }
 
   // punhos cerrados nos cantos, a agarrar as correntes
   for (const fx of [185, 815]) {
@@ -151,11 +174,50 @@ export function drawMummy(px = 1536): HTMLCanvasElement {
   wrap(350, 690, 300, 150, 12, 0.18, 0.3, 36, 54);
   g.restore();
   g.lineWidth = 4; g.strokeStyle = INK; g.beginPath(); g.moveTo(405, 700); g.lineTo(360, 830); g.moveTo(595, 700); g.lineTo(640, 830); g.stroke();
+  // coleira de couro com espigões
+  {
+    g.beginPath(); g.moveTo(372, 786); g.quadraticCurveTo(500, 836, 628, 786); g.lineTo(636, 826); g.quadraticCurveTo(500, 880, 364, 826); g.closePath();
+    const cg = g.createLinearGradient(0, 786, 0, 880); cg.addColorStop(0, '#3a2c20'); cg.addColorStop(0.5, '#1c140d'); cg.addColorStop(1, '#0a0705'); g.fillStyle = cg; g.fill(); g.lineWidth = 4; g.strokeStyle = INK; g.stroke();
+    for (let k = 0; k < 9; k++) {
+      const t = (k + 0.5) / 9, x = 372 + 256 * t + (t < 0.5 ? 0 : 0), y = 792 + Math.sin(t * Math.PI) * 38 + 14;
+      const sg = g.createLinearGradient(x - 9, y, x + 9, y); sg.addColorStop(0, '#3a445c'); sg.addColorStop(0.5, '#e2e9fa'); sg.addColorStop(1, '#4a5470');
+      g.fillStyle = sg; g.beginPath(); g.moveTo(x - 10, y + 8); g.lineTo(x, y + 8 + 34); g.lineTo(x + 10, y + 8); g.closePath(); g.fill(); g.lineWidth = 2.4; g.strokeStyle = INK; g.stroke();
+      g.fillStyle = '#9aa6c4'; g.beginPath(); g.arc(x, y + 6, 6, 0, 6.28); g.fill(); g.stroke();
+    }
+  }
 
   g.save(); head(); g.fillStyle = '#2b2316'; g.fill(); g.clip();
   wrap(240, 150, 520, 660, 78, 0.34, 0.5, 40, 76);
   // faixas extra de testa (sobrancelha zangada) e queixo
   for (let k = 0; k < 4; k++) { strip(430 + k * 38, 392 - k * 6, -0.34 + k * 0.02, 260, 40); strip(570 - k * 38, 392 - k * 6, 0.34 - k * 0.02, 260, 40); }
+  // carne apodrecida a rasgar a ligadura
+  const patch = (cx: number, cy: number, rx: number, ry: number) => {
+    const pts: [number, number][] = [];
+    for (let i = 0; i < 22; i++) { const a = (i / 22) * Math.PI * 2, k = R(0.72, 1.22); pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]); }
+    wobblePath(g, pts, true, 1.5);
+    const pg = g.createRadialGradient(cx, cy, 2, cx, cy, Math.max(rx, ry)); pg.addColorStop(0, '#1b0305'); pg.addColorStop(0.7, '#4a0e12'); pg.addColorStop(1, '#6e1a1c');
+    g.fillStyle = pg; g.fill(); g.lineWidth = 3.5; g.strokeStyle = INK; g.stroke();
+    g.strokeStyle = 'rgba(200,80,70,.75)'; g.lineWidth = 1.5;
+    for (let k = 0; k < 9; k++) { const a = R(0, 6.28), r1 = Math.max(rx, ry) * R(0.2, 0.5), r2 = Math.max(rx, ry) * R(0.7, 1); g.beginPath(); g.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.quadraticCurveTo(cx + Math.cos(a + 0.4) * (r1 + r2) / 2, cy + Math.sin(a + 0.4) * (r1 + r2) / 2, cx + Math.cos(a) * r2, cy + Math.sin(a) * r2); g.stroke(); }
+    g.fillStyle = 'rgba(255,150,130,.18)'; g.beginPath(); g.ellipse(cx - rx * 0.2, cy - ry * 0.3, rx * 0.35, ry * 0.18, -0.4, 0, 6.28); g.fill();
+  };
+  patch(618, 548, 46, 58); patch(342, 300, 36, 44); patch(560, 250, 26, 30);
+  // correias de couro com rebites
+  const stud = (x: number, y: number, r: number) => {
+    const sg = g.createRadialGradient(x - r * 0.3, y - r * 0.3, 0.5, x, y, r); sg.addColorStop(0, '#ffffff'); sg.addColorStop(0.4, '#b6c0da'); sg.addColorStop(1, '#2a3248');
+    g.fillStyle = sg; g.beginPath(); g.arc(x, y, r, 0, 6.28); g.fill(); g.lineWidth = 1.8; g.strokeStyle = INK; g.stroke();
+  };
+  const strap = (x0: number, y0: number, x1: number, y1: number, w: number) => {
+    g.save(); const a = Math.atan2(y1 - y0, x1 - x0), len = Math.hypot(x1 - x0, y1 - y0); g.translate(x0, y0); g.rotate(a);
+    const gr = g.createLinearGradient(0, -w / 2, 0, w / 2); gr.addColorStop(0, '#3c2e22'); gr.addColorStop(0.25, '#4a392b'); gr.addColorStop(0.7, '#1b130d'); gr.addColorStop(1, '#0a0705');
+    g.fillStyle = gr; g.fillRect(0, -w / 2, len, w); g.lineWidth = 3; g.strokeStyle = INK; g.strokeRect(0, -w / 2, len, w);
+    g.strokeStyle = 'rgba(205,185,135,.6)'; g.lineWidth = 1.4; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(0, -w / 2 + 5); g.lineTo(len, -w / 2 + 5); g.moveTo(0, w / 2 - 5); g.lineTo(len, w / 2 - 5); g.stroke(); g.setLineDash([]);
+    for (let x = 16; x < len; x += 34) stud(x, 0, 7.5);
+    g.restore();
+  };
+  strap(236, 318, 764, 292, 34);
+  strap(304, 170, 294, 772, 26); strap(696, 170, 706, 772, 26);
+
   // volume: escurecer as bordas e a base, luz de cima-esquerda
   g.globalCompositeOperation = 'multiply';
   const vol = g.createRadialGradient(440, 400, 30, 500, 470, 400);
@@ -211,6 +273,19 @@ export function drawMummy(px = 1536): HTMLCanvasElement {
     g.beginPath(); g.moveTo(ex - sd * 70, ey - 78 + sd * -0); g.quadraticCurveTo(ex, ey - 62 - sd * 0, ex + sd * 74, ey - 34 - 0); g.stroke();
   });
 
+  // veias e sangue a escorrer das cavidades
+  MUMMY_EYES.forEach(([ex, ey], i) => {
+    const sd = i ? 1 : -1;
+    g.strokeStyle = 'rgba(110,12,22,.75)'; g.lineWidth = 1.3;
+    for (let k = 0; k < 9; k++) { const a = R(0, 6.28), r1 = 64, r2 = R(86, 130); g.beginPath(); g.moveTo(ex + Math.cos(a) * r1, ey + Math.sin(a) * r1 * 0.7); g.quadraticCurveTo(ex + Math.cos(a + 0.3) * (r1 + r2) / 2, ey + Math.sin(a + 0.3) * (r1 + r2) / 2 * 0.7, ex + Math.cos(a) * r2, ey + Math.sin(a) * r2 * 0.7); g.stroke(); }
+    for (let k = 0; k < 3; k++) {
+      const x0 = ex + sd * R(-24, 30), y0 = ey + 36, len = R(60, 190);
+      g.strokeStyle = 'rgba(100,8,14,.95)'; g.lineWidth = R(3.5, 6); g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + sd * R(-6, 12), y0 + len * 0.5, x0 + sd * R(-4, 10), y0 + len); g.stroke();
+      g.strokeStyle = 'rgba(255,120,110,.5)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x0 - 1, y0 + 4); g.lineTo(x0 - 1, y0 + len * 0.8); g.stroke();
+      g.fillStyle = 'rgba(110,10,16,.95)'; g.beginPath(); g.arc(x0 + sd * 5, y0 + len + 4, 4.5, 0, 6.28); g.fill();
+    }
+  });
+
   // nariz de caveira: nariz achatado e cavidade escura
   g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.moveTo(500, 520); g.quadraticCurveTo(470, 585, 482, 600); g.lineTo(518, 600); g.quadraticCurveTo(530, 585, 500, 520); g.fill();
   g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
@@ -258,6 +333,13 @@ export function drawMummy(px = 1536): HTMLCanvasElement {
   for (let k = 0; k < 9; k++) {
     const sd = k % 2 ? 1 : -1, x = 500 + sd * R(60, 220), y = R(230, 520); g.beginPath(); g.moveTo(x, y);
     for (let j = 0; j < 4; j++) g.lineTo(x + sd * R(-30, 30), y + (j + 1) * R(14, 28)); g.stroke();
+  }
+  for (let k = 0; k < 46; k++) {
+    const x0 = 500 + R(-150, 150), y0 = 168 + Math.abs(x0 - 500) * 0.12 + R(0, 20), sd = x0 < 500 ? -1 : 1;
+    g.beginPath(); g.moveTo(x0, y0); g.bezierCurveTo(x0 + sd * R(10, 40), y0 - R(30, 70), x0 + sd * R(30, 90), y0 - R(60, 130), x0 + sd * R(40, 130), y0 - R(20, 150) + R(0, 120));
+    const lw = R(0.9, 2.3);
+    g.strokeStyle = 'rgba(8,8,14,.75)'; g.lineWidth = lw + 1.5; g.stroke();
+    g.strokeStyle = HAIR[(R(0, HAIR.length)) | 0]; g.lineWidth = lw; g.stroke();
   }
   // tiras soltas a pender
   const tails: [number, number, number, number][] = [[300, 520, 250, 780], [330, 640, 340, 860], [700, 520, 760, 800], [668, 650, 650, 880]];

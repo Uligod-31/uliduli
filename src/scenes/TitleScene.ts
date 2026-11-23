@@ -1,6 +1,7 @@
 ﻿import Phaser from 'phaser';
 import { W, H, UI, FONT, FONT_HEAD } from '../core/theme';
 import { neoButton } from '../core/ui';
+import { drawLogo, drawFrame } from '../three/menuArt';
 import { generate, pathTo, DIRS } from '../core/maze';
 import { getWorld } from '../worlds';
 import { sfx } from '../core/audio';
@@ -22,21 +23,20 @@ export class TitleScene extends Phaser.Scene {
     const bot = this.add.graphics();
     bot.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 0.95, 0.95); bot.fillRect(0, H - 600, W, 600);
 
+    if (!this.textures.exists('frameArt')) this.textures.addCanvas('frameArt', drawFrame(1080));
+    this.add.image(W / 2, H / 2, 'frameArt').setDisplaySize(W, H);
     this.hud();
     this.lightning();
 
-    // logótipo com falhas: três camadas (ciano, magenta, branco-gelo) que se desalinham
-    const mk = (col: string | null, a: number, blend = false) => {
-      const t = this.add.text(W / 2, 214, 'UliDUli', { fontFamily: FONT_HEAD, fontSize: '190px', fontStyle: 'bold', color: col ?? '#ffffff' }).setOrigin(0.5).setAlpha(a);
-      t.setStyle({ letterSpacing: 6 } as any);
+    // logótipo metálico com falhas: três camadas (ciano, magenta, cromado) que se desalinham
+    if (!this.textures.exists('logoArt')) this.textures.addCanvas('logoArt', drawLogo());
+    const mk = (tint: number | null, a: number, blend = false) => {
+      const t = this.add.image(W / 2, 214, 'logoArt').setDisplaySize(690, (690 * 420) / 1440).setAlpha(a);
+      if (tint !== null) t.setTint(tint);
       if (blend) t.setBlendMode(Phaser.BlendModes.ADD);
       return t;
     };
-    const cy = mk('#27d3ff', 0.75, true), mg = mk('#ff2bd6', 0.75, true), main = mk(null, 1);
-    const gr = main.context.createLinearGradient(0, 40, 0, main.height);
-    gr.addColorStop(0, '#f4f7ff'); gr.addColorStop(0.55, '#b9c6ee'); gr.addColorStop(1, '#7a6ad8');
-    main.setFill(gr);
-    try { (main as any).postFX?.addGlow(0x5b92ff, 3, 0, false, 0.1, 10); } catch { /* sem WebGL FX */ }
+    const cy = mk(0x27d3ff, 0.55, true), mg = mk(0xff2bd6, 0.55, true), main = mk(null, 1);
     const slice = this.add.rectangle(W / 2, 214, W, 10, 0xffffff, 0).setBlendMode(Phaser.BlendModes.ADD);
     const glitch = () => {
       const n = 3 + ((Math.random() * 4) | 0);
@@ -59,7 +59,7 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: [cy, mg, main], y: '+=8', duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
 
     // bandeira: ESCAPA. OU SOBREVIVE.
-    const sub = this.add.text(W / 2, 346, '', { fontFamily: FONT_HEAD, fontSize: '40px', color: '#eceef3', fontStyle: 'bold' }).setOrigin(0.5);
+    const sub = this.add.text(W / 2, 346, '', { fontFamily: FONT_HEAD, fontSize: '40px', color: '#f4f7ff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 8 }).setOrigin(0.5);
     sub.setStyle({ letterSpacing: 16 } as any);
     const full = 'ESCAPA. OU SOBREVIVE.';
     let ci = 0;
