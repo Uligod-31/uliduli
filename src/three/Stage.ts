@@ -10,6 +10,7 @@ import { buildIsland, Island } from './island';
 import { Scenery, themeFor } from './scenery';
 import { makeRose, makePortal, Trail } from './actors';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
+import { makeTitleGiant, TitleGiant } from './titlegiant';
 import { sfx } from '../core/audio';
 import { mix, brandAt } from '../core/theme';
 import { glowSprite, hdr, disposeTree } from './common';
@@ -64,7 +65,7 @@ export class Stage {
   private pulseCur = 0;
   private fogBase = new THREE.Color();
   private planet = false;
-  private giant?: THREE.Group;
+  private giant?: TitleGiant;
   private th: ReturnType<typeof themeFor> = { top: 0, mid: 0, horizon: 0, ground: 0, ground2: 0, sun: 0 };
   private fogNear = 90;
   private fogFar = 900;
@@ -273,22 +274,23 @@ export class Stage {
 
   start(mode: 'game' | 'title') {
     this.mode = mode;
-    if (mode === 'title' && !this.giant) {
-      // um Crescido colossal a espreitar de trás do planeta
-      const g = makeGuard(1); g.scale.setScalar(11);
-      g.position.set(-8, -9, -26);
-      g.traverse((o) => { if ((o as THREE.Sprite).isSprite) o.visible = false; });
-      for (const m of [g.userData.armL, g.userData.armR]) (m as THREE.Object3D).rotation.x = 0.05;
-      this.scene.add(g); this.giant = g;
+    if (mode === 'title' && !this.giant && this.island) {
+      // um Crescido colossal debruçado sobre o planeta, de olhos acesos e mãos a agarrar o rebordo
+      this.giant = makeTitleGiant(this.island.radius + 1.2);
+      this.scene.add(this.giant.group);
     }
-    if (mode !== 'title' && this.giant) { this.scene.remove(this.giant); disposeTree(this.giant); this.giant = undefined; }
+    if (mode !== 'title' && this.giant) this.dropGiant();
     this.el.style.display = 'block';
     this.sync(true);
     if (!this.raf) { this.last = performance.now(); this.loop(); }
   }
+  private dropGiant() {
+    if (!this.giant) return;
+    this.scene.remove(this.giant.group); disposeTree(this.giant.group); this.giant = undefined;
+  }
   stop() {
     this.mode = 'off';
-    if (this.giant) { this.scene.remove(this.giant); disposeTree(this.giant); this.giant = undefined; }
+    if (this.giant) this.dropGiant();
     this.el.style.display = 'none';
     cancelAnimationFrame(this.raf); this.raf = 0;
   }
@@ -331,9 +333,9 @@ export class Stage {
     const asp = this.camera.aspect;
     if (this.mode === 'title') {
       this.titleAng += dt * 0.11;
-      const d = R * (asp < 1 ? 3.3 : 2.4);
-      want.set(Math.sin(this.titleAng * 0.8) * d * 0.28, R * 0.95, d);
-      look.set(0, R * 0.5, 0);
+      const d = R * (asp < 1 ? 4.1 : 2.8);
+      want.set(Math.sin(this.titleAng * 0.8) * d * 0.2, R * 1.05, d);
+      look.set(0, R * 0.7, 0);
     } else if (this.view === 'overview') {
       const d = R * (asp < 1 ? 2.3 : 1.75);
       want.set(0, d * 0.82, d * 0.72);
@@ -372,13 +374,7 @@ export class Stage {
     const I = this.island;
     if (this.introT < 1) this.introT = Math.min(1, this.introT + dt / 2.6);
     I.update(dt, this.t);
-    if (this.giant) {
-      const U = this.giant.userData;
-      (U.head as THREE.Object3D).rotation.y = Math.sin(this.t * 0.35) * 0.5 - 0.35;
-      (U.body as THREE.Object3D).position.y = Math.sin(this.t * 0.6) * 0.02;
-      (U.armL as THREE.Object3D).rotation.x = Math.sin(this.t * 0.5) * 0.06; (U.armR as THREE.Object3D).rotation.x = -Math.sin(this.t * 0.5) * 0.06;
-      this.giant.position.x = -8 + Math.sin(this.t * 0.12) * 3;
-    }
+    if (this.giant) this.giant.update(this.t, this.worldPlayer(new THREE.Vector3()).setY(0.4));
     this.placeCamera(dt);
     this.scenery.update(this.t, this.camera.position);
 
