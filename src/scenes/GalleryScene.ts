@@ -63,7 +63,9 @@ export class GalleryScene extends Phaser.Scene {
     root.add([dim, art]);
     root.add(label(this, W / 2, 80, `${wd.name} · ${def.title}`, 32, '#ffffff', true));
     root.add(button(this, W / 2 - 150, 1130, 280, 90, 'Guardar', () => {
-      const src = this.textures.get(art.texture.key).getSourceImage() as HTMLCanvasElement;
+      const si = this.textures.get(art.texture.key).getSourceImage() as HTMLCanvasElement | HTMLImageElement;
+      const src = document.createElement('canvas'); src.width = si.width; src.height = si.height;
+      src.getContext('2d')!.drawImage(si, 0, 0);
       const a = document.createElement('a');
       a.href = src.toDataURL('image/png'); a.download = `uliduli-${e.wid}-${e.li + 1}.png`; a.click();
     }, 'primary', 30));
