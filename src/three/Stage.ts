@@ -59,6 +59,10 @@ export class Stage {
   private w = 0;
   private h = 0;
   private camPos = new THREE.Vector3(0, 12, 10);
+  /** vista do jogador: rodar, inclinar, aproximar e arrastar o mapa (alvo e valor suavizado) */
+  private vw = { yaw: 0, pitch: 0, zoom: 1, px: 0, pz: 0 };
+  private vc = { yaw: 0, pitch: 0, zoom: 1, px: 0, pz: 0 };
+  private vVel = { yaw: 0 };
   private camLook = new THREE.Vector3();
   private tmp = new THREE.Vector3();
   private raf = 0;
@@ -192,6 +196,7 @@ export class Stage {
     this.player.x = (m.start % m.cols) + 0.5; this.player.y = ((m.start / m.cols) | 0) + 0.5;
     this.player.h = 0; this.player.dir = 0;
     this.view = 'follow';
+    this.vw = { yaw: 0, pitch: 0, zoom: 1, px: 0, pz: 0 }; this.vc = { yaw: 0, pitch: 0, zoom: 1, px: 0, pz: 0 };
     this.introT = opts.intro === false ? 1 : 0;
     this.celebrate = 0;
     this.darkTarget = this.dark = 0;
@@ -340,6 +345,34 @@ export class Stage {
   setDark(radiusCells: number) { this.darkTarget = radiusCells > 0 ? 1 : 0; if (radiusCells > 0) this.darkR = radiusCells; }
   shake(s = 0.35) { this.shakeT = s; }
   setView(v: ViewMode) { this.view = v; }
+  /** Gesto no mapa: dyaw/dpitch em radianos, zoom multiplicativo, pan em unidades do ecrã (frações). */
+  camGesture(g: { yaw?: number; pitch?: number; zoom?: number; panX?: number; panY?: number }) {
+    const w = this.vw;
+    if (g.yaw) { const y = Math.max(-0.3, Math.min(0.3, g.yaw)); w.yaw += y; this.vVel.yaw = this.vVel.yaw * 0.6 + y * 0.4; }
+    if (g.pitch) w.pitch = Math.max(-0.5, Math.min(0.75, w.pitch + g.pitch));
+    if (g.zoom) w.zoom = Math.max(0.55, Math.min(1.9, w.zoom * g.zoom));
+    if (g.panX || g.panY) {
+      const R = (this.island?.radius ?? 8) + 1;
+      const k = 10 * w.zoom;   // unidades do mundo por ecrã inteiro
+      const c = Math.cos(this.vc.yaw), s = Math.sin(this.vc.yaw);
+      // pan em coordenadas do ecrã → mundo (acompanha a rotação)
+      const dx = -(g.panX ?? 0) * k, dz = -(g.panY ?? 0) * k;
+      w.px = Math.max(-R, Math.min(R, w.px + dx * c + dz * s)); w.pz = Math.max(-R, Math.min(R, w.pz - dx * s + dz * c));
+    }
+  }
+  /** Ao largar o dedo, o giro continua um pouco e assenta num múltiplo de 90° se estiver perto. */
+  camRelease() {
+    const w = this.vw; w.yaw += Math.max(-0.5, Math.min(0.5, this.vVel.yaw * 5)); this.vVel.yaw = 0;
+    const q = Math.round(w.yaw / (Math.PI / 2)) * (Math.PI / 2);
+    if (Math.abs(w.yaw - q) < 0.42) w.yaw = q;
+  }
+  /** Volta a centrar na personagem, com a vista normal. */
+  camRecenter() { this.vw = { yaw: 0, pitch: 0, zoom: 1, px: 0, pz: 0 }; this.vVel.yaw = 0; }
+  /** 0 = vista normal; maior = mais afastada do normal (para mostrar a dica de recentrar). */
+  get camOffset() { const w = this.vw; return Math.abs(w.yaw) + Math.abs(w.pitch) * 2 + Math.abs(w.zoom - 1) * 2 + Math.hypot(w.px, w.pz) * 0.3; }
+  get camYaw() { return this.vc.yaw; }
+  /** Quarto de volta (0..3) em que está a vista: o joystick roda com ela. */
+  get camQuarter() { return (((-Math.round(this.vw.yaw / (Math.PI / 2))) % 4) + 4) % 4; }
   win() { this.celebrate = 1; this.view = 'overview'; this.setDark(0); }
 
   start(mode: 'game' | 'title') {
@@ -445,6 +478,15 @@ export class Stage {
       const ov = new THREE.Vector3(Math.sin((1 - ease) * 1.3) * ovD * 0.6, ovD * 0.82, Math.cos((1 - ease) * 1.3) * ovD * 0.72);
       want.copy(ov).lerp(follow, ease);
       look.set(0, 0, 0).lerp(this.tmp.set(p.x, 0.2, p.z + 1.2), ease);
+    }
+    if (this.mode === 'game') {
+      const v = this.vc, w = this.vw, a = snap ? 1 : 1 - Math.exp(-dt * 11);
+      v.yaw += (w.yaw - v.yaw) * a; v.pitch += (w.pitch - v.pitch) * a; v.zoom += (w.zoom - v.zoom) * a; v.px += (w.px - v.px) * a; v.pz += (w.pz - v.pz) * a;
+      const off = this.tmp.copy(want).sub(look), r = off.length() * v.zoom;
+      let az = Math.atan2(off.x, off.z) + v.yaw, el = Math.asin(Math.min(1, Math.max(-1, off.y / Math.max(0.001, off.length())))) + v.pitch;
+      el = Math.max(0.3, Math.min(1.5, el));
+      look.x += v.px; look.z += v.pz;
+      want.set(look.x + r * Math.cos(el) * Math.sin(az), look.y + r * Math.sin(el), look.z + r * Math.cos(el) * Math.cos(az));
     }
     if (snap) { this.camPos.copy(want); this.camLook.copy(look); }
     else {

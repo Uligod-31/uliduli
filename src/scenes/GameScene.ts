@@ -190,8 +190,11 @@ export class GameScene extends Phaser.Scene {
     if (this.pad.dir >= 0) this.drawArrow(this.pad.dir, false);
     this.pad.dir = d;
     // toque = um passo; só segurar (≥ 0,2 s) dá avanço contínuo
-    if (d >= 0) { this.drawArrow(d, true); this.queued = { dir: d, run: false }; this.padSince = this.time.now; sfx.unlock(); }
+    if (d >= 0) { this.drawArrow(d, true); this.queued = { dir: this.mapDir(d), run: false }; this.padSince = this.time.now; sfx.unlock(); }
   }
+
+  /** O joystick é relativo ao ecrã: roda com a vista (quartos de volta). */
+  private mapDir(d: number) { return (d + stage.camQuarter) % 4; }
 
   private toggleView() {
     if (this.done) return;
@@ -245,20 +248,93 @@ export class GameScene extends Phaser.Scene {
     };
     this.input.on('pointerup', release);
     this.input.on('pointerupoutside', release);
+    this.setupMapGestures();
+  }
+
+  // ───────────────────────── Gestos no mapa ─────────────────────────
+  private camPtrs = new Map<number, { x: number; y: number }>();
+  private camTouched = false;
+  private compass!: Phaser.GameObjects.Graphics;
+  private camHint?: Phaser.GameObjects.Text;
+
+  private setupMapGestures() {
+    this.input.addPointer(2);
+    const P = this.pad;
+    const centre = () => { // toque no centro do joystick (ou na bússola): volta a centrar na personagem
+      stage.camRecenter();
+      try { navigator.vibrate?.(14); } catch { /* sem vibração */ }
+      this.tweens.add({ targets: this.padKnob, scale: 1.25, duration: 110, yoyo: true });
+      this.recFlash = 1;
+    };
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (this.blocked || this.done) return;
+      const dpad = Math.hypot(p.x - P.cx, p.y - P.cy);
+      if (dpad < 34) { centre(); return; }                          // centro do joystick
+      if (dpad <= P.r + 30) return;                                  // resto do joystick
+      if (Math.hypot(p.x - 84, p.y - (H - 350)) < 52) { centre(); return; }   // bússola
+      if (p.y < 232 || p.y > H - 120) return;                        // cabeçalho e rodapé
+      if (this.input.hitTestPointer(p).length) return;               // botões
+      this.camPtrs.set(p.id, { x: p.x, y: p.y });
+    });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      const prev = this.camPtrs.get(p.id);
+      if (!prev) return;
+      if (this.camPtrs.size === 1) {
+        // um dedo: vira o labirinto (esquerda/direita) e inclina-o (cima/baixo)
+        stage.camGesture({ yaw: -(p.x - prev.x) * 0.0072, pitch: (p.y - prev.y) * 0.0042 });
+      } else {
+        // dois dedos: arrasta o mapa, aproxima/afasta e roda
+        const other = [...this.camPtrs.entries()].find(([id]) => id !== p.id)![1];
+        const d0 = Math.hypot(prev.x - other.x, prev.y - other.y), d1 = Math.hypot(p.x - other.x, p.y - other.y);
+        if (d0 > 30 && d1 > 30) stage.camGesture({ zoom: d0 / d1 });
+        const a0 = Math.atan2(prev.y - other.y, prev.x - other.x), a1 = Math.atan2(p.y - other.y, p.x - other.x);
+        let da = a1 - a0; da = Math.atan2(Math.sin(da), Math.cos(da));
+        stage.camGesture({ yaw: -da * 0.5, panX: (p.x - prev.x) / 2 / W, panY: (p.y - prev.y) / 2 / H });
+      }
+      prev.x = p.x; prev.y = p.y;
+      if (!this.camTouched) { this.camTouched = true; this.camHint?.destroy(); try { localStorage.setItem('uliduli_camhint', '1'); } catch { /* ok */ } }
+    });
+    const up = (p: Phaser.Input.Pointer) => { if (this.camPtrs.delete(p.id) && this.camPtrs.size === 0) stage.camRelease(); };
+    this.input.on('pointerup', up); this.input.on('pointerupoutside', up);
+
+    // bússola: o norte do labirinto; toca para centrar
+    this.compass = this.add.graphics().setDepth(31);
+    // dica única, nas primeiras vezes
+    let seen = false; try { seen = !!localStorage.getItem('uliduli_camhint'); } catch { /* ok */ }
+    if (!seen) {
+      this.camHint = this.add.text(W / 2, 262, 'Arrasta o mapa para o virar  ·  toca no centro do joystick para centrar', { fontFamily: FONT, fontSize: '20px', color: '#cfe0ff', stroke: '#05060b', strokeThickness: 5, align: 'center', wordWrap: { width: W - 90 } }).setOrigin(0.5).setDepth(30).setAlpha(0);
+      this.tweens.add({ targets: this.camHint, alpha: 0.95, duration: 500, delay: 1200, yoyo: true, hold: 4200, onComplete: () => this.camHint?.destroy() });
+    }
+  }
+  private recFlash = 0;
+
+  private drawCompass() {
+    const g = this.compass, cx = 84, cy = H - 350, r = 38, yaw = stage.camYaw, off = stage.camOffset;
+    g.clear();
+    g.fillStyle(0x0a0b10, 0.42); g.fillCircle(cx, cy, r);
+    g.lineStyle(3, off > 0.05 ? UI.fuchsia : UI.blue, off > 0.05 ? 0.95 : 0.5); g.strokeCircle(cx, cy, r);
+    // agulha: aponta para o "cima" original do labirinto (roda ao contrário da vista)
+    const a = yaw, nx = Math.sin(a), ny = -Math.cos(a);
+    g.fillStyle(0xff4fd8, 0.95); g.fillTriangle(cx + nx * (r - 6), cy + ny * (r - 6), cx - ny * 8 - nx * 4, cy + nx * 8 - ny * 4, cx + ny * 8 - nx * 4, cy - nx * 8 - ny * 4);
+    g.fillStyle(0xffffff, 0.5); g.fillTriangle(cx - nx * (r - 8), cy - ny * (r - 8), cx - ny * 7 + nx * 4, cy + nx * 7 + ny * 4, cx + ny * 7 + nx * 4, cy - nx * 7 + ny * 4);
+    g.fillStyle(0xffffff, 0.9); g.fillCircle(cx, cy, 4);
+    if (off > 0.05) { const k = 0.5 + 0.5 * Math.sin(this.time.now / 180); g.lineStyle(2, UI.fuchsia, 0.35 + 0.4 * k); g.strokeCircle(this.pad.cx, this.pad.cy, 46 + 8 * k); }
+    if (this.recFlash > 0) { g.lineStyle(5, 0xffffff, this.recFlash * 0.8); g.strokeCircle(this.pad.cx, this.pad.cy, 46 + (1 - this.recFlash) * 70); this.recFlash = Math.max(0, this.recFlash - 0.06); }
   }
 
   update() {
     if (this.padKnob) this.drawKnob();
+    if (this.compass) this.drawCompass();
     if (this.blocked || this.done || this.moving) return;
     const k = this.keys;
     let dir = -1;
     // joystick segurado: continua a andar (sem repetir o "toc" na parede)
-    if (this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 150 && canPass(this.m, this.idx, this.pad.dir, this.phase)) this.queued = { dir: this.pad.dir, run: false };
+    if (this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 150 && canPass(this.m, this.idx, this.mapDir(this.pad.dir), this.phase)) this.queued = { dir: this.mapDir(this.pad.dir), run: false };
     if (k.UP.isDown || k.W.isDown) dir = 0;
     else if (k.RIGHT.isDown || k.D.isDown) dir = 1;
     else if (k.DOWN.isDown || k.S.isDown) dir = 2;
     else if (k.LEFT.isDown || k.A.isDown) dir = 3;
-    if (dir >= 0) this.queued = { dir, run: false };
+    if (dir >= 0) this.queued = { dir: this.mapDir(dir), run: false };
     if (this.queued) {
       const q = this.queued; this.queued = null;
       this.run = q.run;
