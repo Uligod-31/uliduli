@@ -267,6 +267,16 @@ export class EyeTitle {
   env: THREE.Texture;
   private ball = new THREE.Group();
   private iris = new THREE.Group();
+  private mazePivot = new THREE.Group();
+  private mazeIn = new THREE.Group();
+  private wallData: { base: THREE.Vector3; q: THREE.Quaternion; nrm: THREE.Vector3; len: number; r: number; thick: number }[] = [];
+  private wallBody!: THREE.InstancedMesh;
+  private gear = new THREE.Group();
+  private sparks!: THREE.InstancedMesh;
+  private sparkData: { c: number; a: number; v: number }[] = [];
+  private shockT = -1;
+  private shockedCycle = -1;
+  private wallTop!: THREE.InstancedMesh;
   private upper: Lid; private lower: Lid;
   private lashesU: THREE.InstancedMesh; private lashesL: THREE.InstancedMesh;
   private uli = makeUli();
@@ -376,21 +386,46 @@ export class EyeTitle {
       this.tmpQ2.setFromAxisAngle(new THREE.Vector3(0, 0, 1), w.a + (w.radial ? 0 : Math.PI / 2));
       const q = this.tmpQ.clone().multiply(this.tmpQ2);
       const nrm = new THREE.Vector3(Math.sin(phi) * Math.cos(w.a), Math.sin(phi) * Math.sin(w.a), Math.cos(phi));
+      this.wallData.push({ base: new THREE.Vector3(x, y, z), q, nrm, len: w.len, r: w.r, thick });
       this.tmpM.compose(new THREE.Vector3(x, y, z).addScaledVector(nrm, wallH / 2), q, new THREE.Vector3(w.len, thick, wallH)); body.setMatrixAt(k, this.tmpM);
       this.tmpM.compose(new THREE.Vector3(x, y, z).addScaledVector(nrm, wallH + 0.005), q, new THREE.Vector3(w.len, thick * 1.05, 0.03)); top.setMatrixAt(k, this.tmpM);
       top.setColorAt(k, (R() < 0.5 ? cF.set(0xff4fd8).multiplyScalar(1.9) : cB.set(0x7aa8ff).multiplyScalar(1.8)));
     });
-    this.iris.add(body, top);
+    this.wallBody = body; this.wallTop = top;
+    body.frustumCulled = top.frustumCulled = false;
+    this.mazeIn.add(body, top);
 
     // caminho (rasto) e Uli
     this.path = mz.pts.map((q) => new THREE.Vector3(Math.cos(q.a) * q.r, Math.sin(q.a) * q.r, domeZ(q.r) + 0.03));
     const curve = new THREE.CatmullRomCurve3(this.path, false, 'centripetal');
     this.trailGeo = new THREE.TubeGeometry(curve, 420, 0.03, 5, false);
     const trail = new THREE.Mesh(this.trailGeo, new THREE.MeshBasicMaterial({ color: hdr(0xff4fd8, 2.4), toneMapped: false }));
-    this.iris.add(trail);
+    this.mazeIn.add(trail);
     this.pathCum = [0]; for (let i = 1; i < this.path.length; i++) this.pathCum.push(this.pathCum[i - 1] + this.path[i].distanceTo(this.path[i - 1]));
     this.pathLen = this.pathCum[this.pathCum.length - 1];
-    this.uli.scale.setScalar(0.82); this.iris.add(this.uli);
+    this.uli.scale.setScalar(0.82); this.mazeIn.add(this.uli);
+    // engrenagem dourada no limbo da íris, a rodar ao contrário do labirinto
+    const NT = 56, gearM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), NT);
+    const gcol = new THREE.Color();
+    for (let i = 0; i < NT; i++) {
+      const a = (i / NT) * TAU, r = IR - 0.06, phi = Math.atan(r / RD), big = i % 2 === 0;
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-Math.sin(a), Math.cos(a), 0), phi).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), a));
+      this.tmpM.compose(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, domeZ(r) + 0.07), q, new THREE.Vector3(big ? 0.3 : 0.17, 0.09, 0.12));
+      gearM.setMatrixAt(i, this.tmpM); gearM.setColorAt(i, big ? gcol.set(0xffc65a).multiplyScalar(1.6) : gcol.set(0xff4fd8).multiplyScalar(1.5));
+    }
+    gearM.frustumCulled = false; this.gear.add(gearM); this.iris.add(this.gear);
+    // faíscas a correr pelos corredores, cada anel num sentido
+    const NS = 44;
+    this.sparks = new THREE.InstancedMesh(new THREE.SphereGeometry(0.055, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), NS);
+    for (let i = 0; i < NS; i++) {
+      const c = 1 + (i % 5);
+      this.sparkData.push({ c, a: R() * TAU, v: (c % 2 ? 1 : -1) * (0.35 + R() * 0.55) / (0.6 + c * 0.25) });
+      this.sparks.setColorAt(i, i % 3 === 0 ? gcol.set(0xffd98a).multiplyScalar(2.4) : i % 3 === 1 ? gcol.set(0xff4fd8).multiplyScalar(2.2) : gcol.set(0x7aa8ff).multiplyScalar(2.2));
+    }
+    this.sparks.frustumCulled = false; this.mazeIn.add(this.sparks);
+    // o labirinto roda e passeia em 3D à volta do seu centro (pivô no meio da íris)
+    const zc = domeZ(1.8);
+    this.mazePivot.position.z = zc; this.mazeIn.position.z = -zc; this.mazePivot.add(this.mazeIn); this.iris.add(this.mazePivot);
 
     // pálpebras
     const skin = skinTextures();
@@ -511,6 +546,19 @@ export class EyeTitle {
     this.ball.rotation.y = this.look.x * 0.30; this.ball.rotation.x = this.look.y * 0.24;
     this.ball.rotation.z = Math.sin(t * 0.3) * 0.02;
     this.iris.rotation.z = t * 0.035;
+    // labirinto: rotação própria + inclinação 3D + translação suave, e uma onda a subir pelos anéis
+    const mp = this.mazePivot;
+    mp.rotation.set(Math.sin(t * 0.5) * 0.09 + this.look.y * 0.05, Math.cos(t * 0.41) * 0.09 - this.look.x * 0.05, t * 0.16);
+    mp.position.x = Math.sin(t * 0.7) * 0.14; mp.position.y = Math.cos(t * 0.53) * 0.11; mp.position.z = domeZ(1.8) + Math.sin(t * 0.9) * 0.12;
+    this.waveWalls(t, pulse);
+    this.gear.rotation.z = -t * 0.32;
+    for (let i = 0; i < this.sparkData.length; i++) {
+      const d = this.sparkData[i], r = PR + 0.32 + (d.c - 1) * (IR - 0.32 - PR - 0.3) / 4 + ((d.c % 2) ? 0.19 : -0.19), a = d.a + d.v * t;
+      this.tmpV.set(Math.cos(a) * r, Math.sin(a) * r, domeZ(r) + 0.2 + 0.05 * Math.sin(t * 5 + i));
+      this.tmpM.compose(this.tmpV, this.tmpQ.identity(), new THREE.Vector3(1, 1, 1)); this.sparks.setMatrixAt(i, this.tmpM);
+    }
+    this.sparks.instanceMatrix.needsUpdate = true;
+    if (this.shockT >= 0) { this.shockT += dt; if (this.shockT > 1.6) this.shockT = -1; }
 
     // piscar
     this.blinkAt -= dt;
@@ -546,6 +594,8 @@ export class EyeTitle {
     this.uli.position.copy(p).setZ(p.z - 0.03 + fin * 0.4);
     this.uli.scale.setScalar(0.82 * (1 - fin));
     this.uli.visible = fin < 0.99;
+    const cyc = Math.floor((t + 1.2) / cycle);
+    if (!walking && fin > 0.9 && this.shockedCycle !== cyc) { this.shockedCycle = cyc; this.shockT = 0; }
     const U = this.uli.userData, sw = Math.sin(t * 9) * 0.85 * (walking ? 1 : 0);
     (U.legL as THREE.Object3D).rotation.x = sw; (U.legR as THREE.Object3D).rotation.x = -sw;
     (U.armL as THREE.Object3D).rotation.x = -sw * 0.9; (U.armR as THREE.Object3D).rotation.x = sw * 0.9;
@@ -606,6 +656,18 @@ export class EyeTitle {
     camera.fov = fov - 1.2 * pulse; camera.updateProjectionMatrix();
   }
 
+  private waveWalls(t: number, pulse: number) {
+    const base = 0.36;
+    for (let i = 0; i < this.wallData.length; i++) {
+      const d = this.wallData[i], bump = this.shockT >= 0 ? 1.4 * Math.exp(-Math.pow(d.r - (0.9 + this.shockT * 3.2), 2) * 3) * (1 - this.shockT / 1.6) : 0;
+      const h = base * (1 + 0.4 * Math.sin(t * 1.7 - d.r * 2.6) + 0.3 * pulse + bump);
+      this.tmpV.copy(d.base).addScaledVector(d.nrm, h / 2);
+      this.tmpM.compose(this.tmpV, d.q, new THREE.Vector3(d.len, d.thick, h)); this.wallBody.setMatrixAt(i, this.tmpM);
+      this.tmpV.copy(d.base).addScaledVector(d.nrm, h + 0.005);
+      this.tmpM.compose(this.tmpV, d.q, new THREE.Vector3(d.len, d.thick * 1.05, 0.03)); this.wallTop.setMatrixAt(i, this.tmpM);
+    }
+    this.wallBody.instanceMatrix.needsUpdate = true; this.wallTop.instanceMatrix.needsUpdate = true;
+  }
   private placeLashes(im: THREE.InstancedMesh, side: 1 | -1, n: number, o: number, len: number) {
     for (let i = 0; i < n; i++) {
       const u = (i + 0.5) / n, x = -HW * 0.94 + u * HW * 1.88;

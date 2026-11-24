@@ -1,5 +1,5 @@
 // Service worker: rede primeiro (para receber sempre a versão nova), cache só como reserva offline.
-const CACHE = 'uliduli-v17';
+const CACHE = 'uliduli-v18';
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(
