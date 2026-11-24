@@ -93,12 +93,12 @@ export function makeGuard(variant = 0, style = 0): THREE.Group {
   root.add(fig);
   const v = variant % 3;
   const S = style >= 3 ? style - 3 : -1;   // 0 Carcereiro, 1 Sentinela de gelo, 2 Autómato, 3 Livro vivo
-  const cloth = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x140a0a, 0x7fa8c4, 0x5a4220, 0x2a1c14][S] : [0x2a2224, 0x23262d, 0x1f2a25][v], roughness: S === 1 ? 0.25 : S === 2 ? 0.4 : 0.95, metalness: S === 2 ? 0.8 : S === 1 ? 0.15 : 0 });
-  const clothL = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x3a1612, 0xaed4ea, 0x8a6a2f, 0x4a2a1a][S] : [0x4a2f2c, 0x3a3f4a, 0x2d3d35][v], roughness: S === 1 ? 0.2 : S === 2 ? 0.35 : 0.95, metalness: S === 2 ? 0.85 : 0 });
-  const skin = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0xcdbfa6, 0xcfe6f2, 0xb98a3a, 0xcdbfa6][S] : 0xcdbfa6, roughness: S === 1 ? 0.2 : 0.85, metalness: S === 2 ? 0.8 : 0 });
+  const cloth = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x140a0a, 0x7fa8c4, 0x5a4220, 0x2a1c14, 0x2e2416, 0x2a3238][S] : [0x2a2224, 0x23262d, 0x1f2a25][v], roughness: S === 1 ? 0.25 : S === 2 ? 0.4 : S === 5 ? 0.5 : 0.95, metalness: S === 2 ? 0.8 : S === 1 ? 0.15 : S === 5 ? 0.5 : 0 });
+  const clothL = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x3a1612, 0xaed4ea, 0x8a6a2f, 0x4a2a1a, 0x4e3c22, 0x56646e][S] : [0x4a2f2c, 0x3a3f4a, 0x2d3d35][v], roughness: S === 1 ? 0.2 : S === 2 ? 0.35 : S === 5 ? 0.45 : 0.95, metalness: S === 2 ? 0.85 : S === 5 ? 0.55 : 0 });
+  const skin = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0xcdbfa6, 0xcfe6f2, 0xb98a3a, 0xcdbfa6, 0x7a6a44, 0x9fb4b8][S] : 0xcdbfa6, roughness: S === 1 ? 0.2 : 0.85, metalness: S === 2 ? 0.8 : 0 });
   const darkM = new THREE.MeshStandardMaterial({ color: 0x0d0c0b, roughness: 0.7 });
   const goldM = new THREE.MeshStandardMaterial({ color: 0xc9a13a, emissive: 0x5a3c08, emissiveIntensity: 0.8, roughness: 0.4, metalness: 0.6 });
-  const eyeM = new THREE.MeshBasicMaterial({ color: hdr(S >= 0 ? [0xff4a1a, 0x7fd8ff, 0xff3030, 0xffa040][S] : 0xffd36a, 2.6), toneMapped: false });
+  const eyeM = new THREE.MeshBasicMaterial({ color: hdr(S >= 0 ? [0xff4a1a, 0x7fd8ff, 0xff3030, 0xffa040, 0xa8ff6a, 0xff8a30][S] : 0xffd36a, 2.6), toneMapped: false });
 
   const mkLeg = (x: number) => {
     const p = new THREE.Group(); p.position.set(x, 0.66, 0);
@@ -147,6 +147,27 @@ export function makeGuard(variant = 0, style = 0): THREE.Group {
       const tube = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.07, 14), goldM)); tube.rotation.x = Math.PI / 2; tube.position.set(0, 0.01, 0.12); head.add(tube);
       const gg = new THREE.Group(); gg.position.set(0, 0.35, -0.2); up.add(gg); gg.add(cast(new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.025, 6, 18), goldM)));
       for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2, t = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.03), goldM); t.position.set(Math.cos(a) * 0.17, Math.sin(a) * 0.17, 0); t.rotation.z = a; gg.add(t); }
+    } else if (S === 4) {     // Espírito de Raiz: hastes de ramos, musgo nos ombros, rebentos a brilhar e trepadeiras
+      const sprout = new THREE.MeshBasicMaterial({ color: hdr(0xa8ff6a, 1.8), toneMapped: false }), moss = new THREE.MeshStandardMaterial({ color: 0x3a6a2a, roughness: 1 });
+      for (const sd of [-1, 1]) {
+        const main = cast(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(sd * 0.05, 0.1, 0), new THREE.Vector3(sd * 0.1, 0.22, 0), new THREE.Vector3(sd * 0.2, 0.34, 0.0), new THREE.Vector3(sd * 0.26, 0.46, -0.02)]), 12, 0.012, 5), cloth)); head.add(main);
+        for (const [x0, y0, x1, y1] of [[0.1, 0.22, 0.2, 0.2], [0.17, 0.3, 0.1, 0.42], [0.2, 0.36, 0.3, 0.34]] as const) head.add(cast(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(sd * x0, y0, 0), new THREE.Vector3(sd * x1, y1, 0)]), 6, 0.008, 4), cloth)));
+        const bud = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), sprout); bud.position.set(sd * 0.26, 0.47, -0.02); head.add(bud);
+        const sh = cast(new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), moss)); sh.scale.set(1.3, 0.6, 1); sh.position.set(sd * 0.22, 0.6, 0.02); up.add(sh);
+        for (let k = 0; k < 3; k++) { const s = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.07, 5), sprout); s.position.set(sd * (0.2 + k * 0.04), 0.68, 0.02 + (k % 2) * 0.03); up.add(s); }
+      }
+      for (let k = 0; k < 5; k++) { const vn = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.34 + (k % 3) * 0.12, 4), moss)); vn.position.set(-0.12 + k * 0.06, 0.1 - (k % 2) * 0.05, 0.16); up.add(vn); }
+    } else if (S === 5) {     // Draugr: elmo com chifres, escudo redondo e machado, olhos de runa
+      const horn = new THREE.MeshStandardMaterial({ color: 0xcfc6ae, roughness: 0.6 }), steel = new THREE.MeshStandardMaterial({ color: 0x6a747c, roughness: 0.35, metalness: 0.85 });
+      const helm = cast(new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.58), steel)); helm.position.y = 0.045; helm.scale.set(1, 1.05, 1.04); head.add(helm);
+      const nasal = cast(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.012), steel)); nasal.position.set(0, -0.005, 0.105); head.add(nasal);
+      for (const sd of [-1, 1]) head.add(cast(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(sd * 0.11, 0.07, 0), new THREE.Vector3(sd * 0.2, 0.09, 0), new THREE.Vector3(sd * 0.25, 0.2, 0), new THREE.Vector3(sd * 0.22, 0.3, 0)]), 12, 0.02, 6), horn)));
+      const shield = new THREE.Group(); shield.position.set(-0.06, -0.55, 0.12); shield.rotation.y = Math.PI / 2; armL.add(shield);
+      shield.add(cast(new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.03, 18).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7a2a1a, roughness: 0.7 }))));
+      shield.add(cast(new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.016, 6, 22), steel))); const boss = cast(new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), steel)); boss.position.z = 0.02; shield.add(boss);
+      const axe = new THREE.Group(); axe.position.set(0.0, -0.86, 0.05); axe.rotation.z = -0.2; armR.add(axe);
+      const sh = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.6, 6), new THREE.MeshStandardMaterial({ color: 0x4a2c16, roughness: 0.8 }))); sh.position.y = 0.18; axe.add(sh);
+      const blade = cast(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.015), steel)); blade.position.set(0.1, 0.4, 0); axe.add(blade);
     } else {                  // Livro vivo: um livro aberto no lugar da cara
       skull.visible = false;
       for (const sd of [-1, 1]) {
@@ -176,7 +197,7 @@ export function makeGuard(variant = 0, style = 0): THREE.Group {
     const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.075), goldM); clasp.position.set(0, -0.93, 0); armR.add(clasp);
   }
 
-  const glow = glowSprite(S >= 0 ? [0xff5a2a, 0x7fd8ff, 0xffb347, 0xffd98a][S] : 0xffb347, 1.4, 0.32); glow.position.set(0, 0.95, 0); fig.add(glow);
+  const glow = glowSprite(S >= 0 ? [0xff5a2a, 0x7fd8ff, 0xffb347, 0xffd98a, 0xa8ff6a, 0xff8a30][S] : 0xffb347, 1.4, 0.32); glow.position.set(0, 0.95, 0); fig.add(glow);
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.3, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.012; root.add(shadow);
   root.userData = { body: fig, legL, legR, armL, armR, head, glow };

@@ -10,7 +10,7 @@ export interface DecorOpts {
   reserved: Set<number>;
   segs: { x1: number; y1: number; x2: number; y2: number }[];
   rng: () => number;
-  style: 'garden' | 'planet' | 'ice' | 'hell' | 'clock' | 'library';
+  style: 'garden' | 'planet' | 'ice' | 'hell' | 'clock' | 'library' | 'elfic' | 'viking';
   accent: number;
   wallH: number;
   wallT: number;
@@ -67,7 +67,7 @@ export function buildDecor(o: DecorOpts): Decor {
   }
   // ── manchas do mundo: geada, lava, óleo, pó ──
   if (o.style !== 'garden' && o.style !== 'planet') {
-    const spec = { ice: [0xeaf6ff, 0.38, false, 0.28], hell: [0xff5a1a, 0.6, true, 0.2], clock: [0x2a1a08, 0.5, false, 0.2], library: [0xd8c8a0, 0.2, false, 0.3] }[o.style] as [number, number, boolean, number];
+    const spec = { ice: [0xeaf6ff, 0.38, false, 0.28], hell: [0xff5a1a, 0.6, true, 0.2], clock: [0x2a1a08, 0.5, false, 0.2], library: [0xd8c8a0, 0.2, false, 0.3], elfic: [0x9be07a, 0.4, true, 0.22], viking: [0xe6f0fa, 0.34, false, 0.3] }[o.style] as [number, number, boolean, number];
     const l = pick(spec[3]);
     const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: puddleBlob(), color: spec[0], transparent: true, opacity: spec[1], depthWrite: false, blending: spec[2] ? THREE.AdditiveBlending : THREE.NormalBlending, polygonOffset: true, polygonOffsetFactor: -2, fog: !spec[2] }), l.length);
     place(l, (_i, x, z) => compose(x, 0.005, z, rng() * 6.28, 0.5 + rng() * 0.6, 1, 0.4 + rng() * 0.4), mesh);
@@ -79,7 +79,7 @@ export function buildDecor(o: DecorOpts): Decor {
     const mesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), l.length);
     const cc = new THREE.Color();
     place(l, (_i, x, z) => { const s = 0.02 + rng() * 0.05; return compose(x, s * 0.4, z, rng() * 6.28, s * (1 + rng() * 0.8), s * 0.7, s); }, mesh);
-    const RC: Record<string, [number, number]> = { garden: [0x4a463e, 0x7a746a], planet: [0x4a463e, 0x7a746a], ice: [0xaac8dc, 0xe8f4fa], hell: [0x2a2228, 0x4a3a40], clock: [0x8a6a2f, 0xb08a3c], library: [0xcfc4a8, 0xefe6cc] };
+    const RC: Record<string, [number, number]> = { garden: [0x4a463e, 0x7a746a], planet: [0x4a463e, 0x7a746a], ice: [0xaac8dc, 0xe8f4fa], hell: [0x2a2228, 0x4a3a40], clock: [0x8a6a2f, 0xb08a3c], library: [0xcfc4a8, 0xefe6cc], elfic: [0x5a6a48, 0x8a9a6a], viking: [0x4a5058, 0x8a929a] };
     l.forEach((_, k) => mesh.setColorAt(k, cc.setHex(RC[o.style][0]).lerp(new THREE.Color(RC[o.style][1]), rng())));
     mesh.castShadow = true; group.add(mesh);
   }
@@ -97,13 +97,13 @@ export function buildDecor(o: DecorOpts): Decor {
     group.add(mesh);
   }
   // ── ossos e caveiras ──
-  if (o.style === 'garden' || o.style === 'hell' || o.style === 'planet') {
-    const l = pick(o.style === 'planet' ? 0.025 : 0.07);
+  if (o.style === 'garden' || o.style === 'hell' || o.style === 'planet' || o.style === 'viking') {
+    const l = pick(o.style === 'planet' ? 0.025 : o.style === 'viking' ? 0.05 : 0.07);
     const bone = (() => { const a = new THREE.CapsuleGeometry(0.012, 0.11, 3, 6).rotateZ(Math.PI / 2); const b = a.clone().rotateY(0.8); return merge([col(a.translate(0, 0.012, 0), 0xcfc7ad), col(b.translate(0, 0.012, 0), 0xbfb79c)]); })();
     const mesh = new THREE.InstancedMesh(bone, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), l.length);
     place(l, (_i, x, z) => compose(x, 0, z, rng() * 6.28, 1 + rng() * 0.5), mesh);
     group.add(mesh);
-    const ls = pick(o.style === 'planet' ? 0.01 : o.style === 'hell' ? 0.06 : 0.035);
+    const ls = pick(o.style === 'planet' ? 0.01 : o.style === 'hell' ? 0.06 : o.style === 'viking' ? 0.04 : 0.035);
     const sk = new THREE.SphereGeometry(0.05, 10, 8); sk.scale(1, 0.9, 1.05); sk.translate(0, 0.045, 0);
     const jaw = new THREE.BoxGeometry(0.05, 0.025, 0.05); jaw.translate(0, 0.012, 0.03);
     const eyes = [-1, 1].map((s) => { const e = new THREE.SphereGeometry(0.012, 6, 5); e.translate(s * 0.02, 0.05, 0.043); return col(e, 0x050403); });
@@ -164,6 +164,39 @@ export function buildDecor(o: DecorOpts): Decor {
       (sprites as any).pos = c; steamVents.push({ sprites, ph: rng() * 6 });
     }
   }
+  if (o.style === 'elfic') {
+    // cogumelos luminosos em três tamanhos
+    const l = pick(0.16), parts: THREE.BufferGeometry[] = [], caps = [0x7be8c0, 0xffd870, 0xa8f088];
+    for (let k = 0; k < 3; k++) {
+      const h = 0.07 + k * 0.045, rr = 0.045 + k * 0.022, ox = (k - 1) * 0.075, oz = (k % 2) * 0.05;
+      parts.push(col(new THREE.CylinderGeometry(rr * 0.22, rr * 0.3, h, 6).translate(ox, h / 2, oz), 0xe8e0c0));
+      parts.push(col(new THREE.SphereGeometry(rr, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.62, 1).translate(ox, h, oz), caps[k]));
+    }
+    const mm = new THREE.InstancedMesh(merge(parts), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }), l.length);
+    l.forEach((i, k) => { const c = corner(i); mm.setMatrixAt(k, compose(c.x, 0, c.z, rng() * 6.28, 0.9 + rng() * 0.8)); const gs = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x80f0c0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })); gs.position.set(c.x, 0.1, c.z); gs.scale.setScalar(0.55); group.add(gs); glowSprites.push({ s: gs, ph: rng() * 6, base: 0.45 }); });
+    group.add(mm);
+    // fetos
+    const lf = pick(0.28), fp: THREE.BufferGeometry[] = [];
+    for (let k = 0; k < 7; k++) { const c = new THREE.ConeGeometry(0.02, 0.3, 4); c.scale(1, 1, 0.35); c.translate(0, 0.15, 0); c.rotateZ(0.9); c.rotateY(k * 0.9); fp.push(col(c, k % 2 ? 0x3a6a2a : 0x4c8030)); }
+    const fm = new THREE.InstancedMesh(merge(fp), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }), lf.length);
+    place(lf, (_i, x, z) => compose(x, 0, z, rng() * 6.28, 0.7 + rng() * 0.7), fm); group.add(fm);
+  }
+  if (o.style === 'viking') {
+    // pedras rúnicas erguidas, com a runa a arder
+    const l = pick(0.1), runeM = new THREE.MeshBasicMaterial({ color: hdr(0xff8a30, 2.2), toneMapped: false });
+    const slab = col(new THREE.BoxGeometry(0.16, 0.34, 0.06).translate(0, 0.17, 0), 0x5a6068);
+    const mesh = new THREE.InstancedMesh(slab, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }), l.length);
+    const rune = new THREE.InstancedMesh(new THREE.BoxGeometry(0.014, 0.17, 0.01).translate(0, 0.19, 0.034), runeM, l.length), rune2 = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, 0.012, 0.01).translate(0.02, 0.22, 0.034), runeM, l.length);
+    l.forEach((i, k) => { const c = corner(i), m4 = compose(c.x, 0, c.z, (rng() - 0.5) * 1.2, 1 + rng() * 0.4); mesh.setMatrixAt(k, m4); rune.setMatrixAt(k, m4); rune2.setMatrixAt(k, m4); const gs = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xff7a2a, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })); gs.position.set(c.x, 0.2, c.z); gs.scale.setScalar(0.5); group.add(gs); glowSprites.push({ s: gs, ph: rng() * 6, base: 0.5 }); });
+    mesh.castShadow = true; group.add(mesh, rune, rune2);
+    // escudos redondos caídos
+    const ls = pick(0.07);
+    const sp: THREE.BufferGeometry[] = [col(new THREE.CylinderGeometry(0.11, 0.11, 0.02, 14).translate(0, 0.012, 0), 0x6a4a2a), col(new THREE.CylinderGeometry(0.095, 0.095, 0.022, 14).translate(0, 0.013, 0), 0x8a2a1a), col(new THREE.SphereGeometry(0.03, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.024, 0), 0xaaaaaa)];
+    const sh = new THREE.InstancedMesh(merge(sp), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.2 }), ls.length);
+    place(ls, (_i, x, z) => compose(x, 0, z, rng() * 6.28, 0.9 + rng() * 0.4), sh); sh.castShadow = true; group.add(sh);
+    const ln = pick(0.18), snow = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 5), new THREE.MeshStandardMaterial({ color: 0xeef4fa, roughness: 0.9 }), ln.length);
+    place(ln, (_i, x, z) => { const s = 0.06 + rng() * 0.09; return compose(x, 0, z, 0, s * 1.5, s * 0.4, s); }, snow); group.add(snow);
+  }
   if (o.style === 'library') {
     const l = pick(0.1);
     const BC = [0x6a1c1c, 0x1c3a5a, 0x2c4a2c, 0x7a4a1c, 0x4a2c5a];
@@ -177,7 +210,7 @@ export function buildDecor(o: DecorOpts): Decor {
   // ── velas com chama (os dois mundos) ──
   const flames: { g: THREE.Group; ph: number }[] = [];
   {
-    const l = pick(({ garden: 0.07, planet: 0.04, library: 0.16, ice: 0, hell: 0, clock: 0 } as Record<string, number>)[o.style]);
+    const l = pick(({ garden: 0.07, planet: 0.04, library: 0.16, ice: 0, hell: 0, clock: 0, elfic: 0, viking: 0 } as Record<string, number>)[o.style]);
     const waxG = new THREE.CylinderGeometry(0.018, 0.02, 0.09, 8), waxM = new THREE.MeshStandardMaterial({ color: 0xe9e0c4, roughness: 0.8 });
     const flameG = new THREE.ConeGeometry(0.014, 0.05, 6), flameM = new THREE.MeshBasicMaterial({ color: hdr(0xffa040, 2), toneMapped: false });
     l.forEach((i) => {
@@ -196,7 +229,7 @@ export function buildDecor(o: DecorOpts): Decor {
   // ── archotes nas paredes ──
   const torches: { flame: THREE.Mesh; glow: THREE.Sprite; pool: THREE.Mesh; ph: number }[] = [];
   {
-    const TC: Record<string, [number, number]> = { garden: [0xff8a2a, 0xff9a40], planet: [0xff8a2a, 0xff9a40], ice: [0x7fd8ff, 0x9fe0ff], hell: [0xff4a1a, 0xff5a20], clock: [0xffc060, 0xffd080], library: [0xffa040, 0xffb860] };
+    const TC: Record<string, [number, number]> = { garden: [0xff8a2a, 0xff9a40], planet: [0xff8a2a, 0xff9a40], ice: [0x7fd8ff, 0x9fe0ff], hell: [0xff4a1a, 0xff5a20], clock: [0xffc060, 0xffd080], library: [0xffa040, 0xffb860], elfic: [0x9be07a, 0xb8f090], viking: [0xff7a2a, 0xff9a50] };
     const tc = TC[o.style];
     const n = Math.max(2, Math.min(7, Math.round(o.segs.length / 13)));
     const bracket = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.2, 6), new THREE.MeshStandardMaterial({ color: 0x1b1713, roughness: 0.6, metalness: 0.5 }));

@@ -2,7 +2,7 @@ import { MaskKind, MazeOpts } from '../core/maze';
 import { Pal, mkPal } from '../core/theme';
 import { CharKind } from '../art/characters';
 
-export type Weather = 'none' | 'rain' | 'snow' | 'embers' | 'ash' | 'dust' | 'pages' | 'mist';
+export type Weather = 'none' | 'rain' | 'snow' | 'embers' | 'ash' | 'dust' | 'pages' | 'mist' | 'fireflies';
 
 /** Regras dos guardas: ritmo, alcance do faro e Vagalume (ofusca-os). */
 export const GUARD_HUNT = 4;      // casas (caminho) a que farejam
@@ -331,6 +331,68 @@ const biblioteca: WorldDef = {
   ],
 };
 
+// ───────────────────────── Mundo 6: Floresta Élfica ─────────────────────────
+const elfico: WorldDef = {
+  id: 'elfico', name: 'Floresta Élfica',
+  tagline: 'Luz dourada entre troncos enormes, raízes que se mexem sozinhas e uma dama que nunca pestaneja.',
+  rule: 'As raízes crescem e fecham passagens. Os Espíritos de Raiz seguem-te.',
+  pal: mkPal(0x0a1f16, 0x7a9a5a, 0x4a3a22, 0xa8f070), ready: true, guardStyle: 7, weather: 'fireflies',
+  look: { wall: 'bark', floor: 'moss', decor: 'elfic' },
+  preview: { mask: 'heart', cols: 9, rows: 9, seed: 31 },
+  levels: [
+    lv('Orla do Bosque', 7, 9, 'rect', 601, {}, [
+      { who: 'dama', text: 'Uma chama! Há séculos que ninguém acende luz nesta floresta.' },
+      { who: 'uli', text: 'Estou só de passagem.' },
+      { who: 'dama', text: 'Todos estão. Depois as raízes agarram-nos.' },
+    ]),
+    lv('Clareira dos Pirilampos', 8, 10, 'rect', 602, { dyn: 3, loops: 0.05 }, [{ who: 'dama', text: 'As raízes crescem quando ninguém olha. Anda devagar e olha sempre.' }]),
+    lv('Raízes Vivas', 9, 12, 'diamond', 603, { dyn: 3, loops: 0.07, guards: 1, weather: 'mist' }, [{ who: 'dama', text: 'Os meus Espíritos de Raiz mexem-se de três em três passos teus. Cheiram-te a quatro casas.' }]),
+    lv('Ponte de Cipós', 9, 12, 'rect', 8676, { dyn: 4, shift: 7, loops: 0.07, fog: 3.6, guards: 1, weather: 'rain' }, [{ who: 'dama', text: 'Chove. As raízes bebem e crescem mais depressa.' }]),
+    lv('Cogumelos Gigantes', 10, 13, 'circle', 5650, { dyn: 4, shift: 7, loops: 0.08, guards: 2 }, [{ who: 'dama', text: 'Não toques nos chapéus brilhantes. Têm opinião.' }]),
+    lv('Coração da Floresta', 11, 14, 'heart', 6660, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2, weather: 'mist' }, [{ who: 'dama', text: 'Ouves? É o coração da floresta. Bate mais depressa quando estás perto.' }]),
+    lv('Trono de Raízes', 12, 15, 'cross', 8679, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [
+      { who: 'dama', text: 'Chegaste ao meu trono. Há séculos que não tenho visitas.' },
+      { who: 'uli', text: 'E não vais gostar da minha.' },
+    ]),
+    lv('A Árvore-Mãe', 14, 17, 'circle', 7671, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [
+      { who: 'dama', text: 'Todas as estrelas. A Árvore-Mãe quer conhecer-te.' },
+      { who: 'uli', text: 'Diz-lhe que tenho pressa.' },
+      { who: 'dama', text: 'Ela tem mil anos. Nunca teve.' },
+    ], [{ who: 'dama', text: 'Leva uma semente de luz. Uma chama só nunca devia andar sozinha.' }]),
+  ],
+};
+
+// ───────────────────────── Mundo 7: Fiorde Viking ─────────────────────────
+const viking: WorldDef = {
+  id: 'viking', name: 'Fiorde Viking',
+  tagline: 'Gelo negro, drácares a arder ao largo e um jarl que fala com corvos.',
+  rule: 'As runas abrem e fecham os portões. Os Draugr patrulham o fiorde.',
+  pal: mkPal(0x0a1220, 0x7a8a9a, 0x3a4250, 0xff8a30), ready: true, guardStyle: 8, weather: 'snow',
+  look: { wall: 'runes', floor: 'planks', decor: 'viking' },
+  preview: { mask: 'rect', cols: 8, rows: 8, seed: 33 },
+  levels: [
+    lv('Cais de Gelo', 7, 9, 'rect', 701, {}, [
+      { who: 'jarl', text: 'Um fogo pequeno, num cais grande. Os corvos já falaram de ti.' },
+      { who: 'uli', text: 'Disseram coisas boas?' },
+      { who: 'jarl', text: 'Disseram que ardes. Para os meus convidados é sempre o mesmo fim.' },
+    ]),
+    lv('Aldeia Adormecida', 8, 10, 'rect', 702, { dyn: 3, loops: 0.05, weather: 'none' }, [{ who: 'jarl', text: 'As runas nas pedras abrem e fecham os portões. Aprende-lhes o ritmo.' }]),
+    lv('Salão das Runas', 9, 12, 'rect', 12811, { dyn: 4, loops: 0.07, guards: 1 }, [{ who: 'jarl', text: 'Os meus Draugr não dormem. Andam de três em três passos teus e cheiram-te a quatro casas.' }]),
+    lv('Fiorde Negro', 9, 12, 'diamond', 2722, { dyn: 3, loops: 0.07, fog: 3.4, guards: 1, weather: 'rain' }, [{ who: 'jarl', text: 'A água é negra e a chuva também. Só os corvos sabem onde acaba o chão.' }]),
+    lv('Estaleiro', 10, 13, 'rect', 12813, { dyn: 5, shift: 6, loops: 0.08, guards: 3 }, [{ who: 'jarl', text: 'Aqui construímos os barcos que levam os mortos. Há sempre lugar a bordo.' }]),
+    lv('Cume dos Corvos', 11, 14, 'cross', 13823, { dyn: 6, shift: 6, loops: 0.09, fog: 4, guards: 3, weather: 'mist' }, [{ who: 'jarl', text: 'Sobe, pequeno fogo. Lá em cima o vento apaga tudo. Menos a minha raiva.' }]),
+    lv('Salão de Valhalla', 12, 15, 'rect', 9788, { dyn: 7, shift: 5, loops: 0.09, fog: 3.6, guards: 4 }, [
+      { who: 'jarl', text: 'O meu salão. Cheio de heróis que ficaram. Queres lugar?' },
+      { who: 'uli', text: 'Quero a saída.' },
+    ]),
+    lv('Ragnarök', 14, 17, 'circle', 708, { dyn: 11, shift: 4, loops: 0.1, fog: 3.2, guards: 5, bonus: true }, [
+      { who: 'jarl', text: 'Todas as estrelas. Só os que contam as lendas chegam aqui.' },
+      { who: 'uli', text: 'Eu não conto lendas. Acendo-as.' },
+      { who: 'jarl', text: 'Então que o fim do mundo veja como arde uma.' },
+    ], [{ who: 'jarl', text: 'Vai, chama. Os corvos cantarão o teu nome. Não prometo que seja bonito.' }]),
+  ],
+};
+
 // ───────────────────── Próximos mundos (em desenvolvimento) ─────────────────────
 export const WORLDS: WorldDef[] = [
   b612,
@@ -339,15 +401,15 @@ export const WORLDS: WorldDef[] = [
   glaciar,
   relogio,
   biblioteca,
+  elfico,
+  viking,
   soon('mandala', 'Mandala Solar', 'Anéis de luz que giram devagar, sem pressa e sem piedade.', 'Os anéis rodam: sincroniza as aberturas.', mkPal(0x2a1608, 0xffe2a8, 0xd9822b, 0xffd24a), 'circle', 3),
   soon('tinta', 'Oceano de Tinta', 'Nadas às cegas: só a tinta revela o caminho.', 'As paredes só aparecem quando lá tocas.', mkPal(0x06162e, 0x9fd3ff, 0x1d4f9c, 0x44e0ff), 'diamond', 5),
   soon('neon', 'Neon Glitch', 'Uma cidade que se reescreve a cada passo errado.', 'Certas casas reescrevem o labirinto.', mkPal(0x0b0714, 0x1b1530, 0x27d3ff, 0xff2bd6), 'cross', 8),
   soon('escher', 'Sonho Escher', 'Escadas impossíveis e gravidade que se dobra.', 'A gravidade muda de lado.', mkPal(0x1b1830, 0xe9e2ff, 0x7a6bd6, 0xffa6e0), 'circle', 9),
   soon('galactico', 'Intergaláctico', 'Estações perdidas entre nebulosas e buracos negros.', 'Portais ligam salas distantes.', mkPal(0x070a1f, 0x1a1f4a, 0x5a3fd6, 0x39f2d0), 'ring', 10),
-  soon('viking', 'Fiorde Viking', 'Runas, gelo e machados com mau feitio.', 'Runas abrem e fecham portões.', mkPal(0x10181c, 0xcfd8dc, 0x5b6f78, 0xe0703a), 'rect', 11),
   soon('abstrato', 'Abstrato', 'Linhas, cor e geometria pura: o labirinto é uma pintura.', 'As cores definem as regras.', mkPal(0x101010, 0xf4f0e6, 0x161616, 0xe63a2a), 'cross', 12),
   soon('estelar', 'Estelar', 'Constelações que se desenham enquanto andas.', 'Ligas estrelas para abrir o caminho.', mkPal(0x070d24, 0x16224f, 0xc8a34a, 0xffe08a), 'ring', 13),
-  soon('elfico', 'Floresta Élfica', 'Luz dourada, raízes vivas e cantos de arco.', 'Raízes crescem e fecham passagens.', mkPal(0x0a1f16, 0xdff5c9, 0x2d9b6a, 0xffd98a), 'heart', 14),
   soon('angelico', 'Céu Angélico', 'Nuvens, harpas e escadas de luz.', 'Nuvens sustentam-te só por instantes.', mkPal(0x1b2440, 0xfff7e0, 0xc9b6ff, 0xffd86b), 'circle', 16),
   soon('elementais', 'Reino dos Elementos', 'Fogo, água, terra e ar: quatro povos, quatro regras.', 'Mudas de elemento para atravessar.', mkPal(0x0d1c24, 0xe6f2e0, 0x2c8f8f, 0xff8a3b), 'cross', 17),
   soon('animal', 'Reino Animal', 'Savana, selva e quintal: cada bicho tem o seu caminho.', 'Cada animal tem uma habilidade.', mkPal(0x1c1408, 0xf3e0a8, 0x8a6a2b, 0x7be08f), 'rect', 18),

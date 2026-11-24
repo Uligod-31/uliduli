@@ -7,7 +7,7 @@ import { collectWalls } from '../art/render';
 import { hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
 import { buildPlanetBody } from './planet';
 import { wallPBR, floorPBR } from './pbr2';
-import { buildDecor } from './decor';
+import { buildDecor, DecorOpts } from './decor';
 
 export const WALL_H = 0.52;
 export const WALL_T = 0.27;
@@ -200,7 +200,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
 
   // detalhe de cenário: musgo, poças, ossos, lápides, velas, archotes
   const reserved = new Set<number>([m.start, m.exit, ...m.rosas]);
-  const decor = buildDecor({ cols, rows, open, reserved, segs, rng: mulberry32(seed * 71 + 5), style: L.decor as 'garden' | 'planet' | 'ice' | 'hell' | 'clock' | 'library', accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
+  const decor = buildDecor({ cols, rows, open, reserved, segs, rng: mulberry32(seed * 71 + 5), style: L.decor as DecorOpts['style'], accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
   group.add(decor.group);
 
   return {

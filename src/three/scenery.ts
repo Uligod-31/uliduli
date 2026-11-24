@@ -20,6 +20,8 @@ function themeFor0(id: string, pal: Pal): SceneTheme {
   if (id === 'glaciar') return { top: 0x050c18, mid: 0x143a5a, horizon: 0x88c6e4, ground: 0x6a9cbc, ground2: 0x4a7a9c, sun: 0xe8f6ff, fogNear: 26, fogFar: 190, grade: 0.5, sunC: 0xcfe8ff, sunI: 2.5, hemiI: 1.35, rimI: 1.1, lampI: 1.8, lampD: 9, expo: 1.35, dim: 0.5 };
   if (id === 'relogio') return { top: 0x0d0904, mid: 0x3a2a14, horizon: 0xd8a050, ground: 0x2a2012, ground2: 0x120c06, sun: 0xffc060, fogNear: 22, fogFar: 170, grade: 0.7, sunC: 0xffd090, sunI: 2.5, hemiI: 1.15, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.38, dim: 0.5 };
   if (id === 'biblioteca') return { top: 0x070403, mid: 0x241408, horizon: 0x8a5a2a, ground: 0x1c120a, ground2: 0x0c0804, sun: 0xffc880, fogNear: 18, fogFar: 150, grade: 0.8, sunC: 0xffd8a0, sunI: 2.3, hemiI: 1.15, rimI: 1.0, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
+  if (id === 'elfico') return { top: 0x030a06, mid: 0x0c2414, horizon: 0x3a5c28, ground: 0x142210, ground2: 0x0a1408, sun: 0xffe6a0, fogNear: 16, fogFar: 150, grade: 0.85, sunC: 0xffe2a0, sunI: 2.4, hemiI: 1.2, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
+  if (id === 'viking') return { top: 0x050914, mid: 0x16223a, horizon: 0x44546e, ground: 0x0e1c34, ground2: 0x08101e, sun: 0xffb070, fogNear: 22, fogFar: 180, grade: 0.7, sunC: 0xffc8a0, sunI: 2.5, hemiI: 1.25, rimI: 1.1, lampI: 2.0, lampD: 9, expo: 1.38, dim: 0.5 };
   // Jardim Sebe: entardecer doente, névoa verde-oliva, sebes apodrecidas e um sol pálido a morrer
   if (id === 'jardim') return { dali: true, top: 0x040604, mid: 0x1a281c, horizon: 0x56613f, ground: 0x1b2014, ground2: 0x0c0f09, sun: 0xd9cf94, fogNear: 16, fogFar: 150, grade: 0.9, sunC: 0xd6cc9c, sunI: 2.7, hemiI: 1.2, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
   return {
@@ -301,6 +303,55 @@ export class Scenery {
       const sm0 = wallPBR('shelves').map;
       ring(14, 190, 440, (a, dd) => { const h = 120 + rng() * 140; const t = sm0.clone(); t.needsUpdate = true; t.repeat.set(4, 10); this.tex.push(t); const b = new THREE.Mesh(new THREE.BoxGeometry(36, h, 36), new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 })); b.position.set(Math.cos(a) * dd, this.groundY + h / 2, Math.sin(a) * dd); b.rotation.y = a; this.group.add(b); for (let k = 0; k < 3; k++) { const w = glow(0xffb860, 1, 0.55); w.scale.set(16, 22, 1); w.position.set(b.position.x, this.groundY + h * (0.35 + k * 0.2), b.position.z); this.group.add(w); } });
       const lamp = glow(0xffc880, 1, 0.5); lamp.scale.set(260, 260, 1); lamp.position.set(0, 160, -600); this.group.add(lamp);
+    } else if (kind === 'elfico') {
+      gm.map = mk(512, (g) => {
+        g.fillStyle = '#1a2a12'; g.fillRect(0, 0, 512, 512);
+        for (let i = 0; i < 90; i++) { g.fillStyle = rng() < 0.5 ? 'rgba(70,120,40,.3)' : 'rgba(6,16,6,.4)'; g.beginPath(); g.ellipse(rng() * 512, rng() * 512, 14 + rng() * 60, 8 + rng() * 34, rng() * 3, 0, 6.28); g.fill(); }
+        for (let i = 0; i < 14; i++) { let x = rng() * 512, y = rng() * 512; const pts: [number, number][] = [[x, y]]; for (let k = 0; k < 8; k++) { x += (rng() - 0.5) * 90; y += (rng() - 0.5) * 90; pts.push([x, y]); } for (const [w, col] of [[10, 'rgba(10,6,2,.55)'], [4, '#4a3622']] as const) { g.strokeStyle = col; g.lineWidth = w; for (const ox of [-512, 0, 512]) for (const oy of [-512, 0, 512]) { g.beginPath(); pts.forEach(([px, py], j) => (j ? g.lineTo(px + ox, py + oy) : g.moveTo(px + ox, py + oy))); g.stroke(); } } }
+        for (let i = 0; i < 70; i++) { const x = rng() * 512, y = rng() * 512, gr = g.createRadialGradient(x, y, 0, x, y, 7); gr.addColorStop(0, rng() < 0.5 ? 'rgba(255,236,150,.95)' : 'rgba(180,255,150,.95)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, 7, 0, 6.28); g.fill(); }
+      }, 80);
+      gm.color.set(0xffffff); gm.roughness = 0.95; gm.emissiveMap = gm.map; gm.emissive = new THREE.Color(0x335522); gm.emissiveIntensity = 0.2;
+      const bt = wallPBR('bark').map;
+      const trunkM = new THREE.MeshStandardMaterial({ roughness: 1, color: 0x8a7a68 });
+      ring(26, 190, 560, (a, d) => {
+        const h = 160 + rng() * 220, r = 9 + rng() * 11, t = bt.clone(); t.needsUpdate = true; t.repeat.set(3, h / 50); this.tex.push(t);
+        const m = trunkM.clone(); m.map = t;
+        const tr = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r, h, 11), m); tr.position.set(Math.cos(a) * d, this.groundY + h / 2, Math.sin(a) * d); this.group.add(tr);
+        for (let k = 0; k < 5; k++) { const ra = k * 1.26 + rng(), rt = new THREE.Mesh(new THREE.ConeGeometry(r * 0.5, r * 2.6, 5), m); rt.position.set(tr.position.x + Math.cos(ra) * r * 0.9, this.groundY + r * 0.9, tr.position.z + Math.sin(ra) * r * 0.9); rt.rotation.set(Math.sin(ra) * 0.8, 0, -Math.cos(ra) * 0.8); this.group.add(rt); }
+        const cn = glow(0x0e2a14, 1, 0.92); cn.scale.set(r * 14, r * 7, 1); cn.position.set(tr.position.x, this.groundY + h, tr.position.z); this.group.add(cn);
+        const cg = glow(0xb8f070, 1, 0.16); cg.scale.set(r * 9, r * 4, 1); cg.position.set(tr.position.x, this.groundY + h * 0.96, tr.position.z); this.group.add(cg);
+      });
+      for (let i = 0; i < 8; i++) { const a = rng() * Math.PI * 2, d = 120 + rng() * 340, sh = glow(0xffe9a0, 1, 0.075); sh.scale.set(18 + rng() * 22, 300, 1); sh.position.set(Math.cos(a) * d, this.groundY + 130, Math.sin(a) * d); this.group.add(sh); this.worldAnim.push((t) => { (sh.material as THREE.SpriteMaterial).opacity = 0.06 + 0.03 * Math.sin(t * 0.4 + i * 1.7); }); }
+      const moon = glow(0xe8ffd0, 1, 0.55); moon.scale.set(190, 190, 1); moon.position.set(160, 260, -720); this.group.add(moon);
+      ring(34, 120, 420, (a, d) => { const g = new THREE.Group(), sz = 2 + rng() * 5; for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(new THREE.SphereGeometry(sz * (0.5 + k * 0.2), 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(k % 2 ? 0x7be8c0 : 0xffd870).multiplyScalar(2), toneMapped: false })); c.scale.y = 0.62; c.position.set((k - 1) * sz * 0.9, 0, k * 0.4); g.add(c); } const gl = glow(0x80f0c0, sz * 9, 0.4); gl.position.y = sz * 0.5; g.add(gl); g.position.set(Math.cos(a) * d, this.groundY + 1, Math.sin(a) * d); this.group.add(g); });
+    } else if (kind === 'viking') {
+      gm.map = mk(512, (g) => {
+        g.fillStyle = '#0f1e34'; g.fillRect(0, 0, 512, 512);
+        for (let i = 0; i < 520; i++) { const y = rng() * 512, x = rng() * 512, w = 20 + rng() * 80; g.strokeStyle = rng() < 0.82 ? `rgba(70,120,170,${0.1 + rng() * 0.22})` : `rgba(230,244,255,${0.18 + rng() * 0.3})`; g.lineWidth = 1 + rng() * 1.6; for (const ox of [-512, 0, 512]) { g.beginPath(); g.moveTo(x + ox, y); g.quadraticCurveTo(x + ox + w / 2, y - 3 - rng() * 4, x + ox + w, y); g.stroke(); } }
+      }, 90);
+      gm.color.set(0xffffff); gm.roughness = 0.22; gm.metalness = 0.25; gm.envMapIntensity = 1.4;
+      const slate = new THREE.MeshStandardMaterial({ color: 0x1d2735, roughness: 0.95, flatShading: true }), snowM = new THREE.MeshStandardMaterial({ color: 0xe6eef6, roughness: 0.9, flatShading: true });
+      ring(15, 230, 600, (a, d) => {
+        const h = 100 + rng() * 220, r = 40 + rng() * 60, c = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6 + ((rng() * 3) | 0)), slate); c.position.set(Math.cos(a) * d, this.groundY + h / 2, Math.sin(a) * d); c.rotation.y = rng() * 3; this.group.add(c);
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.36, h * 0.3, 7), snowM); cap.position.set(c.position.x, this.groundY + h * 0.86, c.position.z); this.group.add(cap);
+        if (rng() < 0.45) { const bf = glow(0xff7a2a, 1, 0.8); bf.scale.set(26, 34, 1); bf.position.set(c.position.x + r * 0.15, this.groundY + h * 0.97, c.position.z); this.group.add(bf); this.worldAnim.push((t) => { (bf.material as THREE.SpriteMaterial).opacity = 0.65 + 0.2 * Math.sin(t * 7 + a * 5) + 0.1 * Math.sin(t * 13 + a); }); }
+      });
+      const pineM = new THREE.MeshStandardMaterial({ color: 0x0f1c18, roughness: 1, flatShading: true });
+      ring(46, 120, 430, (a, d) => { const g = new THREE.Group(), h = 26 + rng() * 40; for (let k = 0; k < 4; k++) { const c = new THREE.Mesh(new THREE.ConeGeometry(h * (0.3 - k * 0.055), h * 0.45, 7), pineM); c.position.y = h * (0.26 + k * 0.2); g.add(c); const sn = new THREE.Mesh(new THREE.ConeGeometry(h * (0.2 - k * 0.04), h * 0.16, 7), snowM); sn.position.y = h * (0.4 + k * 0.2); g.add(sn); } g.position.set(Math.cos(a) * d, this.groundY, Math.sin(a) * d); this.group.add(g); });
+      // drácares ao largo: casco, proa de dragão, mastro e vela
+      const hullM = new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.85 });
+      const sailTex = mk(128, (g) => { g.fillStyle = '#e8dcc0'; g.fillRect(0, 0, 128, 128); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#a82a1a' : '#e8dcc0'; g.fillRect(i * 16, 0, 16, 128); } g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, 128, 6); g.fillRect(0, 122, 128, 6); }, 1);
+      for (let i = 0; i < 4; i++) {
+        const a = i * 1.7 + 0.6, d = 130 + (i % 3) * 70, ship = new THREE.Group();
+        const hull = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), hullM); hull.scale.set(11, 3.4, 3.2); hull.position.y = 2.2; ship.add(hull);
+        for (const sd of [-1, 1]) { const pr = new THREE.Mesh(new THREE.ConeGeometry(0.7, 6.5, 6), hullM); pr.position.set(sd * 10.4, 4.6, 0); pr.rotation.z = -sd * 0.55; ship.add(pr); const hd = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), hullM); hd.position.set(sd * 12.3, 7.6, 0); ship.add(hd); }
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 17, 6), hullM); mast.position.y = 10; ship.add(mast);
+        const sail = new THREE.Mesh(new THREE.PlaneGeometry(10, 9), new THREE.MeshStandardMaterial({ map: sailTex, side: THREE.DoubleSide, roughness: 0.9, emissive: 0x2a1008, emissiveIntensity: 0.4 })); sail.position.y = 11.5; ship.add(sail);
+        for (let k = 0; k < 8; k++) { const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.15, 12).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: [0xa82a1a, 0xc9a13a, 0x2a4a6a, 0x8a8a90][k % 4], roughness: 0.7 })); sh.position.set(-8 + k * 2.3, 4.2, 3.0); ship.add(sh); }
+        const lamp2 = glow(0xff9a50, 1, 0.8); lamp2.scale.set(9, 9, 1); lamp2.position.set(0, 4.6, 0); ship.add(lamp2);
+        ship.position.set(Math.cos(a) * d, this.groundY + 0.5, Math.sin(a) * d); ship.rotation.y = a + 1.2; this.group.add(ship);
+        const ph = rng() * 6; this.worldAnim.push((t) => { ship.position.y = this.groundY + 0.5 + Math.sin(t * 0.5 + ph) * 0.7; ship.rotation.z = Math.sin(t * 0.4 + ph) * 0.03; });
+      }
     }
 
     // ── detritos flutuantes junto à ilha: o que se vê no ecrã vertical, por baixo e ao lado do labirinto ──
@@ -336,6 +387,28 @@ export class Scenery {
       const paper = new THREE.MeshStandardMaterial({ color: 0xe0d2ae, roughness: 0.9 });
       near(26, (i) => { const g = new THREE.Group(), s = 0.8 + rng() * 1.3, cov = new THREE.MeshStandardMaterial({ color: BC[i % BC.length], roughness: 0.7 }); if (i % 3 === 0) { for (const sd of [-1, 1]) { const h = new THREE.Group(); h.rotation.z = sd * 0.35; h.position.x = sd * 0.45 * s; h.add(new THREE.Mesh(new THREE.BoxGeometry(0.9 * s, 0.05 * s, 1.2 * s), cov)); const pg = new THREE.Mesh(new THREE.BoxGeometry(0.84 * s, 0.05 * s, 1.14 * s), paper); pg.position.y = 0.05 * s; h.add(pg); g.add(h); } } else { g.add(new THREE.Mesh(new THREE.BoxGeometry(1.1 * s, 0.26 * s, 0.8 * s), cov)); const pg = new THREE.Mesh(new THREE.BoxGeometry(1.0 * s, 0.2 * s, 0.74 * s), paper); pg.position.set(0.04 * s, 0, 0.02 * s); g.add(pg); g.add(new THREE.Mesh(new THREE.BoxGeometry(1.1 * s, 0.27 * s, 0.07 * s), new THREE.MeshStandardMaterial({ color: 0xc9a13a, metalness: 0.7, roughness: 0.4 })).translateZ(0.38 * s)); } return g; });
       near(10, () => { const g = new THREE.Group(); const fl = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.45, 6), paper); g.add(fl); const f = glow(0xffb060, 2.2, 0.9); f.position.y = 0.34; g.add(f); const c = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffb870).multiplyScalar(2.5), toneMapped: false })); c.position.y = 0.3; g.add(c); return g; }, 6, 34, 6, -14);
+    } else if (kind === 'elfico') {
+      const rootM = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1, flatShading: true }), mossM = new THREE.MeshStandardMaterial({ color: 0x3f6a2c, roughness: 1, flatShading: true });
+      near(24, () => {
+        const g = new THREE.Group(), sz = 0.9 + rng() * 2.2;
+        g.add(new THREE.Mesh(rockGeo(sz, rng), rootM)); const top = new THREE.Mesh(new THREE.SphereGeometry(sz * 0.95, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2.4), mossM); top.scale.y = 0.45; top.position.y = sz * 0.28; g.add(top);
+        for (let k = 0; k < 5; k++) { const rt = new THREE.Mesh(new THREE.ConeGeometry(0.1 + rng() * 0.1, sz * (1.2 + rng()), 5), rootM); rt.position.set((rng() - 0.5) * sz, -sz * 0.8, (rng() - 0.5) * sz); rt.rotation.x = Math.PI + (rng() - 0.5) * 0.5; rt.rotation.z = (rng() - 0.5) * 0.5; g.add(rt); }
+        if (rng() < 0.6) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.1 + rng() * 0.1, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xb8ff80).multiplyScalar(2.2), toneMapped: false })); b.position.set((rng() - 0.5) * sz * 0.8, sz * 0.5, (rng() - 0.5) * sz * 0.8); g.add(b); const gl = glow(0xa8ff6a, 2.4, 0.8); gl.position.copy(b.position); g.add(gl); }
+        return g;
+      });
+      near(18, () => { const g = new THREE.Group(), s2 = 0.35 + rng() * 0.6, o = glow(rng() < 0.5 ? 0xa8ff6a : 0xffe070, s2 * 5, 0.9); g.add(o); const c = new THREE.Mesh(new THREE.SphereGeometry(s2 * 0.2, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xf4ffd0).multiplyScalar(2.5), toneMapped: false })); g.add(c); return g; }, 4, 40, 8, -12);
+      for (let i = 0; i < 9; i++) { const a = rng() * Math.PI * 2, d = islandR + 36 + rng() * 120; pillar(0xffe9a0, Math.cos(a) * d, Math.sin(a) * d, 70 + rng() * 60, 10 + rng() * 10); }
+    } else if (kind === 'viking') {
+      const wood = new THREE.MeshStandardMaterial({ color: 0x3a2814, roughness: 0.85 }), stoneM = new THREE.MeshStandardMaterial({ color: 0x3a424e, roughness: 0.9, flatShading: true }), rn = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff8a30).multiplyScalar(2.4), toneMapped: false });
+      const SC = [0xa82a1a, 0xc9a13a, 0x2a4a6a, 0x8a8a90];
+      near(26, (i) => {
+        const g = new THREE.Group(), k = i % 3;
+        if (k === 0) { const s2 = 1.3 + rng() * 1.8; const sl = new THREE.Mesh(new THREE.BoxGeometry(0.9 * s2, 2.2 * s2, 0.5 * s2), stoneM); g.add(sl); const v = new THREE.Mesh(new THREE.BoxGeometry(0.07 * s2, 1.2 * s2, 0.05), rn); v.position.set(0, 0.1 * s2, 0.28 * s2); g.add(v); for (const [dy, dx] of [[0.4, 0.2], [0.05, -0.2], [-0.35, 0.18]] as const) { const br = new THREE.Mesh(new THREE.BoxGeometry(0.4 * s2, 0.06 * s2, 0.05), rn); br.position.set(dx * s2, dy * s2, 0.28 * s2); br.rotation.z = dx > 0 ? -0.5 : 0.5; g.add(br); } const gl = glow(0xff7a2a, s2 * 3.4, 0.4); gl.position.z = 0.6; g.add(gl); }
+        else if (k === 1) { const s2 = 0.9 + rng() * 1.1, sh = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * s2, 1.2 * s2, 0.14 * s2, 18).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: SC[(rng() * 4) | 0], roughness: 0.7 })); g.add(sh); const rim = new THREE.Mesh(new THREE.TorusGeometry(1.2 * s2, 0.07 * s2, 6, 24), new THREE.MeshStandardMaterial({ color: 0x6a6e76, metalness: 0.8, roughness: 0.4 })); g.add(rim); const bs = new THREE.Mesh(new THREE.SphereGeometry(0.28 * s2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8a8e96, metalness: 0.8, roughness: 0.4 })); bs.position.z = 0.07 * s2; g.add(bs); }
+        else { const s2 = 1 + rng() * 1.4; for (let p = 0; p < 3; p++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(2.6 * s2, 0.16, 0.5), wood); pl.position.set((p - 1) * 0.2, 0, (p - 1) * 0.56); pl.rotation.y = (rng() - 0.5) * 0.3; g.add(pl); } const ar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4 * s2, 5), wood); ar.rotation.z = Math.PI / 2; ar.position.set(0, 0.3, 0.2); g.add(ar); }
+        return g;
+      });
+      for (let i = 0; i < 9; i++) { const a = rng() * Math.PI * 2, d = islandR + 38 + rng() * 120; pillar(0xff7a2a, Math.cos(a) * d, Math.sin(a) * d, 36 + rng() * 40, 7 + rng() * 6); }
     }
   }
 

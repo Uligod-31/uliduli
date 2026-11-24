@@ -442,3 +442,136 @@ export function bibliotecario(): THREE.Group {
   const gl = glowSprite(0xffd98a, 4, 0.4); gl.position.set(0, 3.3, 0.2); g.add(gl);
   return g;
 }
+
+/** A Dama das Raízes: figura esguia e pálida de coroa de ramos com rebentos a brilhar, cabelo de trepadeiras, saia de folhas e raízes a rastejar pelo chão; segura uma semente-lanterna. */
+export function dama(): THREE.Group {
+  const g = new THREE.Group();
+  const bark = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 }), barkL = dull(0x5a4428, 0.95);
+  const leaf = new THREE.MeshStandardMaterial({ color: 0x2c5a26, roughness: 0.85, side: THREE.DoubleSide }), leafD = new THREE.MeshStandardMaterial({ color: 0x1c3a1c, roughness: 0.9, side: THREE.DoubleSide });
+  const skin = dull(0xaebb9c, 0.6), glowG = emit(0xa8ff6a, 2.2), glowY = emit(0xffe070, 2.6);
+  const tube = (pts: THREE.Vector3[], r0: number, m: THREE.Material, seg = 14, parent: THREE.Object3D = g) => { const t = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), seg, r0, 6), m); t.castShadow = true; parent.add(t); return t; };
+  // raízes a rastejar à volta dos pés
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2 + 0.2, r = 1.5 + (k % 3) * 0.35;
+    tube([V(Math.cos(a) * 0.3, 1.1, Math.sin(a) * 0.3), V(Math.cos(a + 0.2) * r * 0.45, 0.55, Math.sin(a + 0.2) * r * 0.45), V(Math.cos(a - 0.15) * r * 0.8, 0.14, Math.sin(a - 0.15) * r * 0.8), V(Math.cos(a) * r, 0.03, Math.sin(a) * r)], 0.055 - (k % 3) * 0.01, k % 2 ? bark : barkL);
+  }
+  // saia: cilindro de folhas sobrepostas em três anéis
+  g.add(mesh(new THREE.CylinderGeometry(0.3, 0.85, 1.9, 22, 1, true), leafD, 0, 1.45, 0));
+  for (const [y, r, n, len] of [[0.7, 0.85, 22, 0.8], [1.15, 0.65, 18, 0.7], [1.6, 0.48, 14, 0.6]] as const) {
+    for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2; const l = mesh(new THREE.ConeGeometry(0.1, len, 4), k % 3 ? leaf : leafD, Math.cos(a) * r, y, Math.sin(a) * r); l.scale.set(1, 1, 0.25); l.rotation.order = 'YXZ'; l.rotation.set(Math.PI + Math.sin(a) * 0.35, -a, -Math.cos(a) * 0.35); g.add(l); }
+  }
+  // tronco, ombros e pescoço
+  g.add(mesh(new THREE.CapsuleGeometry(0.23, 0.5, 6, 14), leaf, 0, 2.5, 0));
+  g.add(mesh(sph(0.26, 1.7, 0.45, 0.8), leafD, 0, 2.88, 0));
+  for (const s of [-1, 1]) for (let k = 0; k < 4; k++) { const l = mesh(new THREE.ConeGeometry(0.08, 0.34, 4), leaf, s * (0.34 + k * 0.08), 2.9 - k * 0.04, 0.0); l.scale.z = 0.25; l.rotation.z = -s * (1.1 + k * 0.1); g.add(l); }
+  g.add(mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.34, 10), skin, 0, 3.1, 0));
+  // cabeça: fina, comprida, olhos dourados e orelhas de elfo muito longas
+  const head = new THREE.Group(); head.position.set(0, 3.5, 0.03); head.rotation.z = 0.05; g.add(head);
+  head.add(mesh(sph(0.25, 0.78, 1.18, 0.9), skin));
+  head.add(mesh(new THREE.ConeGeometry(0.025, 0.12, 5), skin, 0, -0.03, 0.22).rotateX(-1.25));
+  head.add(mesh(new THREE.BoxGeometry(0.075, 0.014, 0.02), dull(0x3a4a2a, 0.5), 0, -0.14, 0.2));
+  for (const s of [-1, 1]) {
+    head.add(mesh(sph(0.07, 1.4, 0.8, 0.5), dull(0x050805, 0.4), s * 0.095, 0.03, 0.2).rotateZ(-s * 0.22));
+    head.add(mesh(sph(0.03, 1.6, 0.7, 0.5), glowY, s * 0.095, 0.03, 0.245).rotateZ(-s * 0.22));
+    head.add(mesh(new THREE.BoxGeometry(0.13, 0.01, 0.02), dull(0x2a3a1c, 0.5), s * 0.1, 0.1, 0.22).rotateZ(-s * 0.3));
+    const ear = mesh(new THREE.ConeGeometry(0.06, 0.62, 5), skin, s * 0.3, 0.14, -0.02); ear.rotation.z = -s * 1.2; ear.scale.z = 0.4; head.add(ear);
+  }
+  // coroa: dois ramos de veado com rebentos e folhas
+  for (const s of [-1, 1]) {
+    tube([V(s * 0.1, 0.22, 0), V(s * 0.22, 0.55, -0.02), V(s * 0.36, 0.95, -0.04), V(s * 0.46, 1.4, -0.06)], 0.026, bark, 14, head);
+    for (const [y0, dx, dy] of [[0.45, 0.28, 0.3], [0.75, 0.3, 0.32], [1.05, 0.26, 0.3]] as const) {
+      const x0 = s * (0.2 + y0 * 0.26), p1 = V(x0, y0, -0.03), p2 = V(x0 + s * dx * 0.7, y0 + dy * 0.7, -0.04), p3 = V(x0 + s * dx, y0 + dy * 1.2, -0.05);
+      tube([p1, p2, p3], 0.016, bark, 8, head);
+      head.add(mesh(sph(0.035), glowG, p3.x, p3.y, p3.z));
+      const lf = mesh(new THREE.ConeGeometry(0.04, 0.12, 4), leaf, p2.x, p2.y, p2.z); lf.scale.z = 0.3; lf.rotation.z = -s * 0.9; head.add(lf);
+    }
+    head.add(mesh(sph(0.05), glowG, s * 0.46, 1.42, -0.06));
+    const gs = glowSprite(0xa8ff6a, 0.38, 0.55); gs.position.set(s * 0.46, 1.42, -0.06); head.add(gs);
+  }
+  // cabelo de trepadeiras com folhinhas, a pender até à cintura
+  for (let k = 0; k < 30; k++) {
+    const sd = k % 2 ? 1 : -1, x = sd * (0.12 + (k % 7) * 0.035), len = 1.1 + (k % 6) * 0.22, z = -0.1 - (k % 4) * 0.05;
+    tube([V(x, 3.65, z), V(x * 1.3, 3.2 - len * 0.2, z - 0.1), V(x * 1.5 + Math.sin(k) * 0.08, 3.4 - len * 0.6, z - 0.12), V(x * 1.3, 3.4 - len, z - 0.08)], 0.012, k % 3 ? leafD : bark, 10);
+    if (k % 3 === 0) { const lf = mesh(new THREE.ConeGeometry(0.035, 0.1, 4), leaf, x * 1.4, 3.4 - len * 0.7, z - 0.12); lf.scale.z = 0.3; g.add(lf); }
+  }
+  // braço esquerdo: segura a semente-lanterna; direito: erguido, com dedos longos
+  const lan = V(-0.78, 2.2, 0.75);
+  g.add(limb(V(-0.34, 2.85, 0.02), V(-0.62, 2.35, 0.4), 0.065, 0.045, skin)); g.add(limb(V(-0.62, 2.35, 0.4), V(-0.74, 2.12, 0.7), 0.045, 0.035, skin));
+  hand(g, V(-0.76, 2.1, 0.74), V(0.1, 0.8, 0.3), skin, 0.14, 0.6);
+  const seed = new THREE.Group(); seed.position.copy(lan).add(V(0, 0.22, 0.05)); g.add(seed);
+  seed.add(mesh(sph(0.16, 0.85, 1.1, 0.85), emit(0xd8ff90, 2.4)));
+  for (let k = 0; k < 5; k++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.012, 5, 18), bark); r.scale.set(0.9, 1.2, 0.9); r.rotation.y = (k / 5) * Math.PI; seed.add(r); }
+  seed.add(glowSprite(0xb8ff70, 1.3, 0.7));
+  g.add(limb(V(0.34, 2.85, 0.02), V(0.7, 3.1, 0.3), 0.06, 0.045, skin)); g.add(limb(V(0.7, 3.1, 0.3), V(0.85, 3.6, 0.5), 0.045, 0.035, skin));
+  hand(g, V(0.86, 3.64, 0.52), V(0.1, 1, 0.1), skin, 0.2, 0.2);
+  tube([V(0.86, 3.7, 0.52), V(1.1, 3.6, 0.7), V(1.25, 3.3, 0.6), V(1.3, 2.9, 0.4)], 0.014, leafD, 12);
+  // pirilampos à volta
+  for (let k = 0; k < 22; k++) { const a = k * 2.4, r = 0.9 + (k % 5) * 0.35; const f = mesh(sph(0.026), glowY, Math.cos(a) * r, 1.2 + (k % 9) * 0.34, Math.sin(a) * r * 0.7 + 0.3); g.add(f); const gs2 = glowSprite(0xffe070, 0.26, 0.4); gs2.position.copy(f.position); g.add(gs2); }
+  const gl = glowSprite(0x9be07a, 4.2, 0.16); gl.position.set(0, 2.9, -0.6); g.add(gl);
+  return g;
+}
+
+/** Corvo de pesadelo: corpo preto, bico comprido, asas abertas e olhos a arder. */
+const corvo = (s = 1) => {
+  const r = new THREE.Group(), blk = dull(0x08080c, 0.45);
+  r.add(mesh(sph(0.13, 0.85, 0.8, 1.6), blk));
+  r.add(mesh(sph(0.08), blk, 0, 0.07, 0.2));
+  r.add(mesh(new THREE.ConeGeometry(0.03, 0.17, 5), dull(0x1a1a20, 0.4), 0, 0.055, 0.34).rotateX(Math.PI / 2));
+  r.add(mesh(sph(0.015), emit(0xff8a30, 3), 0.05, 0.1, 0.25)); r.add(mesh(sph(0.015), emit(0xff8a30, 3), -0.05, 0.1, 0.25));
+  for (const sd of [-1, 1]) {
+    const w = new THREE.Group(); w.position.set(sd * 0.1, 0.03, 0); w.rotation.z = sd * 0.5; r.add(w);
+    for (let k = 0; k < 5; k++) { const f = mesh(new THREE.BoxGeometry(0.34 - k * 0.04, 0.012, 0.075), blk, sd * (0.18 - k * 0.012), 0, -0.04 - k * 0.07); f.rotation.y = sd * (0.2 + k * 0.1); w.add(f); }
+  }
+  r.add(mesh(new THREE.BoxGeometry(0.1, 0.01, 0.22), blk, 0, 0, -0.3).rotateX(0.2));
+  r.scale.setScalar(s); return r;
+};
+
+/** O Jarl dos Corvos: gigante de capa de peles e elmo de asas de corvo, barba entrançada com argolas de ferro, um olho de runa a arder, machado enorme e corvos nos ombros. */
+export function jarl(): THREE.Group {
+  const g = new THREE.Group();
+  const fur = new THREE.MeshStandardMaterial({ color: 0x4a382a, roughness: 1, side: THREE.DoubleSide }), furL = dull(0x6a5640, 1), mail = new THREE.MeshStandardMaterial({ color: 0x8a929a, roughness: 0.5, metalness: 0.45 }), iron = new THREE.MeshStandardMaterial({ color: 0x6a727c, roughness: 0.4, metalness: 0.5 });
+  const skin = dull(0xc4b4a0, 0.8), hair = dull(0x8a7a62, 0.95), rune = emit(0xff8a30, 2.6), leather = dull(0x3a2414, 0.8);
+  // capa de peles com bainha esfiapada
+  g.add(mesh(new THREE.CylinderGeometry(0.5, 1.25, 2.7, 28, 1, true, Math.PI * 0.3, Math.PI * 1.4), fur, 0, 1.35, 0));
+  for (let k = 0; k < 26; k++) { const a = (k / 26) * Math.PI * 2; if (Math.sin(a) > 0.55) continue; const c = mesh(new THREE.ConeGeometry(0.14, 0.45 + (k % 4) * 0.16, 4), furL, Math.cos(a) * 1.22, 0.22, Math.sin(a) * 1.22); c.rotation.set(Math.PI, a, 0); g.add(c); }
+  // botas
+  for (const s of [-1, 1]) { g.add(limb(V(s * 0.3, 1.2, 0), V(s * 0.34, 0.2, 0.05), 0.16, 0.12, leather)); g.add(mesh(new THREE.BoxGeometry(0.3, 0.18, 0.56), dull(0x1a120a, 0.8), s * 0.34, 0.09, 0.14)); }
+  // tronco de malha com placa de runas
+  g.add(mesh(new THREE.CapsuleGeometry(0.52, 0.8, 8, 18), mail, 0, 1.9, 0));
+  for (let k = 0; k < 6; k++) g.add(mesh(new THREE.TorusGeometry(0.54 - Math.abs(k - 2.5) * 0.02, 0.018, 5, 24), iron, 0, 1.45 + k * 0.17, 0).rotateX(Math.PI / 2));
+  g.add(mesh(new THREE.BoxGeometry(0.46, 0.5, 0.05), iron, 0, 2.15, 0.5));
+  g.add(mesh(new THREE.BoxGeometry(0.035, 0.34, 0.02), rune, 0, 2.15, 0.53)); g.add(mesh(new THREE.BoxGeometry(0.2, 0.03, 0.02), rune, 0.03, 2.24, 0.53).rotateZ(-0.35)); g.add(mesh(new THREE.BoxGeometry(0.18, 0.03, 0.02), rune, -0.02, 2.05, 0.53).rotateZ(0.35));
+  g.add(mesh(new THREE.TorusGeometry(0.56, 0.045, 6, 28), leather, 0, 1.3, 0).rotateX(Math.PI / 2)); g.add(mesh(new THREE.BoxGeometry(0.16, 0.14, 0.05), iron, 0, 1.3, 0.56));
+  // ombros de pele, em tufos
+  for (const s of [-1, 1]) { g.add(mesh(sph(0.46, 1.1, 0.7, 1), fur, s * 0.7, 2.75, 0)); for (let k = 0; k < 9; k++) { const a = k * 0.8, c = mesh(new THREE.ConeGeometry(0.07, 0.3, 4), furL, s * 0.7 + Math.cos(a) * 0.42, 2.8 + (k % 3) * 0.04, Math.sin(a) * 0.4); c.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9); g.add(c); } }
+  // machado enorme seguro com as duas mãos, à frente
+  const hx = 0.55, hz = 0.85;
+  g.add(mesh(new THREE.CylinderGeometry(0.045, 0.05, 3.6, 8), dull(0x4a2c16, 0.8), hx, 1.75, hz));
+  g.add(mesh(new THREE.ConeGeometry(0.05, 0.2, 6), iron, hx, 3.65, hz));
+  const bs = new THREE.Shape(); bs.moveTo(0.02, 0.3); bs.bezierCurveTo(0.5, 0.42, 1.0, 0.8, 0.9, 0.02); bs.bezierCurveTo(1.0, -0.8, 0.5, -0.42, 0.02, -0.3); bs.lineTo(0.02, 0.3);
+  const blade = new THREE.Mesh(new THREE.ExtrudeGeometry(bs, { depth: 0.07, bevelEnabled: true, bevelSize: 0.015, bevelThickness: 0.015, bevelSegments: 1 }), new THREE.MeshStandardMaterial({ color: 0xb4bcc6, roughness: 0.3, metalness: 0.5 })); blade.position.set(hx, 3.0, hz - 0.035); blade.castShadow = true; g.add(blade);
+  g.add(mesh(new THREE.BoxGeometry(0.04, 0.5, 0.02), rune, hx + 0.5, 3.0, hz + 0.05)); g.add(mesh(new THREE.BoxGeometry(0.2, 0.035, 0.02), rune, hx + 0.56, 3.12, hz + 0.05).rotateZ(-0.4));
+  for (const [s, y] of [[-1, 2.1], [1, 1.45]] as const) { const sh = V(s * 0.74, 2.7, 0.05), el = V(s * 0.8, 2.0, 0.55), hp = V(hx, y, hz); g.add(limb(sh, el, 0.14, 0.1, mail)); g.add(limb(el, hp, 0.1, 0.075, mail)); hand(g, hp, V(0, 0, -1), skin, 0.17, 0.95); }
+  // cabeça grande, barba entrançada com argolas
+  const head = new THREE.Group(); head.position.set(0, 3.35, 0.12); head.rotation.x = 0.1; g.add(head);
+  head.add(mesh(sph(0.34, 1, 1.08, 1), skin)); head.add(mesh(sph(0.1, 1, 0.9, 1.1), dull(0xdccab4, 0.7), 0, -0.04, 0.34));
+  head.add(mesh(sph(0.075, 1.2, 0.8, 0.5), dull(0x050403, 0.4), 0.13, 0.08, 0.3)); head.add(mesh(sph(0.036, 1.3, 0.8, 0.5), rune, 0.13, 0.08, 0.34));
+  head.add(mesh(sph(0.075, 1.2, 0.8, 0.5), dull(0xdcd8cc, 0.5), -0.13, 0.08, 0.3)); head.add(mesh(sph(0.02), dull(0x9aa0a8, 0.4), -0.13, 0.08, 0.35));
+  head.add(mesh(new THREE.BoxGeometry(0.17, 0.035, 0.04), hair, 0.13, 0.19, 0.31).rotateZ(0.25)); head.add(mesh(new THREE.BoxGeometry(0.17, 0.035, 0.04), hair, -0.13, 0.19, 0.31).rotateZ(-0.12));
+  head.add(mesh(new THREE.BoxGeometry(0.014, 0.2, 0.012), dull(0x6a2a1a, 0.6), -0.13, 0.08, 0.345));   // cicatriz sobre o olho cego
+  for (let k = 0; k < 15; k++) { const sd = (k - 7) / 7, len = 0.55 + (1 - Math.abs(sd)) * 0.55 + (k % 3) * 0.08; const b = mesh(new THREE.ConeGeometry(0.045, len, 5), hair, sd * 0.3, -0.22 - len / 2 + 0.06, 0.26 - Math.abs(sd) * 0.1); b.rotation.set(Math.PI + 0.12, 0, sd * 0.12); head.add(b); if (k % 4 === 1) head.add(mesh(new THREE.TorusGeometry(0.05, 0.014, 5, 12), iron, sd * 0.3, -0.22 - len + 0.18, 0.24 - Math.abs(sd) * 0.1).rotateX(Math.PI / 2)); }
+  head.add(mesh(new THREE.BoxGeometry(0.2, 0.04, 0.04), dull(0x30241a, 0.7), 0, -0.1, 0.35));
+  // elmo com asas de corvo abertas
+  const helm = new THREE.Mesh(new THREE.SphereGeometry(0.37, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron); helm.position.set(0, 0.1, -0.01); helm.scale.set(1, 1, 1.02); helm.castShadow = true; head.add(helm);
+  head.add(mesh(new THREE.BoxGeometry(0.045, 0.24, 0.025), iron, 0, -0.01, 0.37)); head.add(mesh(new THREE.TorusGeometry(0.37, 0.025, 6, 28), mail, 0, 0.1, 0).rotateX(Math.PI / 2));
+  for (const sd of [-1, 1]) {
+    head.add(mesh(new THREE.BoxGeometry(0.06, 0.3, 0.24), iron, sd * 0.35, -0.08, 0.1));
+    for (let k = 0; k < 8; k++) { const a = 0.35 + k * 0.17, len = 0.5 + k * 0.05; const f = mesh(new THREE.BoxGeometry(len, 0.02, 0.24), dull(0x12121a, 0.5), sd * (0.36 + Math.cos(a) * len * 0.45), 0.2 + Math.sin(a) * len * 0.9, -0.05 - k * 0.012); f.rotation.z = sd * (a + 0.2); head.add(f); }
+  }
+  // dois corvos pousados nos ombros e vários a rodear
+  const cv1 = corvo(1.7); cv1.position.set(-0.86, 3.12, 0.1); cv1.rotation.y = 0.5; g.add(cv1);
+  const cv2 = corvo(1.5); cv2.position.set(0.9, 3.08, -0.05); cv2.rotation.y = -0.7; g.add(cv2);
+  for (let k = 0; k < 6; k++) { const a = k * 1.15 + 0.4, c = corvo(1.1 + (k % 3) * 0.2); c.position.set(Math.cos(a) * (1.9 + (k % 2) * 0.5), 2.7 + (k % 4) * 0.4, -0.5 - Math.abs(Math.sin(a)) * 0.7); c.rotation.set(0, -a + Math.PI / 2, k % 2 ? 0.3 : -0.3); g.add(c); }
+  const gl = glowSprite(0xff8a30, 4.6, 0.28); gl.position.set(0, 2.4, -0.7); g.add(gl);
+  return g;
+}

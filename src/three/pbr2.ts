@@ -24,6 +24,7 @@ interface BlockOpts {
   glow?: string;          // cor das fendas luminosas (cria mapa emissivo)
   stain?: { col: string; n: number } | null;   // musgo / pátina / geada
   rivets?: boolean; frost?: boolean;
+  runes?: string;         // cor das runas gravadas (a brilhar)
 }
 
 function blocks(o: BlockOpts): Tex {
@@ -55,9 +56,19 @@ function blocks(o: BlockOpts): Tex {
     c.strokeStyle = o.crackCol; c.lineWidth = 2; path(c); h.strokeStyle = 'rgba(0,0,0,.95)'; h.lineWidth = 3.5; path(h);
     if (o.glow) { e.strokeStyle = o.glow; e.globalAlpha = 0.35; e.lineWidth = 9; path(e); e.globalAlpha = 1; e.lineWidth = 2.6; path(e); c.strokeStyle = o.glow; c.lineWidth = 1.6; path(c); }
   }
+  if (o.runes) {   // runas gravadas: haste vertical com ramos e traços, luminosas
+    for (let i = 0; i < 12; i++) {
+      const gx = r(40, N - 40), gy = Math.floor(r(0, rows)) * rh + rh / 2, s = r(0.8, 1.25), pts: [number, number, number, number][] = [[0, -22, 0, 22]];
+      for (let k = 0; k < 2 + ((R() * 3) | 0); k++) { const y0 = r(-18, 10), dx = r(10, 20) * (R() < 0.5 ? -1 : 1); pts.push([0, y0, dx, y0 + r(-14, 14)]); }
+      const path = (g2: CanvasRenderingContext2D) => { g2.beginPath(); for (const [x1, y1, x2, y2] of pts) { g2.moveTo(gx + x1 * s, gy + y1 * s); g2.lineTo(gx + x2 * s, gy + y2 * s); } g2.stroke(); };
+      e.lineCap = 'round'; e.strokeStyle = o.runes; e.globalAlpha = 0.3; e.lineWidth = 12; path(e); e.globalAlpha = 1; e.lineWidth = 3.2; path(e);
+      c.lineCap = 'round'; c.strokeStyle = 'rgba(8,10,14,.9)'; c.lineWidth = 7; path(c); c.strokeStyle = o.runes; c.lineWidth = 2.4; path(c);
+      h.lineCap = 'round'; h.strokeStyle = 'rgba(0,0,0,.95)'; h.lineWidth = 7; path(h);
+    }
+  }
   if (o.stain) for (let i = 0; i < o.stain.n; i++) { const x = r(0, N), y = Math.floor(r(0, rows)) * rh + r(-4, 10), rad = r(10, 32); blob(c, x, y, rad, o.stain.col); blob(h, x, y, rad, 'rgba(255,255,255,.22)'); }
   const out: Tex = { map: tex(cc, true), normal: tex(heightToNormal(hc, 3), false) };
-  if (o.glow) out.emissive = tex(ec, true);
+  if (o.glow || o.runes) out.emissive = tex(ec, true);
   return out;
 }
 
@@ -119,6 +130,30 @@ function floors(kind: string): Tex {
     for (let i = 0; i < 50; i++) blob(c, r(0, N), r(0, N), r(24, 90), R() < 0.5 ? 'rgba(255,255,255,.3)' : 'rgba(90,150,210,.28)');
     for (let i = 0; i < 6; i++) { let x = r(30, N - 30), y = r(30, N - 30), a = r(0, 6.28); const pts: [number, number][] = [[x, y]]; for (let s = 0; s < 9; s++) { a += r(-0.7, 0.7); x += Math.cos(a) * r(20, 50); y += Math.sin(a) * r(20, 50); pts.push([x, y]); } for (const [g2, col, lw] of [[c, 'rgba(255,255,255,.8)', 1.8], [h, 'rgba(0,0,0,.9)', 3]] as const) { g2.strokeStyle = col; g2.lineWidth = lw; g2.beginPath(); pts.forEach(([px, py], j) => (j ? g2.lineTo(px, py) : g2.moveTo(px, py))); g2.stroke(); } }
     for (let i = 0; i < 300; i++) { c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(r(8, N - 8), r(8, N - 8), r(1, 3), r(1, 3)); }
+  } else if (kind === 'moss') {   // musgo profundo, raízes, folhas caídas e flores minúsculas que brilham
+    c.fillStyle = '#26361c'; c.fillRect(0, 0, N, N); h.fillStyle = '#808080'; h.fillRect(0, 0, N, N);
+    c.strokeStyle = '#0c1408'; c.lineWidth = 22; c.strokeRect(0, 0, N, N); h.strokeStyle = '#303030'; h.lineWidth = 28; h.strokeRect(0, 0, N, N);
+    for (let i = 0; i < 70; i++) blob(c, r(0, N), r(0, N), r(24, 80), R() < 0.5 ? 'rgba(90,140,60,.34)' : 'rgba(10,24,8,.34)');
+    for (let i = 0; i < 5; i++) { // raízes grossas a atravessar a pedra
+      let x = r(0, N), y = r(0, N), a = r(0, 6.28); const pts: [number, number][] = [[x, y]];
+      for (let s = 0; s < 8; s++) { a += r(-0.7, 0.7); x += Math.cos(a) * r(30, 60); y += Math.sin(a) * r(30, 60); pts.push([x, y]); }
+      const path = (g2: CanvasRenderingContext2D) => { g2.beginPath(); pts.forEach(([px, py], j) => (j ? g2.lineTo(px, py) : g2.moveTo(px, py))); g2.stroke(); };
+      c.strokeStyle = '#3a2a18'; c.lineWidth = 9; path(c); c.strokeStyle = '#5a4428'; c.lineWidth = 3; path(c); h.strokeStyle = 'rgba(255,255,255,.7)'; h.lineWidth = 9; path(h);
+    }
+    for (let i = 0; i < 90; i++) { const x = r(10, N - 10), y = r(10, N - 10); c.fillStyle = R() < 0.5 ? 'rgba(70,120,40,.85)' : 'rgba(140,150,50,.8)'; c.beginPath(); c.ellipse(x, y, r(4, 9), r(2, 4), r(0, 3), 0, 6.28); c.fill(); }
+    for (let i = 0; i < 26; i++) { const x = r(14, N - 14), y = r(14, N - 14); blob(c, x, y, 6, R() < 0.5 ? 'rgba(255,230,140,.95)' : 'rgba(190,255,150,.95)'); c.fillStyle = '#fff6c0'; c.fillRect(x - 1, y - 1, 2, 2); }
+  } else if (kind === 'planks') {   // tábuas de convés batidas pelo mar, azul-ardósia, com pregos e sal
+    h.fillStyle = '#707070'; h.fillRect(0, 0, N, N);
+    const pl = 5, ph = N / pl, tones = ['#4a5058', '#40464e', '#555c64', '#383e46', '#4c525a'];
+    for (let k = 0; k < pl; k++) {
+      c.fillStyle = tones[(R() * tones.length) | 0]; c.fillRect(0, k * ph, N, ph);
+      for (let g = 0; g < 50; g++) { const y = k * ph + r(3, ph - 3); c.strokeStyle = `rgba(${R() < 0.5 ? '14,18,24' : '150,170,190'},${r(0.1, 0.32)})`; c.lineWidth = r(0.6, 1.6); c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(N * 0.3, y + r(-4, 4), N * 0.6, y + r(-4, 4), N, y + r(-3, 3)); c.stroke(); h.strokeStyle = 'rgba(0,0,0,.25)'; h.lineWidth = 1; h.beginPath(); h.moveTo(0, y); h.lineTo(N, y + r(-2, 2)); h.stroke(); }
+      c.fillStyle = 'rgba(0,0,0,.65)'; c.fillRect(0, k * ph, N, 5); h.fillStyle = 'rgba(0,0,0,.85)'; h.fillRect(0, k * ph, N, 8);
+      const bx = r(80, N - 80); c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(bx, k * ph, 3, ph); h.fillStyle = 'rgba(0,0,0,.8)'; h.fillRect(bx, k * ph, 5, ph);
+      for (const nx of [12, N - 12, bx - 10, bx + 12]) blob(c, nx, k * ph + ph / 2, 4, 'rgba(180,170,150,.85)');
+    }
+    for (let i = 0; i < 36; i++) blob(c, r(0, N), r(0, N), r(18, 64), R() < 0.55 ? 'rgba(235,245,255,.26)' : 'rgba(0,0,0,.16)');
+    for (let i = 0; i < 160; i++) { c.fillStyle = 'rgba(240,248,255,.45)'; c.fillRect(r(0, N), r(0, N), r(1, 3), r(1, 2)); }
   } else { // obsidiana com fendas de lava
     c.fillStyle = '#1c1820'; c.fillRect(0, 0, N, N); h.fillStyle = '#d0d0d0'; h.fillRect(0, 0, N, N);
     c.strokeStyle = '#08060a'; c.lineWidth = 24; c.strokeRect(0, 0, N, N); h.strokeStyle = '#303030'; h.lineWidth = 30; h.strokeRect(0, 0, N, N);
@@ -145,6 +180,8 @@ export function wallPBR(kind: string): Tex {
     case 'ice': t = blocks({ tones: ['#a9cde2', '#9cc4dc', '#b8d8ea', '#8fb8d2', '#a2c8de'], mortar: '#5a86a4', rows: 6, seed: 62, cracks: 7, crackCol: 'rgba(255,255,255,.85)', frost: true, stain: { col: 'rgba(235,248,255,.55)', n: 70 } }); break;
     case 'brass': t = blocks({ tones: ['#a07a34', '#8e6a2a', '#b08a3c', '#7e5e24', '#98762e'], mortar: '#2a1c08', rows: 5, seed: 63, cracks: 5, crackCol: 'rgba(30,18,6,.9)', rivets: true, stain: { col: 'rgba(70,140,110,.5)', n: 60 } }); break;
     case 'shelves': t = shelves(); break;
+    case 'bark': t = blocks({ tones: ['#3a2c1c', '#32261a', '#443222', '#2c2a18', '#3c3420'], mortar: '#100c06', rows: 7, seed: 64, cracks: 8, crackCol: '#0a0805', glow: '#8be060', stain: { col: 'rgba(80,140,50,.6)', n: 110 } }); break;
+    case 'runes': t = blocks({ tones: ['#363c46', '#2e343e', '#404752', '#2a3039', '#38404a'], mortar: '#0c0f14', rows: 5, seed: 65, cracks: 6, crackCol: '#06080b', runes: '#ff8a30', stain: { col: 'rgba(225,238,250,.4)', n: 60 }, frost: true }); break;
     case 'stone': { const p = stonePBR(); t = { map: p.map, normal: p.normal }; break; }
     default: { const p = stonePBR(); t = { map: p.map, normal: p.normal }; }
   }
@@ -154,7 +191,7 @@ export function wallPBR(kind: string): Tex {
 export function floorPBR(kind: string): Tex {
   const hit = cache.get('f' + kind); if (hit) return hit;
   let t: Tex;
-  if (kind === 'wood' || kind === 'metal' || kind === 'ice' || kind === 'obsidian') t = floors(kind);
+  if (kind === 'wood' || kind === 'metal' || kind === 'ice' || kind === 'obsidian' || kind === 'moss' || kind === 'planks') t = floors(kind);
   else { const p = flagPBR(); t = { map: p.map, normal: p.normal }; }
   cache.set('f' + kind, t); return t;
 }
