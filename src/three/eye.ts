@@ -10,8 +10,8 @@ import { makeUli, animateFlame } from './nightmare';
 const TAU = Math.PI * 2;
 const RS = 6, ZC = -2.4;            // globo ocular (raio e centro em z)
 const RL = 6.9;                      // pele das pálpebras (esfera um pouco maior)
-const PR = 0.82, IR = 3.2, RD = 7;   // pupila, íris, curvatura da íris
-const HW = 3.85, HU = 2.7, HL = 2.0, YC = -0.8;   // abertura: meia-largura, alturas, linha de fecho
+const PR = 0.92, IR = 3.65, RD = 7;   // pupila, íris, curvatura da íris
+const HW = 3.9, HU = 3.2, HL = 2.35, YC = -0.9;   // abertura: meia-largura, alturas, linha de fecho
 const XO = 6.6, EYO = 6.0;           // extensão da pele (vai esbatendo para o vazio)
 const CAM_D = 24;
 
@@ -316,7 +316,7 @@ export class EyeTitle {
     envScene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
 
     // globo ocular
-    const sg = new THREE.SphereGeometry(RS, 96, 48, 0, TAU, 0, Math.asin(4.3 / RS)); sg.rotateX(Math.PI / 2);
+    const sg = new THREE.SphereGeometry(RS, 96, 48, 0, TAU, 0, Math.asin(4.7 / RS)); sg.rotateX(Math.PI / 2);
     const p = sg.attributes.position, uvA = sg.attributes.uv as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) uvA.setXY(i, p.getX(i) / 9.6 + 0.5, p.getY(i) / 9.6 + 0.5);
     const sclera = new THREE.Mesh(sg, new THREE.MeshPhysicalMaterial({ map: scleraTexture(), roughness: 0.34, clearcoat: 0.85, clearcoatRoughness: 0.12, envMapIntensity: 1.1 }));
@@ -360,7 +360,7 @@ export class EyeTitle {
     const pg = glowSprite(0xff4fd8, 2.2, 0.1); pg.position.z = domeZ(PR) + 0.1; this.iris.add(pg);
 
     // córnea (vidro)
-    const cg = new THREE.SphereGeometry(3.7, 64, 24, 0, TAU, 0, Math.asin(3.55 / 3.7)); cg.rotateX(Math.PI / 2); cg.translate(0, 0, 0.2 - ZC);
+    const cg = new THREE.SphereGeometry(4.4, 64, 24, 0, TAU, 0, Math.asin(4.05 / 4.4)); cg.rotateX(Math.PI / 2); cg.translate(0, 0, -0.5 - ZC);
     const cornea = new THREE.Mesh(cg, new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, roughness: 0.03, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 3.2, depthWrite: false }));
     cornea.renderOrder = 3; this.ball.add(cornea);
 
@@ -390,7 +390,7 @@ export class EyeTitle {
     this.iris.add(trail);
     this.pathCum = [0]; for (let i = 1; i < this.path.length; i++) this.pathCum.push(this.pathCum[i - 1] + this.path[i].distanceTo(this.path[i - 1]));
     this.pathLen = this.pathCum[this.pathCum.length - 1];
-    this.uli.scale.setScalar(0.72); this.iris.add(this.uli);
+    this.uli.scale.setScalar(0.82); this.iris.add(this.uli);
 
     // pálpebras
     const skin = skinTextures();
@@ -428,7 +428,7 @@ export class EyeTitle {
     this.bands = [kb, kg, low];
     this.group.add(kb.mesh, kg.mesh, low.mesh);
     // sobrancelha: arco largo, com friso de paredes-de-labirinto por baixo
-    const browY = (x: number) => 3.2 + 0.7 * (1 - (x / 5.2) * (x / 5.2)) - 0.35 * Math.pow(Math.abs(x) / 5.2, 3);
+    const browY = (x: number) => 3.8 + 0.7 * (1 - (x / 5.2) * (x / 5.2)) - 0.35 * Math.pow(Math.abs(x) / 5.2, 3);
     const brow: THREE.Vector2[] = [];
     for (let i = 0; i <= 60; i++) { const x = -4.9 + 9.8 * i / 60; brow.push(new THREE.Vector2(x, browY(x))); }
     this.group.add(ribbon(brow, (t) => 0.34 * Math.sin(Math.PI * t) + 0.08, blackMat, 0.03));
@@ -444,15 +444,15 @@ export class EyeTitle {
     this.group.add(glyph);
     // linha que desce do olho e acaba numa espiral (o labirinto em miniatura)
     const spi: THREE.Vector2[] = [];
-    for (let i = 0; i <= 14; i++) spi.push(new THREE.Vector2(0.75, -2.25 - 0.85 * i / 14));
-    const cx = 0.75 + 0.6, cy = -3.1, TT = 3.6 * Math.PI;
+    for (let i = 0; i <= 14; i++) spi.push(new THREE.Vector2(0.75, -2.7 - 0.7 * i / 14));
+    const cx = 0.75 + 0.6, cy = -3.4, TT = 3.6 * Math.PI;
     for (let i = 1; i <= 90; i++) { const th = TT * i / 90, r = 0.6 - 0.48 * th / TT; spi.push(new THREE.Vector2(cx - Math.cos(th) * r, cy - Math.sin(th) * r)); }
     this.group.add(ribbon(spi, (t) => 0.2 - 0.07 * t, blackMat, 0.03), ribbon(spi, (t) => 0.07 - 0.03 * t, this.goldMat, 0.05));
     // cauda curva do lado oposto, a acabar num ponto
     const tl: THREE.Vector2[] = [];
-    for (let i = 0; i <= 40; i++) { const t = i / 40; tl.push(new THREE.Vector2(-1.5 - 1.6 * t - 0.5 * t * t, -2.1 - 1.3 * t + 0.4 * Math.sin(t * Math.PI))); }
+    for (let i = 0; i <= 40; i++) { const t = i / 40; tl.push(new THREE.Vector2(-1.5 - 1.6 * t - 0.5 * t * t, -2.55 - 1.0 * t + 0.35 * Math.sin(t * Math.PI))); }
     this.group.add(ribbon(tl, (t) => 0.2 * (1 - t) + 0.03, blackMat, 0.03), ribbon(tl, (t) => 0.06 * (1 - t) + 0.01, neonMat, 0.05));
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), neonMat); dot.position.set(-3.6, -3.4, ZC + Math.sqrt(RL * RL - 3.6 * 3.6 - 3.4 * 3.4) + 0.1); this.group.add(dot);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), neonMat); dot.position.set(-3.6, -3.55, ZC + Math.sqrt(RL * RL - 3.6 * 3.6 - 3.55 * 3.55) + 0.1); this.group.add(dot);
 
     // lágrima
     this.tear = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshPhysicalMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.7, roughness: 0.05, emissive: 0x3a78c8, emissiveIntensity: 0.6, envMapIntensity: 2.5, clearcoat: 1 }));
@@ -544,7 +544,7 @@ export class EyeTitle {
     const q3 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
     this.uli.quaternion.copy(this.tmpQ).multiply(this.tmpQ2).multiply(q3);
     this.uli.position.copy(p).setZ(p.z - 0.03 + fin * 0.4);
-    this.uli.scale.setScalar(0.72 * (1 - fin));
+    this.uli.scale.setScalar(0.82 * (1 - fin));
     this.uli.visible = fin < 0.99;
     const U = this.uli.userData, sw = Math.sin(t * 9) * 0.85 * (walking ? 1 : 0);
     (U.legL as THREE.Object3D).rotation.x = sw; (U.legR as THREE.Object3D).rotation.x = -sw;
@@ -587,9 +587,9 @@ export class EyeTitle {
     this.halo.material.opacity = 0.3 + 0.12 * pulse;
 
     // câmara: respira; no mergulho voa pela pupila
-    const asp = camera.aspect, d = CAM_D * (asp > 0.62 ? 0.95 : 1.1) * (1.12 - 0.12 * this.intro);
+    const asp = camera.aspect, d = CAM_D * (asp > 0.62 ? 0.95 : 1.17) * (1.12 - 0.12 * this.intro);
     let fov = 40;
-    const ty = 0.75;
+    const ty = 0.55;
     if (this.dive < 0) {
       camera.position.set(Math.sin(t * 0.3) * 0.5 - this.look.x * 0.5, Math.cos(t * 0.23) * 0.3 + this.look.y * 0.3 + ty * 0, d);
       camera.lookAt(0, ty, 0);
