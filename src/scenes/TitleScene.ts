@@ -5,6 +5,7 @@ import { drawLogo } from '../three/menuArt';
 import { sfx } from '../core/audio';
 import { save } from '../core/save';
 import { stage } from '../three/Stage';
+import { warmMenus } from '../core/prewarm';
 
 export class TitleScene extends Phaser.Scene {
   private shown = false;
@@ -88,8 +89,12 @@ export class TitleScene extends Phaser.Scene {
     stage.onEyeFlash = (a) => { this.flash.setAlpha(a); };
     stage.start('title');
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => stage.eyeLook((p.x / W - 0.5) * 2, (p.y / H - 0.5) * 2));
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { stage.eyeLook((p.x / W - 0.5) * 2, (p.y / H - 0.5) * 2); stage.eyeBlink(); });
-    this.events.once('shutdown', () => { stage.onEyeFlash = undefined; stage.stop(); });
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { stage.eyeLook((p.x / W - 0.5) * 2, (p.y / H - 0.5) * 2); stage.eyePoke(); });
+    // inclinar o telemóvel move o olho e o labirinto (paralaxe)
+    const tilt = (e: DeviceOrientationEvent) => { if (e.gamma != null && e.beta != null) stage.eyeTilt(e.gamma, e.beta); };
+    window.addEventListener('deviceorientation', tilt);
+    warmMenus(this, () => this.scene.isActive() && !this.diving);
+    this.events.once('shutdown', () => { stage.onEyeFlash = undefined; window.removeEventListener('deviceorientation', tilt); stage.stop(); });
   }
 
   /** Jogar: a câmara mergulha pela pupila e só depois abre os Mundos. */
@@ -97,7 +102,7 @@ export class TitleScene extends Phaser.Scene {
     if (this.diving) return;
     this.diving = true;
     this.tweens.add({ targets: this.children.list.filter((c) => c !== this.flash), alpha: 0, duration: 520, ease: 'Sine.In' });
-    stage.eyeDive(() => this.scene.start('Worlds'));
+    stage.eyeDive(() => this.scene.start('Worlds', { dive: true }));
   }
 
   update() {

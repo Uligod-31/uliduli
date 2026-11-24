@@ -22,6 +22,7 @@ function themeFor0(id: string, pal: Pal): SceneTheme {
   if (id === 'biblioteca') return { top: 0x070403, mid: 0x241408, horizon: 0x8a5a2a, ground: 0x1c120a, ground2: 0x0c0804, sun: 0xffc880, fogNear: 18, fogFar: 150, grade: 0.8, sunC: 0xffd8a0, sunI: 2.3, hemiI: 1.15, rimI: 1.0, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
   if (id === 'elfico') return { top: 0x030a06, mid: 0x0c2414, horizon: 0x3a5c28, ground: 0x142210, ground2: 0x0a1408, sun: 0xffe6a0, fogNear: 16, fogFar: 150, grade: 0.85, sunC: 0xffe2a0, sunI: 2.4, hemiI: 1.2, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
   if (id === 'viking') return { top: 0x050914, mid: 0x16223a, horizon: 0x44546e, ground: 0x0e1c34, ground2: 0x08101e, sun: 0xffb070, fogNear: 22, fogFar: 180, grade: 0.7, sunC: 0xffc8a0, sunI: 2.5, hemiI: 1.25, rimI: 1.1, lampI: 2.0, lampD: 9, expo: 1.38, dim: 0.5 };
+  if (id === 'egipto') return { top: 0x070518, mid: 0x3a1f58, horizon: 0xf2a152, ground: 0xb08a4a, ground2: 0x6a4a28, sun: 0xffc060, fogNear: 70, fogFar: 520, grade: 0.55, sunC: 0xffd49a, sunI: 2.7, hemiI: 1.3, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.42, dim: 0.5 };
   // Jardim Sebe: entardecer doente, névoa verde-oliva, sebes apodrecidas e um sol pálido a morrer
   if (id === 'jardim') return { dali: true, top: 0x040604, mid: 0x1a281c, horizon: 0x56613f, ground: 0x1b2014, ground2: 0x0c0f09, sun: 0xd9cf94, fogNear: 16, fogFar: 150, grade: 0.9, sunC: 0xd6cc9c, sunI: 2.7, hemiI: 1.2, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
   return {
@@ -352,6 +353,53 @@ export class Scenery {
         ship.position.set(Math.cos(a) * d, this.groundY + 0.5, Math.sin(a) * d); ship.rotation.y = a + 1.2; this.group.add(ship);
         const ph = rng() * 6; this.worldAnim.push((t) => { ship.position.y = this.groundY + 0.5 + Math.sin(t * 0.5 + ph) * 0.7; ship.rotation.z = Math.sin(t * 0.4 + ph) * 0.03; });
       }
+    } else if (kind === 'egipto') {
+      gm.map = mk(512, (g) => {
+        g.fillStyle = '#a07a44'; g.fillRect(0, 0, 512, 512);
+        for (let i = 0; i < 90; i++) { g.fillStyle = rng() < 0.5 ? 'rgba(236,200,140,.28)' : 'rgba(70,44,18,.3)'; g.beginPath(); g.ellipse(rng() * 512, rng() * 512, 20 + rng() * 70, 8 + rng() * 28, rng() * 3, 0, 6.28); g.fill(); }
+        for (let i = 0; i < 260; i++) { const y = rng() * 512, x = rng() * 512, w = 30 + rng() * 110; g.strokeStyle = `rgba(${rng() < 0.5 ? '255,230,170' : '60,36,14'},${0.1 + rng() * 0.2})`; g.lineWidth = 1 + rng() * 1.6; for (const ox of [-512, 0, 512]) { g.beginPath(); g.moveTo(x + ox, y); g.quadraticCurveTo(x + ox + w / 2, y - 3 - rng() * 4, x + ox + w, y); g.stroke(); } }
+      }, 170);
+      gm.color.set(0x4e3b28); gm.roughness = 1;
+      const duneM = new THREE.MeshStandardMaterial({ color: 0x8a6636, roughness: 1 });
+      ring(22, 200, 640, (a, d) => { const r = 50 + rng() * 110, m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8), duneM); m.scale.set(r * 1.5, r * 0.22, r * 0.9); m.position.set(Math.cos(a) * d, this.groundY + 2, Math.sin(a) * d); m.rotation.y = rng() * 3; this.group.add(m); });
+      // pirâmides ao longe, com a ponta a brilhar
+      const pyrM = new THREE.MeshStandardMaterial({ color: 0xb08a50, roughness: 0.95, flatShading: true, emissive: 0x3a2208, emissiveIntensity: 0.4 });
+      for (const [x, z, r, h] of [[-260, -800, 230, 260], [130, -900, 170, 190], [430, -640, 120, 140], [-540, -430, 95, 115]] as const) {
+        const p = new THREE.Mesh(new THREE.ConeGeometry(r, h, 4).rotateY(Math.PI / 4), pyrM); p.position.set(x, this.groundY + h / 2, z); this.group.add(p);
+        const cap = glow(0xffd070, 1, 0.9); cap.scale.set(r * 0.5, r * 0.5, 1); cap.position.set(x, this.groundY + h + 4, z); this.group.add(cap);
+      }
+      // esfinge colossal em silhueta, de olhos turquesa
+      const sphM = new THREE.MeshStandardMaterial({ color: 0x2a1c10, roughness: 1, flatShading: true, emissive: 0x2a1a08, emissiveIntensity: 0.3 });
+      const sx = new THREE.Group();
+      const bx = (w: number, h: number, d: number, x: number, y: number, z: number) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), sphM); m.position.set(x, y, z); sx.add(m); return m; };
+      bx(72, 26, 28, 0, 13, 0); bx(26, 22, 26, 34, 18, 0); bx(30, 8, 9, -52, 4, 10); bx(30, 8, 9, -52, 4, -10); bx(18, 24, 17, -46, 38, 0);
+      bx(8, 26, 4, -46, 30, 11); bx(8, 26, 4, -46, 30, -11); bx(10, 6, 20, -46, 52, 0);
+      for (const sd of [-1, 1]) { const eg = glow(0x2fe6d0, 1, 0.95); eg.scale.set(5, 5, 1); eg.position.set(-55, 40, sd * 4.5); sx.add(eg); }
+      sx.position.set(-170, this.groundY, -340); sx.rotation.y = 0.5; this.group.add(sx);
+      // obeliscos altos de ponta dourada
+      const obM = new THREE.MeshStandardMaterial({ color: 0xc4a066, roughness: 0.85, flatShading: true, emissive: 0x3a2208, emissiveIntensity: 0.35 }), goldM2 = new THREE.MeshStandardMaterial({ color: 0xe6b84a, roughness: 0.3, metalness: 0.8, emissive: 0x5a3a08, emissiveIntensity: 0.8 });
+      ring(11, 220, 470, (a, d) => {
+        const h = 60 + rng() * 70, w = 3.5 + rng() * 2.5, px = Math.cos(a) * d, pz = Math.sin(a) * d;
+        const o = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.6, w, h, 4).rotateY(Math.PI / 4), obM); o.position.set(px, this.groundY + h / 2, pz); this.group.add(o);
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(w * 0.6, w * 1.6, 4).rotateY(Math.PI / 4), goldM2); tip.position.set(px, this.groundY + h + w * 0.8, pz); this.group.add(tip);
+        const gl = glow(0xffc860, 1, 0.7); gl.scale.set(20, 28, 1); gl.position.set(px, this.groundY + h + w * 0.8, pz); this.group.add(gl);
+        const gs = glow(0x2fe6d0, 1, 0.5); gs.scale.set(5, 24, 1); gs.position.set(px, this.groundY + h * 0.55, pz); this.group.add(gs);
+      });
+      // palmeiras em silhueta
+      const trunkM = new THREE.MeshStandardMaterial({ color: 0x1c140c, roughness: 1 }), frondM = new THREE.MeshStandardMaterial({ color: 0x0d1a10, roughness: 1, side: THREE.DoubleSide, flatShading: true });
+      ring(28, 120, 420, (a, d) => {
+        const g = new THREE.Group(), h = 22 + rng() * 20;
+        const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.5, h, 6), trunkM); tr.position.y = h / 2; tr.rotation.z = (rng() - 0.5) * 0.2; g.add(tr);
+        for (let k = 0; k < 8; k++) { const f = new THREE.Mesh(new THREE.ConeGeometry(1.7, 17, 4).translate(0, 8.5, 0), frondM); f.scale.z = 0.22; f.position.y = h; f.rotation.set(0, k * 0.785, 1.15 + (k % 2) * 0.2); g.add(f); }
+        g.position.set(Math.cos(a) * d, this.groundY, Math.sin(a) * d); g.rotation.y = rng() * 3; this.group.add(g);
+      });
+      // sol baixo e grande, e estrelas no alto
+      const sunG = glow(0xffb050, 1, 0.95); sunG.scale.set(330, 330, 1); sunG.position.set(-170, 70, -860); this.group.add(sunG);
+      const sunH = glow(0xff7a3a, 1, 0.34); sunH.scale.set(760, 520, 1); sunH.position.set(-170, 60, -860); this.group.add(sunH);
+      const NS = 420, sp2 = new Float32Array(NS * 3);
+      for (let i = 0; i < NS; i++) { const a = rng() * Math.PI * 2, b = 0.35 + rng() * 1.1; sp2[i * 3] = Math.cos(a) * Math.cos(b) * 1300; sp2[i * 3 + 1] = Math.sin(b) * 1300; sp2[i * 3 + 2] = Math.sin(a) * Math.cos(b) * 1300; }
+      const sg2 = new THREE.BufferGeometry(); sg2.setAttribute('position', new THREE.BufferAttribute(sp2, 3));
+      const stars2 = new THREE.Points(sg2, new THREE.PointsMaterial({ size: 2.6, color: 0xfff0d0, sizeAttenuation: false, fog: false, depthWrite: false, transparent: true, opacity: 0.8, toneMapped: false })); stars2.frustumCulled = false; this.group.add(stars2);
     }
 
     // ── detritos flutuantes junto à ilha: o que se vê no ecrã vertical, por baixo e ao lado do labirinto ──
@@ -409,6 +457,17 @@ export class Scenery {
         return g;
       });
       for (let i = 0; i < 9; i++) { const a = rng() * Math.PI * 2, d = islandR + 38 + rng() * 120; pillar(0xff7a2a, Math.cos(a) * d, Math.sin(a) * d, 36 + rng() * 40, 7 + rng() * 6); }
+    } else if (kind === 'egipto') {
+      const sandM = new THREE.MeshStandardMaterial({ color: 0xb48c52, roughness: 0.9, flatShading: true }), tqM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x2fe6d0).multiplyScalar(2.4), toneMapped: false }), goldN = new THREE.MeshStandardMaterial({ color: 0xe6b84a, roughness: 0.3, metalness: 0.85, emissive: 0x5a3a08, emissiveIntensity: 0.7 });
+      near(26, (i) => {
+        const g = new THREE.Group(), k = i % 3;
+        if (k === 0) { const s2 = 1.2 + rng() * 1.8; g.add(new THREE.Mesh(new THREE.BoxGeometry(1.5 * s2, 0.9 * s2, 1.5 * s2), sandM)); const v = new THREE.Mesh(new THREE.BoxGeometry(0.08 * s2, 0.6 * s2, 0.04), tqM); v.position.set(0, 0, 0.77 * s2); g.add(v); for (const dy of [0.2, -0.15]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.4 * s2, 0.06 * s2, 0.04), tqM); b.position.set(0, dy * s2, 0.77 * s2); g.add(b); } const gl = glow(0x2fe6d0, s2 * 3.2, 0.3); gl.position.z = 0.9 * s2; g.add(gl); }
+        else if (k === 1) { const s2 = 1 + rng() * 1.4; const ob = new THREE.Mesh(new THREE.CylinderGeometry(0.4 * s2, 0.55 * s2, 2.4 * s2, 4).rotateY(Math.PI / 4), sandM); g.add(ob); const tp = new THREE.Mesh(new THREE.ConeGeometry(0.4 * s2, 0.7 * s2, 4).rotateY(Math.PI / 4), goldN); tp.position.y = 1.5 * s2; g.add(tp); const gl = glow(0xffc860, s2 * 3, 0.5); gl.position.y = 1.5 * s2; g.add(gl); }
+        else { const s2 = 1.1 + rng() * 0.9; g.add(new THREE.Mesh(new THREE.TorusGeometry(0.5 * s2, 0.07 * s2, 6, 20).translate(0, 0.9 * s2, 0), tqM)); const st = new THREE.Mesh(new THREE.BoxGeometry(0.1 * s2, 1.5 * s2, 0.1 * s2), tqM); st.position.y = -0.2 * s2; g.add(st); const ar = new THREE.Mesh(new THREE.BoxGeometry(0.95 * s2, 0.1 * s2, 0.1 * s2), tqM); ar.position.y = 0.3 * s2; g.add(ar); const gl = glow(0x2fe6d0, s2 * 4, 0.45); gl.position.y = 0.4 * s2; g.add(gl); }
+        return g;
+      });
+      near(14, () => { const g = new THREE.Group(), s2 = 0.3 + rng() * 0.4; const b = new THREE.Mesh(new THREE.SphereGeometry(0.5 * s2, 10, 8), goldN); b.scale.set(1, 0.55, 1.4); g.add(b); const hd = new THREE.Mesh(new THREE.SphereGeometry(0.28 * s2, 8, 6), new THREE.MeshStandardMaterial({ color: 0x1c3fb0, roughness: 0.4, metalness: 0.4 })); hd.position.z = 0.7 * s2; g.add(hd); const gl = glow(0xffc860, s2 * 6, 0.5); g.add(gl); return g; }, 6, 40, 4, -12);
+      for (let i = 0; i < 9; i++) { const a = rng() * Math.PI * 2, d = islandR + 38 + rng() * 120; pillar(0xffc860, Math.cos(a) * d, Math.sin(a) * d, 40 + rng() * 40, 8 + rng() * 6); }
     }
   }
 

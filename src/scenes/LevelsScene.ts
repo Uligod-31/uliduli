@@ -8,10 +8,12 @@ import { drawPlate } from '../three/menuArt';
 
 export class LevelsScene extends Phaser.Scene {
   private worldId = 'b612';
+  private leaving = false;
   constructor() { super('Levels'); }
   init(d: { world: string }) { this.worldId = d.world; }
 
   create() {
+    this.leaving = false;
     const wd = getWorld(this.worldId);
     paintedBg(this, 0.45);
 
@@ -53,7 +55,9 @@ export class LevelsScene extends Phaser.Scene {
         const z = this.add.rectangle(x + cw / 2, y + CH / 2, cw, CH, 0xffffff, 0.001).setInteractive();
         z.on('pointerup', (p: Phaser.Input.Pointer) => {
           if (p.getDistance() > 16) return;
-          this.scene.start('Game', { world: wd.id, level: i });
+          if (this.leaving) return;
+          this.leaving = true; this.cameras.main.fadeOut(260, 5, 6, 11);
+          this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Game', { world: wd.id, level: i }));
         });
         list.add(z);
       }

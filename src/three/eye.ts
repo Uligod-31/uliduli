@@ -298,7 +298,8 @@ export class EyeTitle {
   private blinkAt = 2.4; private blinkT = -1; private double = false;
   private look = new THREE.Vector2(); private lookT = new THREE.Vector2(); private idle = true; private idleT = 0;
   private walkS = 0;
-  private dive = -1; private diveCb?: () => void;
+  private dive = -1; private diveCb?: () => void; private diveT0 = 0;
+  private tilt = new THREE.Vector2(); private tiltT = new THREE.Vector2();
   private flash = 0;
   /** tempo desde a primeira pintura (0..1) para a entrada */
   private intro = 0;
@@ -533,7 +534,16 @@ export class EyeTitle {
   setLook(x: number, y: number) { this.lookT.set(x, y); this.idle = false; this.idleT = 0; }
   /** Pisca já (ex.: ao tocar). */
   blink() { if (this.blinkT < 0) this.blinkT = 0; }
-  startDive(cb: () => void) { if (this.dive >= 0) return; this.dive = 0; this.diveCb = cb; this.blinkT = -1; }
+  startDive(cb: () => void) { if (this.dive >= 0) return; this.dive = 0; this.diveT0 = performance.now(); this.diveCb = cb; this.blinkT = -1; }
+  /** Toque: pisca e manda uma onda de choque pelo labirinto. */
+  poke() { this.blink(); if (this.dive < 0) this.shockT = 0; }
+  /** Inclinação do telemóvel (gamma/beta em graus) → paralaxe. */
+  setTilt(gamma: number, beta: number) { this.tiltT.set(Math.max(-1, Math.min(1, gamma / 25)), Math.max(-1, Math.min(1, (beta - 50) / 25))); }
+  /** Volta ao estado inicial (o olho fica em cache entre visitas ao ecrã inicial). */
+  reset() {
+    this.dive = -1; this.diveCb = undefined; this.flash = 0; this.intro = 0; this.blinkT = -1; this.blinkAt = 2.4; this.shockT = -1; this.shockedCycle = -1;
+    this.look.set(0, 0); this.lookT.set(0, 0); this.idle = true; this.idleT = 0; this.open = 1; this.t = 0;
+  }
   get diving() { return this.dive >= 0; }
 
   update(dt: number, camera: THREE.PerspectiveCamera, pulse: number) {
@@ -548,7 +558,7 @@ export class EyeTitle {
     this.iris.rotation.z = t * 0.035;
     // labirinto: rotação própria + inclinação 3D + translação suave, e uma onda a subir pelos anéis
     const mp = this.mazePivot;
-    mp.rotation.set(Math.sin(t * 0.5) * 0.09 + this.look.y * 0.05, Math.cos(t * 0.41) * 0.09 - this.look.x * 0.05, t * 0.16);
+    mp.rotation.set(Math.sin(t * 0.5) * 0.09 + this.look.y * 0.05 + this.tilt.y * 0.06, Math.cos(t * 0.41) * 0.09 - this.look.x * 0.05 + this.tilt.x * 0.08, t * 0.16);
     mp.position.x = Math.sin(t * 0.7) * 0.14; mp.position.y = Math.cos(t * 0.53) * 0.11; mp.position.z = domeZ(1.8) + Math.sin(t * 0.9) * 0.12;
     this.waveWalls(t, pulse);
     this.gear.rotation.z = -t * 0.32;
@@ -641,14 +651,15 @@ export class EyeTitle {
     let fov = 40;
     const ty = 0.55;
     if (this.dive < 0) {
-      camera.position.set(Math.sin(t * 0.3) * 0.5 - this.look.x * 0.5, Math.cos(t * 0.23) * 0.3 + this.look.y * 0.3 + ty * 0, d);
+      this.tilt.lerp(this.tiltT, 1 - Math.exp(-dt * 3));
+      camera.position.set(Math.sin(t * 0.3) * 0.5 - this.look.x * 0.5 + this.tilt.x * 1.1, Math.cos(t * 0.23) * 0.3 + this.look.y * 0.3 - this.tilt.y * 0.7, d);
       camera.lookAt(0, ty, 0);
     } else {
-      this.dive += dt / 1.15; const u = Math.min(1, this.dive), e = u * u * u;
+      this.dive = (performance.now() - this.diveT0) / 1150; const u = Math.min(1, this.dive), e = Math.pow(u, 2.4);
       const target = this.ball.localToWorld(new THREE.Vector3(0, 0, domeZ(PR) - 0.4));
       camera.position.set(THREE.MathUtils.lerp(0, target.x, e), THREE.MathUtils.lerp(0, target.y, e), THREE.MathUtils.lerp(d, target.z + 0.3, e));
       camera.lookAt(THREE.MathUtils.lerp(0, target.x, e), THREE.MathUtils.lerp(ty, target.y, e), THREE.MathUtils.lerp(0, target.z - 2, e));
-      fov = 40 + 80 * e;
+      fov = 40 + 85 * e;
       this.flash = sstep(0.78, 1, u);
       if (u >= 1 && this.diveCb) { const cb = this.diveCb; this.diveCb = undefined; cb(); }
     }

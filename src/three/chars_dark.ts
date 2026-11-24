@@ -575,3 +575,82 @@ export function jarl(): THREE.Group {
   const gl = glowSprite(0xff8a30, 4.6, 0.28); gl.position.set(0, 2.4, -0.7); g.add(gl);
   return g;
 }
+
+/** A Esfinge das Areias: cabeça faraónica de touca às riscas, olhos de khol a brilhar em turquesa, cobra na testa, colar largo, patas de leão e asas de luz com ankhs a flutuar. */
+export function esfinge(): THREE.Group {
+  const g = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({ color: 0xd2a63c, roughness: 0.3, metalness: 0.85 }), goldD = new THREE.MeshStandardMaterial({ color: 0x8a6a22, roughness: 0.45, metalness: 0.7 });
+  const lapis = new THREE.MeshStandardMaterial({ color: 0x1c3fb0, roughness: 0.32, metalness: 0.4 }), carn = new THREE.MeshStandardMaterial({ color: 0xc23a2a, roughness: 0.4, metalness: 0.2 });
+  const turq = emit(0x2fe6d0, 2.4), turqS = new THREE.MeshStandardMaterial({ color: 0x2fe6d0, roughness: 0.3, emissive: 0x14806e, emissiveIntensity: 0.7 });
+  const skin = dull(0xb87a44, 0.5), sand = dull(0xc9a468, 0.8), sandD = dull(0xa98450, 0.85), kohl = new THREE.MeshStandardMaterial({ color: 0x06040a, roughness: 0.25, metalness: 0.3 });
+  // corpo de leão agachado e patas estendidas
+  g.add(mesh(sph(1.0, 1.25, 0.82, 1.9), sand, 0, 0.9, -0.9));
+  for (const s of [-1, 1]) {
+    g.add(mesh(sph(0.78, 1, 1, 1.1), sandD, s * 0.85, 0.75, -1.7));
+    g.add(limb(V(s * 0.55, 1.5, 0.15), V(s * 0.55, 0.38, 1.55), 0.3, 0.24, sand));
+    g.add(mesh(sph(0.3, 1.05, 0.6, 1.6), sand, s * 0.55, 0.2, 1.7));
+    for (let k = -1; k <= 1; k++) g.add(mesh(new THREE.ConeGeometry(0.035, 0.16, 5).rotateX(Math.PI / 2), goldD, s * 0.55 + k * 0.1, 0.16, 2.12));
+    g.add(mesh(new THREE.TorusGeometry(0.28, 0.035, 6, 18), gold, s * 0.55, 0.9, 0.75).rotateX(Math.PI / 2 - 0.15));
+  }
+  g.add(limb(V(0, 1.1, -2.6), V(0.2, 0.5, -3.3), 0.1, 0.06, sandD)); g.add(mesh(sph(0.15, 1, 1.4, 1), goldD, 0.2, 0.4, -3.35));
+  // peito e colar usekh em anéis de ouro, lápis, turquesa e cornalina
+  g.add(mesh(sph(0.74, 1.05, 1.0, 0.9), sand, 0, 1.95, 0.1));
+  const ringMats = [gold, lapis, turqS, carn, gold];
+  for (let k = 0; k < 5; k++) {
+    const t = new THREE.Mesh(new THREE.TorusGeometry(0.5 + k * 0.095, 0.045, 8, 40, Math.PI), ringMats[k]); t.rotation.x = Math.PI / 2; t.position.set(0, 2.72 - k * 0.15, 0.04 + k * 0.03); t.castShadow = true; g.add(t);
+  }
+  for (let k = 0; k < 9; k++) { const an = Math.PI * (0.12 + k * 0.095), R = 1.0; g.add(mesh(new THREE.ConeGeometry(0.05, 0.2, 5).rotateX(Math.PI), k % 2 ? lapis : turqS, Math.cos(an) * R, 2.0, Math.sin(an) * R + 0.2)); }
+  g.add(mesh(sph(0.1, 1, 1.2, 0.6), emit(0x2fe6d0, 1.4), 0, 1.6, 0.98)); g.add(mesh(new THREE.TorusGeometry(0.13, 0.025, 6, 18), gold, 0, 1.6, 0.97));
+  g.add(mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.6, 14), skin, 0, 3.05, 0.08));
+  // cabeça
+  const head = new THREE.Group(); head.position.set(0, 3.78, 0.14); head.scale.setScalar(1.32); g.add(head);
+  head.add(mesh(sph(0.43, 0.92, 1.18, 0.98), skin));
+  head.add(mesh(new THREE.ConeGeometry(0.05, 0.16, 5).rotateX(-1.35), skin, 0, -0.02, 0.4));
+  head.add(mesh(new THREE.BoxGeometry(0.17, 0.028, 0.03), dull(0x7a2a1a, 0.5), 0, -0.17, 0.39)); head.add(mesh(new THREE.BoxGeometry(0.15, 0.03, 0.03), dull(0x8a3a28, 0.5), 0, -0.2, 0.385));
+  for (const s of [-1, 1]) {
+    head.add(mesh(sph(0.075, 1.8, 0.6, 0.5), kohl, s * 0.17, 0.07, 0.37).rotateZ(-s * 0.16));
+    head.add(mesh(sph(0.042, 1.3, 0.9, 0.6), turq, s * 0.17, 0.07, 0.405).rotateZ(-s * 0.16));
+    head.add(mesh(new THREE.BoxGeometry(0.34, 0.035, 0.03), kohl, s * 0.4, 0.045, 0.34).rotateZ(-s * 0.14));
+    head.add(mesh(new THREE.BoxGeometry(0.34, 0.012, 0.032), gold, s * 0.4, 0.075, 0.345).rotateZ(-s * 0.14));
+    head.add(mesh(new THREE.BoxGeometry(0.27, 0.06, 0.04), kohl, s * 0.17, 0.21, 0.36).rotateZ(-s * 0.2));
+    head.add(mesh(sph(0.075, 0.7, 1.2, 0.5), skin, s * 0.43, -0.02, 0.0));
+  }
+  // touca nemes: calote com riscas, abas largas até ao peito e rabo atrás
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.42), gold); cap.position.set(0, 0.14, -0.07); cap.scale.set(1, 1.04, 1.06); cap.castShadow = true; head.add(cap);
+  for (let k = 1; k < 8; k++) { const a = k * 0.16, r = 0.508 * Math.sin(a) * 1.0, y = 0.14 + 0.508 * 1.04 * Math.cos(a); head.add(mesh(new THREE.TorusGeometry(r, 0.012, 6, 30), k % 2 ? lapis : gold, 0, y, -0.07).rotateX(Math.PI / 2)); }
+  head.add(mesh(new THREE.TorusGeometry(0.45, 0.028, 6, 30), gold, 0, 0.3, -0.03).rotateX(Math.PI / 2));
+  for (const s of [-1, 1]) {
+    const lap = new THREE.Group(); lap.position.set(s * 0.5, -0.45, 0.14); lap.rotation.z = s * 0.2; head.add(lap);
+    lap.add(mesh(new THREE.BoxGeometry(0.4, 1.5, 0.16), gold, 0, 0, 0));
+    for (let k = 0; k < 9; k++) lap.add(mesh(new THREE.BoxGeometry(0.405, 0.06, 0.165), k % 2 ? lapis : turqS, 0, 0.68 - k * 0.16, 0));
+    lap.add(mesh(new THREE.BoxGeometry(0.42, 0.07, 0.17), carn, 0, -0.76, 0));
+  }
+  const tail = new THREE.Group(); tail.position.set(0, -0.55, -0.5); head.add(tail);
+  tail.add(mesh(new THREE.BoxGeometry(0.36, 1.4, 0.14), gold)); for (let k = 0; k < 8; k++) tail.add(mesh(new THREE.BoxGeometry(0.365, 0.06, 0.145), k % 2 ? lapis : turqS, 0, 0.6 - k * 0.17, 0));
+  // uraeus (cobra) na testa, a brilhar
+  const ur = new THREE.Group(); ur.position.set(0, 0.3, 0.43); head.add(ur);
+  ur.add(mesh(sph(0.065, 0.8, 1.5, 0.5), gold, 0, 0.06, 0)); ur.add(mesh(sph(0.05), gold, 0, 0.17, 0.03));
+  ur.add(mesh(sph(0.012), turq, -0.02, 0.18, 0.075)); ur.add(mesh(sph(0.012), turq, 0.02, 0.18, 0.075));
+  const ug = glowSprite(0x2fe6d0, 0.5, 0.55); ug.position.set(0, 0.2, 0.1); ur.add(ug);
+  // barba postiça entrançada
+  const bd = mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.55, 6), lapis, 0, -0.6, 0.42); bd.rotation.x = -0.22; head.add(bd);
+  for (let k = 0; k < 5; k++) head.add(mesh(new THREE.TorusGeometry(0.052, 0.014, 5, 10), k % 2 ? gold : turqS, 0, -0.4 - k * 0.1, 0.415 + k * 0.022).rotateX(Math.PI / 2 - 0.22));
+  head.add(mesh(sph(0.065), gold, 0, -0.91, 0.5));
+  // asas de luz: duas leques de penas a abrir-se atrás do corpo
+  for (const s of [-1, 1]) {
+    const w = new THREE.Group(); w.position.set(s * 0.55, 2.5, -0.65); g.add(w);
+    for (let k = 0; k < 11; k++) {
+      const len = 1.2 + Math.sin(k / 10 * Math.PI) * 1.2, gf = new THREE.BoxGeometry(0.17, len, 0.025).translate(0, len / 2, 0);
+      const f = mesh(gf, k < 3 ? gold : k % 2 ? turqS : lapis); f.rotation.set(-0.15, 0, s * (-0.4 - k * 0.2)); w.add(f);
+      const ed = mesh(new THREE.BoxGeometry(0.018, len, 0.03).translate(0.08, len / 2, 0), emit(0x2fe6d0, 1.3)); ed.rotation.copy(f.rotation); w.add(ed);
+    }
+  }
+  // ankhs luminosos a flutuar
+  for (let k = 0; k < 6; k++) {
+    const a = k * 1.05 + 0.4, r = 2.1 + (k % 3) * 0.35, an = new THREE.Group(); an.position.set(Math.cos(a) * r, 1.4 + k * 0.5, -1.1 - Math.abs(Math.sin(a)) * 0.6); an.rotation.y = -a * 0.3; g.add(an);
+    an.add(mesh(new THREE.TorusGeometry(0.13, 0.03, 6, 16), turq, 0, 0.32, 0)); an.add(mesh(new THREE.BoxGeometry(0.045, 0.5, 0.045), turq, 0, 0.02, 0)); an.add(mesh(new THREE.BoxGeometry(0.3, 0.045, 0.045), turq, 0, 0.14, 0));
+    const gl = glowSprite(0x2fe6d0, 0.9, 0.4); gl.position.set(0, 0.2, 0); an.add(gl);
+  }
+  const hg = glowSprite(0xffc65a, 5.2, 0.3); hg.position.set(0, 3.2, -1.0); g.add(hg);
+  return g;
+}

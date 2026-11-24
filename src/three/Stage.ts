@@ -74,6 +74,7 @@ export class Stage {
   private planet = false;
   private giant?: TitleGiant;
   private eye?: EyeTitle;
+  private eyeCache?: EyeTitle;
   /** 0..1: clarão do mergulho pela pupila (para o ecrã inicial desenhar por cima) */
   onEyeFlash?: (a: number) => void;
   private weather = new Weather();
@@ -204,7 +205,9 @@ export class Stage {
   loadEye() {
     this.clear();
     this.maze = undefined;
-    this.eye = new EyeTitle(this.renderer);
+    if (!this.eyeCache) this.eyeCache = new EyeTitle(this.renderer);
+    this.eye = this.eyeCache; this.eye.reset();
+    this.applyDpr();
     this.eye.onFlash = (a) => this.onEyeFlash?.(a);
     this.scene.add(this.eye.group);
     this.scene.environment = this.eye.env; this.scene.environmentIntensity = 1;
@@ -216,14 +219,26 @@ export class Stage {
   }
   private dropEye() {
     if (!this.eye) return;
-    this.scene.remove(this.eye.group); this.eye.dispose(); this.eye = undefined;
-    this.scene.background = null;
+    this.scene.remove(this.eye.group); this.eye.onFlash = undefined; this.eye = undefined;   // fica em cache para voltar ao ecrã inicial sem pausas
+    this.scene.environment = null; this.scene.background = null;
     this.uli.visible = true; this.portal.visible = true; this.trail.mesh.visible = true; this.trail.dots.visible = true;
     this.camera.fov = 58; this.camera.updateProjectionMatrix();
   }
   eyeLook(x: number, y: number) { this.eye?.setLook(x, y); }
   eyeBlink() { this.eye?.blink(); }
-  eyeDive(cb: () => void) { if (this.eye) this.eye.startDive(cb); else cb(); }
+  eyePoke() { this.eye?.poke(); }
+  eyeTilt(gamma: number, beta: number) { this.eye?.setTilt(gamma, beta); }
+  /** Mergulho na pupila: baixa a resolução para o voo ser fluido, mesmo em telemóveis modestos. */
+  eyeDive(cb: () => void) {
+    if (!this.eye) { cb(); return; }
+    this.renderer.setPixelRatio(1); this.composer.setPixelRatio(1); this.sync(true);
+    this.eye.startDive(cb);
+  }
+  private applyDpr() {
+    const dpr = window.devicePixelRatio || 1;
+    this.renderer.setPixelRatio(this.quality === 0 ? Math.min(dpr, 1.75) : this.quality === 1 ? Math.min(dpr, 1.25) : 1);
+    this.composer.setPixelRatio(this.renderer.getPixelRatio()); this.sync(true);
+  }
 
   /** Saída: no asteroide é uma porta de luz quente; nos outros mundos, o gradiente de assinatura. */
   private tintPortal(warm: boolean) {

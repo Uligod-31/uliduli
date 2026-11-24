@@ -25,6 +25,7 @@ interface BlockOpts {
   stain?: { col: string; n: number } | null;   // musgo / pátina / geada
   rivets?: boolean; frost?: boolean;
   runes?: string;         // cor das runas gravadas (a brilhar)
+  glyphs?: string;        // cor dos hieróglifos gravados (a brilhar)
 }
 
 function blocks(o: BlockOpts): Tex {
@@ -66,9 +67,32 @@ function blocks(o: BlockOpts): Tex {
       h.lineCap = 'round'; h.strokeStyle = 'rgba(0,0,0,.95)'; h.lineWidth = 7; path(h);
     }
   }
+  if (o.glyphs) {   // hieróglifos: ankh, água, pena, disco solar, escaravelho, junco, pilar djed
+    const draw = (g2: CanvasRenderingContext2D, t: number, gx: number, gy: number, s: number) => {
+      const L = (x1: number, y1: number, x2: number, y2: number) => { g2.moveTo(gx + x1 * s, gy + y1 * s); g2.lineTo(gx + x2 * s, gy + y2 * s); };
+      g2.beginPath();
+      if (t === 0) { g2.ellipse(gx, gy - 12 * s, 7 * s, 9 * s, 0, 0, 6.28); L(0, -3, 0, 22); L(-10, 4, 10, 4); }
+      else if (t === 1) { for (let k = 0; k < 3; k++) { const y = -10 + k * 9; L(-14, y, -7, y - 5); L(-7, y - 5, 0, y); L(0, y, 7, y - 5); L(7, y - 5, 14, y); } }
+      else if (t === 2) { L(0, -22, 0, 22); for (let k = 0; k < 6; k++) { L(0, -16 + k * 6, 8, -22 + k * 6); L(0, -16 + k * 6, -8, -22 + k * 6); } }
+      else if (t === 3) { g2.ellipse(gx, gy, 11 * s, 11 * s, 0, 0, 6.28); g2.moveTo(gx + 2 * s, gy); g2.ellipse(gx, gy, 2 * s, 2 * s, 0, 0, 6.28); }
+      else if (t === 4) { g2.ellipse(gx, gy, 9 * s, 13 * s, 0, 0, 6.28); L(-9, -4, -17, -9); L(-9, 4, -17, 9); L(9, -4, 17, -9); L(9, 4, 17, 9); L(0, -13, 0, 13); }
+      else if (t === 5) { g2.ellipse(gx, gy + 2 * s, 12 * s, 7 * s, -0.3, 0, 6.28); L(10, -6, 18, -14); L(18, -14, 24, -12); L(-4, 8, -6, 22); L(4, 9, 6, 22); }
+      else if (t === 6) { L(0, 22, 0, -8); L(0, -8, -9, -20); L(0, -8, 9, -20); L(0, -8, 0, -22); L(-3, 4, -10, -2); L(3, 4, 10, -2); }
+      else { L(0, -22, 0, 22); for (let k = 0; k < 4; k++) L(-11, -18 + k * 7, 11, -18 + k * 7); L(-11, -18, -11, 3); L(11, -18, 11, 3); }
+      g2.stroke();
+    };
+    for (let i = 0; i < 14; i++) {
+      const gx = r(46, N - 46), gy = Math.floor(r(0, rows)) * rh + rh / 2, s = r(0.75, 1.1), t = (i * 3 + ((R() * 8) | 0)) % 8;
+      e.lineCap = 'round'; e.strokeStyle = o.glyphs; e.globalAlpha = 0.3; e.lineWidth = 11; draw(e, t, gx, gy, s); e.globalAlpha = 1; e.lineWidth = 3; draw(e, t, gx, gy, s);
+      c.lineCap = 'round'; c.strokeStyle = 'rgba(40,24,6,.85)'; c.lineWidth = 7; draw(c, t, gx, gy, s); c.strokeStyle = o.glyphs; c.lineWidth = 2.4; draw(c, t, gx, gy, s);
+      h.lineCap = 'round'; h.strokeStyle = 'rgba(0,0,0,.9)'; h.lineWidth = 7; draw(h, t, gx, gy, s);
+    }
+    // friso de ouro no limite de cada fiada, em alguns blocos
+    for (let k = 1; k < rows; k += 2) { c.fillStyle = 'rgba(224,176,72,.55)'; c.fillRect(0, k * rh - 3, N, 3); }
+  }
   if (o.stain) for (let i = 0; i < o.stain.n; i++) { const x = r(0, N), y = Math.floor(r(0, rows)) * rh + r(-4, 10), rad = r(10, 32); blob(c, x, y, rad, o.stain.col); blob(h, x, y, rad, 'rgba(255,255,255,.22)'); }
   const out: Tex = { map: tex(cc, true), normal: tex(heightToNormal(hc, 3), false) };
-  if (o.glow || o.runes) out.emissive = tex(ec, true);
+  if (o.glow || o.runes || o.glyphs) out.emissive = tex(ec, true);
   return out;
 }
 
@@ -154,6 +178,16 @@ function floors(kind: string): Tex {
     }
     for (let i = 0; i < 36; i++) blob(c, r(0, N), r(0, N), r(18, 64), R() < 0.55 ? 'rgba(235,245,255,.26)' : 'rgba(0,0,0,.16)');
     for (let i = 0; i < 160; i++) { c.fillStyle = 'rgba(240,248,255,.45)'; c.fillRect(r(0, N), r(0, N), r(1, 3), r(1, 2)); }
+  } else if (kind === 'sand') {   // lajes de arenito sob a areia batida pelo vento, com friso de ouro e turquesa
+    c.fillStyle = '#b89a62'; c.fillRect(0, 0, N, N); h.fillStyle = '#909090'; h.fillRect(0, 0, N, N);
+    c.strokeStyle = '#4a3418'; c.lineWidth = 20; c.strokeRect(0, 0, N, N); h.strokeStyle = '#2c2c2c'; h.lineWidth = 26; h.strokeRect(0, 0, N, N);
+    for (let i = 0; i < 70; i++) blob(c, r(0, N), r(0, N), r(24, 90), R() < 0.5 ? 'rgba(236,208,150,.32)' : 'rgba(110,76,34,.3)');
+    for (let i = 0; i < 46; i++) { const y = r(0, N), x = r(0, N), w = r(40, 160); c.strokeStyle = `rgba(${R() < 0.5 ? '250,230,180' : '90,60,26'},${r(0.1, 0.28)})`; c.lineWidth = r(1, 2.4); c.beginPath(); c.moveTo(x, y); c.bezierCurveTo(x + w * 0.3, y - r(2, 7), x + w * 0.6, y + r(2, 7), x + w, y + r(-3, 3)); c.stroke(); h.strokeStyle = 'rgba(0,0,0,.2)'; h.lineWidth = 2; h.beginPath(); h.moveTo(x, y); h.lineTo(x + w, y); h.stroke(); }
+    c.strokeStyle = '#e0b050'; c.lineWidth = 5; c.strokeRect(34, 34, N - 68, N - 68); c.strokeStyle = 'rgba(60,38,10,.7)'; c.lineWidth = 2; c.strokeRect(28, 28, N - 56, N - 56);
+    e.strokeStyle = '#2fe6d0'; e.globalAlpha = 0.3; e.lineWidth = 10; e.strokeRect(34, 34, N - 68, N - 68); e.globalAlpha = 0.7; e.lineWidth = 2.2; e.strokeRect(34, 34, N - 68, N - 68); e.globalAlpha = 1; glow = true;
+    for (const [x, y] of [[34, 34], [N - 34, 34], [34, N - 34], [N - 34, N - 34]] as const) { blob(c, x, y, 12, 'rgba(47,230,208,.95)'); blob(e, x, y, 16, 'rgba(47,230,208,.95)'); }
+    for (let i = 0; i < 6; i++) { let x = r(30, N - 30), y = r(30, N - 30), a = r(0, 6.28); const pts: [number, number][] = [[x, y]]; for (let s = 0; s < 8; s++) { a += r(-0.7, 0.7); x += Math.cos(a) * r(20, 46); y += Math.sin(a) * r(20, 46); pts.push([x, y]); } for (const [g2, col, lw] of [[c, 'rgba(50,30,10,.7)', 2], [h, 'rgba(0,0,0,.85)', 3.5]] as const) { g2.strokeStyle = col; g2.lineWidth = lw; g2.beginPath(); pts.forEach(([px, py], j) => (j ? g2.lineTo(px, py) : g2.moveTo(px, py))); g2.stroke(); } }
+    for (let i = 0; i < 420; i++) { c.fillStyle = `rgba(${R() < 0.5 ? '255,236,190' : '100,70,30'},.5)`; c.fillRect(r(6, N - 6), r(6, N - 6), r(1, 2.6), r(1, 2.6)); }
   } else { // obsidiana com fendas de lava
     c.fillStyle = '#1c1820'; c.fillRect(0, 0, N, N); h.fillStyle = '#d0d0d0'; h.fillRect(0, 0, N, N);
     c.strokeStyle = '#08060a'; c.lineWidth = 24; c.strokeRect(0, 0, N, N); h.strokeStyle = '#303030'; h.lineWidth = 30; h.strokeRect(0, 0, N, N);
@@ -182,6 +216,7 @@ export function wallPBR(kind: string): Tex {
     case 'shelves': t = shelves(); break;
     case 'bark': t = blocks({ tones: ['#3a2c1c', '#32261a', '#443222', '#2c2a18', '#3c3420'], mortar: '#100c06', rows: 7, seed: 64, cracks: 8, crackCol: '#0a0805', glow: '#8be060', stain: { col: 'rgba(80,140,50,.6)', n: 110 } }); break;
     case 'runes': t = blocks({ tones: ['#363c46', '#2e343e', '#404752', '#2a3039', '#38404a'], mortar: '#0c0f14', rows: 5, seed: 65, cracks: 6, crackCol: '#06080b', runes: '#ff8a30', stain: { col: 'rgba(225,238,250,.4)', n: 60 }, frost: true }); break;
+    case 'hiero': t = blocks({ tones: ['#c4a56c', '#b39560', '#cdb078', '#a98b56', '#bd9e66'], mortar: '#3a2a14', rows: 5, seed: 66, cracks: 5, crackCol: '#3a2a14', glyphs: '#2fe6d0', stain: { col: 'rgba(110,72,28,.38)', n: 70 } }); break;
     case 'stone': { const p = stonePBR(); t = { map: p.map, normal: p.normal }; break; }
     default: { const p = stonePBR(); t = { map: p.map, normal: p.normal }; }
   }
@@ -191,7 +226,7 @@ export function wallPBR(kind: string): Tex {
 export function floorPBR(kind: string): Tex {
   const hit = cache.get('f' + kind); if (hit) return hit;
   let t: Tex;
-  if (kind === 'wood' || kind === 'metal' || kind === 'ice' || kind === 'obsidian' || kind === 'moss' || kind === 'planks') t = floors(kind);
+  if (kind === 'wood' || kind === 'metal' || kind === 'ice' || kind === 'obsidian' || kind === 'moss' || kind === 'planks' || kind === 'sand') t = floors(kind);
   else { const p = flagPBR(); t = { map: p.map, normal: p.normal }; }
   cache.set('f' + kind, t); return t;
 }

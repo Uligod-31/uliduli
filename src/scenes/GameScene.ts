@@ -55,6 +55,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    this.cameras.main.fadeIn(380, 5, 6, 11);
     const { def } = this;
     const m = (this.m = levelMaze(def));
     this.idx = m.start;

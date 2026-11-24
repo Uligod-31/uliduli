@@ -42,7 +42,7 @@ export interface WorldDef {
   levels: LevelDef[];
   weather?: Weather; // clima base do mundo
   planet?: boolean; // visual de asteroide (Pequenos Pesadelos)
-  guardStyle?: number; // aspeto dos guardas (0-2 Crescidos, 3 Carcereiro, 4 Sentinela de gelo, 5 Autómato, 6 Livro vivo)
+  guardStyle?: number; // aspeto dos guardas (0-2 Crescidos, 3 Carcereiro, 4 Sentinela de gelo, 5 Autómato, 6 Livro vivo, 7 Espírito de Raiz, 8 Draugr, 9 Guarda de Anúbis)
   look?: { wall: string; floor: string; decor: string }; // texturas e adereços do mundo
 }
 
@@ -393,8 +393,41 @@ const viking: WorldDef = {
   ],
 };
 
+// ───────────────────────── Mundo 8: Reino das Areias (Egito) ─────────────────────────
+const egipto: WorldDef = {
+  id: 'egipto', name: 'Reino das Areias',
+  tagline: 'Pirâmides que sussurram, hieróglifos a brilhar e uma esfinge que só fala por enigmas.',
+  rule: 'Portas de pedra abrem e fecham ao ritmo do sol. Os Guardas de Anúbis seguem-te.',
+  pal: mkPal(0x140c1e, 0xc9a25a, 0x8a6a3a, 0x2fe6d0), ready: true, guardStyle: 9, weather: 'dust',
+  look: { wall: 'hiero', floor: 'sand', decor: 'egypt' },
+  preview: { mask: 'diamond', cols: 9, rows: 9, seed: 41 },
+  levels: [
+    lv('Portal das Dunas', 7, 9, 'rect', 801, {}, [
+      { who: 'esfinge', text: 'Uma chama a caminhar nas minhas areias! Há quatro mil anos que ninguém ousa.' },
+      { who: 'uli', text: 'Só procuro a saída.' },
+      { who: 'esfinge', text: 'Todos procuram. Eu guardo a pergunta: qual é o caminho que não existe?' },
+    ]),
+    lv('Oásis Perdido', 8, 10, 'rect', 802, { dyn: 3, loops: 0.05 }, [{ who: 'esfinge', text: 'As portas de pedra respiram com o sol. Abrem, fecham, enganam. Aprende-lhes o ritmo.' }]),
+    lv('Vale dos Obeliscos', 9, 12, 'diamond', 6857, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'esfinge', text: 'Os Guardas de Anúbis pesam corações. Andam de três em três passos teus e cheiram-te a quatro casas.' }]),
+    lv('Tempestade de Areia', 9, 12, 'rect', 3831, { dyn: 4, shift: 7, loops: 0.07, fog: 3.6, guards: 1 }, [{ who: 'esfinge', text: 'O vento esconde tudo. Até eu, às vezes, me perco no meu próprio enigma.' }]),
+    lv('Sala das Colunas', 10, 13, 'rect', 10895, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'esfinge', text: 'Cada coluna é uma pergunta. Quase todos respondem mal.' }]),
+    lv('Barca do Sol', 11, 14, 'cross', 6860, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2, weather: 'mist' }, [{ who: 'esfinge', text: 'À noite, o sol viaja pelo mundo dos mortos. Segue-lhe a luz, pequena chama.' }]),
+    lv('Câmara do Faraó', 12, 15, 'rect', 9888, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [
+      { who: 'esfinge', text: 'A câmara do faraó. Ouro, silêncio e uma maldição simpática.' },
+      { who: 'uli', text: 'Simpática como?' },
+      { who: 'esfinge', text: 'Só te devora no fim.' },
+    ]),
+    lv('A Grande Pirâmide', 14, 17, 'diamond', 4844, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [
+      { who: 'esfinge', text: 'Todas as estrelas. A pirâmide deixa-se subir por quem as merece.' },
+      { who: 'uli', text: 'E o enigma?' },
+      { who: 'esfinge', text: 'Já o resolveste. O caminho que não existe é o que ainda não andaste.' },
+    ], [{ who: 'esfinge', text: 'Vai, chama. O deserto vai contar que uma luz atravessou o meu labirinto.' }]),
+  ],
+};
+
 // ───────────────────── Próximos mundos (em desenvolvimento) ─────────────────────
 export const WORLDS: WorldDef[] = [
+  egipto,
   b612,
   jardim,
   demoniaco,

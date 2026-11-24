@@ -1,23 +1,30 @@
 import Phaser from 'phaser';
 import { W, H, UI, FONT, toHex, lighten } from '../core/theme';
 import { paintedBg, chromeHeading, button, enableScroll, signatureLine } from '../core/ui';
-import { drawPlate } from '../three/menuArt';
 import { WORLDS } from '../worlds';
 import { worldPreview } from '../art/thumb';
 import { save } from '../core/save';
+import { ensureWorldCard, CARD_H } from '../core/prewarm';
 
 export class WorldsScene extends Phaser.Scene {
+  private fromDive = false;
   constructor() { super('Worlds'); }
+  init(d?: { dive?: boolean }) { this.fromDive = !!d?.dive; }
 
   create() {
     paintedBg(this, 0.5);
+    if (this.fromDive) {
+      // saímos da pupila: clarão rosa que se dissipa e o ecrã a recuar até ao tamanho normal
+      const cam = this.cameras.main;
+      cam.setZoom(1.3); cam.fadeIn(700, 255, 214, 246);
+      this.tweens.add({ targets: cam, zoom: 1, duration: 900, ease: 'Cubic.Out' });
+    }
     const list = this.add.container(0, 0);
-    const CARD_H = 210, GAP = 26, TOP = 190;
+    const GAP = 26, TOP = 190;
 
     WORLDS.forEach((wd, i) => {
       const y = i * (CARD_H + GAP);
-      const ck = `card_${wd.id}_${wd.ready ? 1 : 0}`;
-      if (!this.textures.exists(ck)) this.textures.addCanvas(ck, drawPlate(W - 80, CARD_H, false, 1.5, wd.ready ? toHex(wd.pal.accent) : '#4a4f5e'));
+      const ck = ensureWorldCard(this.textures, wd);
       const card = this.add.image(40, y - 44, ck).setOrigin(0, 0).setScale(1 / 1.5);
 
       const prev = worldPreview(this, wd, 170);
