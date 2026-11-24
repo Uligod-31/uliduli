@@ -1,6 +1,36 @@
 import * as THREE from 'three';
 import { glowSprite, hdr, vnoise } from './common';
 
+/** Ruído de valor 2D periódico (a textura repete sem costuras); f = nº de células por textura. */
+function pn(x: number, y: number, f: number, o = 0): number {
+  const h = (i: number, j: number) => { let n = (((i % f) + f) % f) * 374761393 + (((j % f) + f) % f) * 668265263 + o * 2147483647; n = (n ^ (n >>> 13)) * 1274126177; return (((n ^ (n >>> 16)) >>> 0) % 10000) / 10000; };
+  const fx = x * f, fy = y * f, ix = Math.floor(fx), iy = Math.floor(fy), u = fx - ix, v = fy - iy, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
+  return (h(ix, iy) * (1 - su) + h(ix + 1, iy) * su) * (1 - sv) + (h(ix, iy + 1) * (1 - su) + h(ix + 1, iy + 1) * su) * sv;
+}
+
+/** Textura procedural (cor + relevo) a partir de uma função de altura; o relevo vira mapa de normais. */
+function surfaceTex(size: number, seed: number, base: [number, number, number], height: (x: number, y: number, r: () => number) => number, tint: number, contrast: number) {
+  let s = seed >>> 0;
+  const r = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  const hmap = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) hmap[y * size + x] = height(x / size, y / size, r);
+  const col = document.createElement('canvas'), nor = document.createElement('canvas');
+  col.width = col.height = nor.width = nor.height = size;
+  const cc = col.getContext('2d')!, nc = nor.getContext('2d')!;
+  const ci = cc.createImageData(size, size), ni = nc.createImageData(size, size);
+  const H = (x: number, y: number) => hmap[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const i = (y * size + x) * 4, h = H(x, y);
+    const k = 1 + (h - 0.5) * contrast, g = 1 + (r() - 0.5) * tint;
+    ci.data[i] = Math.min(255, base[0] * k * g); ci.data[i + 1] = Math.min(255, base[1] * k * g); ci.data[i + 2] = Math.min(255, base[2] * k * g); ci.data[i + 3] = 255;
+    const dx = (H(x + 1, y) - H(x - 1, y)) * 5, dy = (H(x, y + 1) - H(x, y - 1)) * 5, l = Math.hypot(dx, dy, 1);
+    ni.data[i] = (-dx / l * 0.5 + 0.5) * 255; ni.data[i + 1] = (dy / l * 0.5 + 0.5) * 255; ni.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; ni.data[i + 3] = 255;
+  }
+  cc.putImageData(ci, 0, 0); nc.putImageData(ni, 0, 0);
+  const mk = (c: HTMLCanvasElement, srgb: boolean) => { const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+  return { map: mk(col, true), normal: mk(nor, false) };
+}
+
 /** Corpo de um asteroide à moda do pequeno príncipe: disco de areia, ventre rochoso e três vulcões, baobás e um candeeiro à volta. */
 export function buildPlanetBody(cells: THREE.Vector2[], R: number, rng: () => number): { group: THREE.Group; anim: (t: number) => void } {
   const group = new THREE.Group();
@@ -25,12 +55,29 @@ export function buildPlanetBody(cells: THREE.Vector2[], R: number, rng: () => nu
     }
   }
   body.computeVertexNormals();
-  const rock = new THREE.Mesh(body, new THREE.MeshStandardMaterial({ color: 0x4b4338, roughness: 1, flatShading: true }));
+  // rocha: estratos irregulares, fendas e grão
+  const rockT = surfaceTex(256, 7, [150, 136, 118], (x, y) => {
+    const n = pn(x, y, 8) * 0.5 + pn(x, y, 24, 1) * 0.3 + pn(x, y, 64, 2) * 0.2;
+    const band = 0.5 + 0.5 * Math.sin((y * 8 + pn(x, y, 4, 3) * 1.5) * Math.PI * 2);
+    const crack = Math.abs(pn(x, y, 6, 4) - 0.5) < 0.02 ? -0.35 : 0;
+    return Math.max(0, Math.min(1, n * 0.6 + band * 0.4 + crack));
+  }, 0.25, 0.9);
+  rockT.map.repeat.set(5, 2); rockT.normal.repeat.set(5, 2);
+  const rock = new THREE.Mesh(body, new THREE.MeshStandardMaterial({ color: 0x8a7e70, map: rockT.map, normalMap: rockT.normal, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 1, flatShading: true }));
   rock.receiveShadow = true;
   group.add(rock);
 
   // areia do disco (por baixo das casas)
-  const sand = new THREE.Mesh(new THREE.CircleGeometry(Rd, 56), new THREE.MeshStandardMaterial({ color: 0x8a7b62, roughness: 1 }));
+  // dunas em ondulação, grão fino e seixos
+  const sandT = surfaceTex(256, 21, [190, 168, 130], (x, y) => {
+    const dune = 0.5 + 0.5 * Math.sin((x * 4 + y * 3 + pn(x, y, 4, 5) * 1.6) * Math.PI * 2);
+    const grain = pn(x, y, 128, 6);
+    const pebble = pn(x, y, 16, 7) > 0.8 ? 0.35 : 0;
+    return Math.max(0, Math.min(1, dune * 0.45 + grain * 0.3 + pebble + 0.1));
+  }, 0.3, 0.7);
+  const rep = Math.max(2, Rd / 2.2);
+  sandT.map.repeat.set(rep, rep); sandT.normal.repeat.set(rep, rep);
+  const sand = new THREE.Mesh(new THREE.CircleGeometry(Rd, 56), new THREE.MeshStandardMaterial({ color: 0xb09a78, map: sandT.map, normalMap: sandT.normal, normalScale: new THREE.Vector2(1.2, 1.2), roughness: 1 }));
   sand.rotation.x = -Math.PI / 2; sand.position.y = -0.055; sand.receiveShadow = true;
   group.add(sand);
 
