@@ -1,32 +1,28 @@
 ﻿import Phaser from 'phaser';
 import { W, H, UI, FONT, FONT_HEAD } from '../core/theme';
 import { neoButton } from '../core/ui';
-import { drawLogo, drawFrame } from '../three/menuArt';
-import { generate, pathTo, DIRS } from '../core/maze';
-import { getWorld } from '../worlds';
+import { drawLogo } from '../three/menuArt';
 import { sfx } from '../core/audio';
 import { save } from '../core/save';
 import { stage } from '../three/Stage';
 
 export class TitleScene extends Phaser.Scene {
-  private seed = 5;
-  private ev?: Phaser.Time.TimerEvent;
   private shown = false;
+  private diving = false;
+  private flash!: Phaser.GameObjects.Rectangle;
 
   constructor() { super('Title'); }
 
   create() {
+    this.diving = false;
 
     // véus para legibilidade sobre o 3D
     const top = this.add.graphics();
-    top.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.85, 0.85, 0, 0); top.fillRect(0, 0, W, 560);
+    top.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.8, 0.8, 0, 0); top.fillRect(0, 0, W, 470);
     const bot = this.add.graphics();
-    bot.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 0.95, 0.95); bot.fillRect(0, H - 600, W, 600);
+    bot.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 0.88, 0.88); bot.fillRect(0, H - 420, W, 420);
 
-    if (!this.textures.exists('frameArt')) this.textures.addCanvas('frameArt', drawFrame(1080));
-    this.add.image(W / 2, H / 2, 'frameArt').setDisplaySize(W, H);
     this.hud();
-    this.lightning();
 
     // logótipo metálico com falhas: três camadas (ciano, magenta, cromado) que se desalinham
     if (!this.textures.exists('logoArt')) this.textures.addCanvas('logoArt', drawLogo());
@@ -69,7 +65,7 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: sub2, alpha: 0.25, duration: 90, yoyo: true, repeat: -1, repeatDelay: 1700 + Math.random() * 1200 });
     this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 380, 380, 4);
 
-    neoButton(this, W / 2, 1060, 620, 124, 'Jogar', '01', () => this.scene.start('Worlds'), true, 52);
+    neoButton(this, W / 2, 1060, 620, 124, 'Jogar', '01', () => this.dive(), true, 52);
     neoButton(this, W / 2 - 160, 1178, 300, 88, 'Galeria', '02', () => this.scene.start('Gallery'), false, 30);
     const snd = neoButton(this, W / 2 + 160, 1178, 300, 88, save.mute ? 'Som: off' : 'Som: on', '03', () => {
       sfx.setMute(!save.mute);
@@ -86,47 +82,28 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: bar, y: H, duration: 5200, repeat: -1, ease: 'Linear' });
     this.input.once('pointerdown', () => sfx.unlock());
 
-    this.events.once('shutdown', () => { this.ev?.remove(); stage.stop(); });
-    this.attract();
+    // O Olho: 3D por baixo, segue o dedo e pisca ao toque
+    this.add.text(W / 2, 452, 'ELE JÁ TE VIU.', { fontFamily: FONT_HEAD, fontSize: '26px', color: '#ff86e8', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5).setAlpha(0.8).setStyle({ letterSpacing: 10 } as any);
+    this.flash = this.add.rectangle(W / 2, H / 2, W, H, 0xffd6f6, 0).setDepth(100);
+    stage.loadEye();
+    stage.onEyeFlash = (a) => { this.flash.setAlpha(a); };
+    stage.start('title');
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => stage.eyeLook((p.x / W - 0.5) * 2, (p.y / H - 0.5) * 2));
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { stage.eyeLook((p.x / W - 0.5) * 2, (p.y / H - 0.5) * 2); stage.eyeBlink(); });
+    this.events.once('shutdown', () => { stage.onEyeFlash = undefined; stage.stop(); });
+  }
+
+  /** Jogar: a câmara mergulha pela pupila e só depois abre os Mundos. */
+  private dive() {
+    if (this.diving) return;
+    this.diving = true;
+    this.tweens.add({ targets: this.children.list.filter((c) => c !== this.flash), alpha: 0, duration: 520, ease: 'Sine.In' });
+    stage.eyeDive(() => this.scene.start('Worlds'));
   }
 
   update() {
     // o ecrã de arranque só sai quando o 3D já desenhou algumas imagens (sem mostrar a câmara a assentar)
     if (!this.shown && stage.frames > 4) { this.shown = true; document.getElementById('splash')?.classList.add('hide'); }
-  }
-
-  /** Relâmpagos azuis e fúcsia a estalar à volta da cara. */
-  private lightning() {
-    const g = this.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setDepth(5);
-    const flash = this.add.rectangle(W / 2, H / 2, W, H, 0x9bb8ff, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(5);
-    const path = (x0: number, y0: number, x1: number, y1: number, jit: number) => {
-      const pts: [number, number][] = [[x0, y0]];
-      const n = 9;
-      for (let i = 1; i < n; i++) {
-        const t = i / n, nx = -(y1 - y0), ny = x1 - x0, l = Math.hypot(nx, ny) || 1, o = (Math.random() - 0.5) * jit * (1 - Math.abs(t - 0.5) * 0.6);
-        pts.push([x0 + (x1 - x0) * t + (nx / l) * o, y0 + (y1 - y0) * t + (ny / l) * o]);
-      }
-      pts.push([x1, y1]); return pts;
-    };
-    const strike = () => {
-      g.clear();
-      const side = Math.random() < 0.5 ? -1 : 1, y0 = 150 + Math.random() * 420;
-      const x0 = side < 0 ? -10 : W + 10, x1 = W / 2 + side * (120 + Math.random() * 130), y1 = y0 + (Math.random() - 0.2) * 220;
-      const main = path(x0, y0, x1, y1, 70);
-      const bolts = [main];
-      for (let b = 0; b < 2; b++) { const k = 2 + ((Math.random() * 5) | 0), [bx, by] = main[k]; bolts.push(path(bx, by, bx + (Math.random() - 0.5) * 220, by + 60 + Math.random() * 160, 40)); }
-      const col = Math.random() < 0.75 ? 0x5b92ff : 0xff4fd8;
-      for (const [w, c, a] of [[12, col, 0.22], [6, col, 0.55], [2.5, 0xffffff, 1]] as const) {
-        g.lineStyle(w, c, a);
-        for (const pts of bolts) { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const [x, y] of pts) g.lineTo(x, y); g.strokePath(); }
-      }
-      flash.setAlpha(0.16);
-      this.tweens.add({ targets: flash, alpha: 0, duration: 160 });
-      this.time.delayedCall(70, () => { if (Math.random() < 0.6) { g.setAlpha(0.3); this.time.delayedCall(60, () => g.setAlpha(1)); } });
-      this.time.delayedCall(190, () => g.clear());
-      this.time.delayedCall(900 + Math.random() * 2600, strike);
-    };
-    this.time.delayedCall(1800, strike);
   }
 
   /** Moldura técnica: cantos de mira, REC, coordenadas e texto vertical. */
@@ -147,37 +124,4 @@ export class TitleScene extends Phaser.Scene {
     const v = this.add.text(W - 40, 640, 'NÃO OLHES PARA CIMA', { fontFamily: FONT_HEAD, fontSize: '22px', color: '#ffffff' }).setOrigin(0.5).setAngle(90).setAlpha(0.35);
     v.setStyle({ letterSpacing: 10 } as any);
   }
-
-  /** Modo "vitrina": o Uli percorre a ilha, deixando o trilho de luz; depois nasce outro labirinto. */
-  private attract() {
-    const wd = getWorld('b612');
-    const m = generate({ cols: 9, rows: 11, mask: 'circle', seed: this.seed, loops: 0.06, dyn: 0, rosas: 3 });
-    stage.load(m, wd, this.seed, { intro: false });
-    stage.start('title');
-    const path = pathTo(m, m.start, m.exit, 0);
-    let k = 0;
-    const walk = () => {
-      if (k >= path.length - 1) {
-        stage.win(); stage.setView('follow');
-        this.time.delayedCall(2600, () => { this.seed += 3; this.attract(); });
-        return;
-      }
-      const a = path[k], b = path[k + 1];
-      const fx = (a % m.cols) + 0.5, fy = ((a / m.cols) | 0) + 0.5, tx = (b % m.cols) + 0.5, ty = ((b / m.cols) | 0) + 0.5;
-      stage.player.dir = Math.atan2(tx - fx, ty - fy);
-      const o = { t: 0 };
-      this.tweens.add({
-        targets: o, t: 1, duration: 150, onUpdate: () => {
-          stage.player.x = fx + (tx - fx) * o.t; stage.player.y = fy + (ty - fy) * o.t; stage.player.h = o.t;
-        },
-        onComplete: () => {
-          stage.player.h = 0; stage.addTrail(a, b, k + 1);
-          if (m.rosas.includes(b)) stage.removeRose(b);
-          k++; this.ev = this.time.delayedCall(10, walk);
-        },
-      });
-    };
-    this.ev = this.time.delayedCall(900, walk);
-  }
 }
-

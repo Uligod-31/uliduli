@@ -11,6 +11,7 @@ import { Scenery, themeFor } from './scenery';
 import { makeRose, makePortal, Trail } from './actors';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
 import { makeTitleGiant, TitleGiant } from './titlegiant';
+import { EyeTitle } from './eye';
 import { Weather, Mist } from './weather';
 import type { Weather as WeatherMode } from '../worlds';
 import { sfx } from '../core/audio';
@@ -72,6 +73,9 @@ export class Stage {
   quality = 0;
   private planet = false;
   private giant?: TitleGiant;
+  private eye?: EyeTitle;
+  /** 0..1: clarão do mergulho pela pupila (para o ecrã inicial desenhar por cima) */
+  onEyeFlash?: (a: number) => void;
   private weather = new Weather();
   private mist = new Mist();
   private guardsArmed = false;
@@ -196,6 +200,31 @@ export class Stage {
     this.placeCamera(0, true);
   }
 
+  /** Ecrã inicial: o Olho (3D próprio, sem labirinto de jogo). */
+  loadEye() {
+    this.clear();
+    this.maze = undefined;
+    this.eye = new EyeTitle(this.renderer);
+    this.eye.onFlash = (a) => this.onEyeFlash?.(a);
+    this.scene.add(this.eye.group);
+    this.scene.environment = this.eye.env; this.scene.environmentIntensity = 1;
+    this.scene.fog = null; this.scene.background = new THREE.Color(0x05030c);
+    this.uli.visible = false; this.portal.visible = false; this.trail.mesh.visible = false; this.trail.dots.visible = false;
+    this.hemi.intensity = 0; this.sun.intensity = 0; this.rim.intensity = 0; this.lamp.intensity = 0;
+    this.fx.uniforms.grade.value = 0; this.renderer.toneMappingExposure = 0.95;
+    this.view = 'follow';
+  }
+  private dropEye() {
+    if (!this.eye) return;
+    this.scene.remove(this.eye.group); this.eye.dispose(); this.eye = undefined;
+    this.scene.background = null;
+    this.uli.visible = true; this.portal.visible = true; this.trail.mesh.visible = true; this.trail.dots.visible = true;
+    this.camera.fov = 58; this.camera.updateProjectionMatrix();
+  }
+  eyeLook(x: number, y: number) { this.eye?.setLook(x, y); }
+  eyeBlink() { this.eye?.blink(); }
+  eyeDive(cb: () => void) { if (this.eye) this.eye.startDive(cb); else cb(); }
+
   /** Saída: no asteroide é uma porta de luz quente; nos outros mundos, o gradiente de assinatura. */
   private tintPortal(warm: boolean) {
     const ch = this.portal.children as THREE.Mesh[];
@@ -205,6 +234,7 @@ export class Stage {
   }
 
   private clear() {
+    this.dropEye();
     for (const r of this.roses.values()) this.scene.remove(r), disposeTree(r);
     this.roses.clear();
     for (const o of this.orbs) this.scene.remove(o.m), disposeTree(o.m);
@@ -417,7 +447,16 @@ export class Stage {
     this.camera.lookAt(this.camLook);
   }
 
+  private stepEye(dt: number) {
+    const pulse = sfx.pulse();
+    this.pulseCur += (pulse - this.pulseCur) * 0.6;
+    this.fx.uniforms.pulse.value = this.pulseCur;
+    this.bloom.strength = 0.55 + 0.4 * this.pulseCur;
+    this.eye!.update(dt, this.camera, this.pulseCur);
+  }
+
   private step(dt: number) {
+    if (this.eye) { this.stepEye(dt); return; }
     if (!this.island || !this.scenery) return;
     const I = this.island;
     if (this.introT < 1) this.introT = Math.min(1, this.introT + dt / 2.6);
@@ -545,3 +584,4 @@ export class Stage {
 
 export const stage = new Stage();
 
+if ((import.meta as any).env?.DEV) (window as any).__stage = stage;
