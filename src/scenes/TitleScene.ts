@@ -77,8 +77,10 @@ export class TitleScene extends Phaser.Scene {
     }, false, 30);
 
     // película: linhas de varrimento, faixa que desce e cantos de mira
-    const lt = this.textures.createCanvas('scan', 4, 4)!;
-    const lc = lt.getContext(); lc.fillStyle = 'rgba(0,0,0,.55)'; lc.fillRect(0, 0, 4, 1); lt.refresh();
+    if (!this.textures.exists('scan')) {
+      const lt = this.textures.createCanvas('scan', 4, 4)!;
+      const lc = lt.getContext(); lc.fillStyle = 'rgba(0,0,0,.55)'; lc.fillRect(0, 0, 4, 1); lt.refresh();
+    }
     this.add.tileSprite(W / 2, H / 2, W, H, 'scan').setAlpha(0.28);
     const bar = this.add.rectangle(W / 2, 0, W, 90, 0x7aa8ff, 0.05).setBlendMode(Phaser.BlendModes.ADD);
     this.tweens.add({ targets: bar, y: H, duration: 5200, repeat: -1, ease: 'Linear' });
