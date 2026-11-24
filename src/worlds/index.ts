@@ -1,8 +1,15 @@
-import { MaskKind } from '../core/maze';
+import { MaskKind, MazeOpts } from '../core/maze';
 import { Pal, mkPal } from '../core/theme';
 import { CharKind } from '../art/characters';
 
 export type Weather = 'none' | 'rain' | 'snow' | 'embers' | 'ash' | 'dust' | 'pages' | 'mist';
+
+/** Regras dos guardas: ritmo, alcance do faro e Vagalume (ofusca-os). */
+export const GUARD_HUNT = 4;      // casas (caminho) a que farejam
+export const GUARD_STUN = 8;      // passos que ficam ofuscados
+export const GUARD_STUN_R = 6;    // alcance do Vagalume
+export const HINTS = 3;           // cargas do Vagalume por nível
+export const guardEvery = (d: { gp?: number }) => d.gp ?? 3;
 
 export interface Line { who: CharKind; text: string }
 
@@ -17,6 +24,7 @@ export interface LevelDef {
   loops: number;
   fog: number;     // 0 = sem nevoeiro; senão raio de visão em células
   guards?: number; // guardas que perseguem o jogador
+  gp?: number;     // os guardas mexem-se de gp em gp passos teus (por defeito 3)
   weather?: Weather; // clima deste nível (por cima do do mundo)
   bonus?: boolean; // nível bónus: só abre com todas as estrelas dos outros
   intro: Line[];
@@ -81,13 +89,13 @@ const b612: WorldDef = {
       title: 'O Planeta do Vaidoso', cols: 9, rows: 12, mask: 'diamond', seed: 103, dyn: 4, shift: 8, loops: 0.08, fog: 0, guards: 1,
       intro: [
         { who: 'raposa', text: 'Cuidado. Os Crescidos. Altos, curvados, e cheios de si.' },
-        { who: 'raposa', text: 'Mexem-se de dois em dois passos teus e cheiram-te a seis casas. Se te apanham, voltas ao início.' },
+        { who: 'raposa', text: 'Mexem-se de três em três passos teus e cheiram-te a quatro casas. Se te apanham, voltas ao início.' },
         { who: 'uli', text: 'Então corro.' },
-        { who: 'raposa', text: 'Corre de lado. Eles só olham em frente.' },
+        { who: 'raposa', text: 'Corre de lado. E se estiverem em cima de ti, acende o Vagalume: a luz ofusca-os e podes passar por eles.' },
       ],
     },
     {
-      title: 'O Homem dos Números', cols: 9, rows: 11, mask: 'circle', seed: 104, dyn: 3, shift: 8, loops: 0.05, fog: 3.2, guards: 1,
+      title: 'O Homem dos Números', cols: 9, rows: 11, mask: 'circle', seed: 7167, dyn: 3, shift: 8, loops: 0.05, fog: 3.2, guards: 1,
       intro: [
         { who: 'acendedor', text: 'Não acendas nada. Ele conta tudo. As estrelas, os passos, os teus dias.' },
         { who: 'acendedor', text: 'Fica escuro. Só vês o que está perto de ti. Eu só tenho duas centelhas para te dar.' },
@@ -96,7 +104,7 @@ const b612: WorldDef = {
       ],
     },
     {
-      title: 'O Acendedor', cols: 10, rows: 12, mask: 'heart', seed: 105, dyn: 4, shift: 7, loops: 0.08, fog: 0, guards: 2,
+      title: 'O Acendedor', cols: 10, rows: 12, mask: 'heart', seed: 3132, dyn: 4, shift: 7, loops: 0.08, fog: 0, guards: 2,
       intro: [
         { who: 'acendedor', text: 'Acendo o candeeiro de manhã. Apago à noite. O meu planeta gira depressa. Nunca descanso.' },
         { who: 'rei', text: 'Ordeno que ele descanse!' },
@@ -104,7 +112,7 @@ const b612: WorldDef = {
       ],
     },
     {
-      title: 'O Deserto da Raposa', cols: 11, rows: 14, mask: 'circle', seed: 106, dyn: 6, shift: 6, loops: 0.07, fog: 4.2, guards: 3,
+      title: 'O Deserto da Raposa', cols: 11, rows: 14, mask: 'circle', seed: 9187, dyn: 6, shift: 6, loops: 0.07, fog: 4.2, guards: 3,
       intro: [
         { who: 'raposa', text: 'Chegaste. Eu devia ter dito antes: o deserto é grande e as estrelas vigiam.' },
         { who: 'raposa', text: 'Três Crescidos, névoa e sebes que mudam de ideias. Cativa-me ao chegar à saída.' },
@@ -115,11 +123,11 @@ const b612: WorldDef = {
         { who: 'acendedor', text: 'Há mais mundos. E nenhum acende sozinho.' },
       ],
     },
-    lv('O Planeta Esquecido', 11, 13, 'circle', 107, { dyn: 5, shift: 6, loops: 0.08, fog: 3.6, guards: 2 }, [
+    lv('O Planeta Esquecido', 11, 13, 'circle', 8179, { dyn: 5, shift: 6, loops: 0.08, fog: 3.6, guards: 2 }, [
       { who: 'acendedor', text: 'Este planeta ninguém visita. Os Crescidos esqueceram-se dele.' },
       { who: 'raposa', text: 'Esqueceram-se do planeta, não de ti. Cuidado com o escuro.' },
     ]),
-    lv('A Rosa Sob o Vidro', 13, 15, 'circle', 108, { dyn: 8, shift: 6, loops: 0.09, fog: 4, guards: 3, bonus: true }, [
+    lv('A Rosa Sob o Vidro', 13, 15, 'circle', 6162, { dyn: 8, shift: 6, loops: 0.09, fog: 4, guards: 3, bonus: true }, [
       { who: 'raposa', text: 'Só chega aqui quem apanhou todas as estrelas. O Pequeno Príncipe teria orgulho.' },
       { who: 'uli', text: 'Quero a minha rosa.' },
       { who: 'raposa', text: 'Então cativa-a. Três Crescidos, névoa e sebes que mentem. Boa sorte.' },
@@ -159,17 +167,17 @@ const jardim: WorldDef = {
       ],
     },
     {
-      title: 'O Diamante', cols: 9, rows: 13, mask: 'diamond', seed: 33, dyn: 4, shift: 8, loops: 0.08, fog: 0, guards: 1,
+      title: 'O Diamante', cols: 9, rows: 13, mask: 'diamond', seed: 1042, dyn: 4, shift: 8, loops: 0.08, fog: 0, guards: 1,
       intro: [
         { who: 'pimpa', text: 'Um diamante. Corta o tempo, e corta quem se atrasa.' },
         { who: 'uli', text: 'Então vou cortar caminho.' },
-        { who: 'pimpa', text: 'Cuidado com os Espadas. Os guardas da Rainha. Mexem-se de dois em dois passos e farejam-te de longe.' },
+        { who: 'pimpa', text: 'Cuidado com os Espadas. Os guardas da Rainha. Mexem-se de três em três passos e farejam-te a quatro casas.' },
         { who: 'uli', text: 'E se me apanham?' },
-        { who: 'pimpa', text: 'Voltas ao início. Ou pior. Aprende o ritmo deles.' },
+        { who: 'pimpa', text: 'Voltas ao início. Ou pior. Aprende o ritmo deles, os pontos vermelhos no canto. E se te cercarem, o Vagalume ofusca-os e passas por eles.' },
       ],
     },
     {
-      title: 'Nevoeiro de Orvalho', cols: 8, rows: 12, mask: 'circle', seed: 44, dyn: 2, shift: 8, loops: 0.05, fog: 3.1, guards: 1,
+      title: 'Nevoeiro de Orvalho', cols: 8, rows: 12, mask: 'circle', seed: 3071, dyn: 2, shift: 8, loops: 0.05, fog: 3.1, guards: 1,
       intro: [
         { who: 'sorriso', text: 'Nevoeiro. A minha casa. Aqui ninguém me vê a rir de ti.' },
         { who: 'sorriso', text: 'Só vês o que está perto de ti. Como na vida real.' },
@@ -178,7 +186,7 @@ const jardim: WorldDef = {
       ],
     },
     {
-      title: 'Coração de Roseira', weather: 'rain', cols: 10, rows: 12, mask: 'heart', seed: 55, dyn: 4, shift: 7, loops: 0.08, fog: 0, guards: 2,
+      title: 'Coração de Roseira', weather: 'rain', cols: 10, rows: 12, mask: 'heart', seed: 8127, dyn: 4, shift: 7, loops: 0.08, fog: 0, guards: 2,
       intro: [
         { who: 'lagarta', text: 'Um labirinto em forma de coração. Alguém desenhou isto a sofrer.' },
         { who: 'uli', text: 'Gosto.' },
@@ -186,7 +194,7 @@ const jardim: WorldDef = {
       ],
     },
     {
-      title: 'O Palácio da Rainha', cols: 10, rows: 14, mask: 'rect', seed: 66, dyn: 6, shift: 6, loops: 0.07, fog: 4.2, guards: 3,
+      title: 'O Palácio da Rainha', cols: 10, rows: 14, mask: 'rect', seed: 9147, dyn: 6, shift: 6, loops: 0.07, fog: 4.2, guards: 3,
       intro: [
         { who: 'rainha', text: 'QUEM É QUE PISOU O MEU RELVADO?!' },
         { who: 'uli', text: 'Passava por aqui.' },
@@ -198,11 +206,11 @@ const jardim: WorldDef = {
         { who: 'sorriso', text: 'O próximo mundo roda, Uli. Aperta o cinto.' },
       ],
     },
-    lv('A Roseira Infinita', 12, 12, 'ring', 67, { weather: 'rain', dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [
+    lv('A Roseira Infinita', 12, 12, 'ring', 8139, { weather: 'rain', dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [
       { who: 'sorriso', text: 'Rodas, rodas, e a saída não aparece. Divertido, não?' },
       { who: 'lagarta', text: 'A roseira não acaba. Quem entra, pergunta-se se saiu.' },
     ]),
-    lv('O Trono da Rainha', 13, 17, 'cross', 68, { dyn: 9, shift: 5, loops: 0.09, fog: 4, guards: 4, bonus: true }, [
+    lv('O Trono da Rainha', 13, 17, 'cross', 2086, { dyn: 9, shift: 5, loops: 0.09, fog: 4, guards: 4, bonus: true }, [
       { who: 'rainha', text: 'APANHASTE TODAS AS ESTRELAS?! Ninguém me tira as estrelas!' },
       { who: 'uli', text: 'Já tirei.' },
       { who: 'rainha', text: 'Então chega ao meu trono, rebelde. Quatro Crescidos a guardá-lo. Corta-te a cabeça quem lá chegar... ou quase.' },
@@ -226,15 +234,15 @@ const demoniaco: WorldDef = {
       { who: 'carcereiro', text: 'Todas as chamas me pertencem. Mas deixo-te tentar.' },
     ]),
     lv('Rio de Brasas', 8, 10, 'rect', 202, { dyn: 3, shift: 8, loops: 0.05 }, [{ who: 'carcereiro', text: 'As grades sobem e descem com o calor. Quem não sabe esperar, queima.' }]),
-    lv('A Sala das Correntes', 9, 12, 'diamond', 203, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'carcereiro', text: 'Os meus ajudantes têm fome. Fome de passos teus.' }]),
-    lv('Fornalha', 10, 12, 'circle', 204, { dyn: 4, shift: 7, loops: 0.07, fog: 4.2, guards: 1 }, [{ who: 'carcereiro', text: 'Fumo. Escuridão. Só vês o que arde perto de ti.' }]),
-    lv('O Coração Negro', 10, 13, 'heart', 205, { dyn: 4, shift: 7, loops: 0.08, guards: 2 }, [{ who: 'carcereiro', text: 'Dizem que o inferno tem um coração. Eu comi-o.' }]),
-    lv('Escadaria Invertida', 11, 15, 'rect', 206, { dyn: 6, shift: 6, loops: 0.08, fog: 4.5, guards: 2 }),
-    lv('O Trono do Carcereiro', 12, 15, 'cross', 207, { dyn: 6, shift: 6, loops: 0.08, fog: 3.6, guards: 3 }, [
+    lv('A Sala das Correntes', 9, 12, 'diamond', 1212, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'carcereiro', text: 'Os meus ajudantes têm fome. Fome de passos teus.' }]),
+    lv('Fornalha', 10, 12, 'circle', 4240, { dyn: 4, shift: 7, loops: 0.07, fog: 4.2, guards: 1 }, [{ who: 'carcereiro', text: 'Fumo. Escuridão. Só vês o que arde perto de ti.' }]),
+    lv('O Coração Negro', 10, 13, 'heart', 6259, { dyn: 4, shift: 7, loops: 0.08, guards: 2 }, [{ who: 'carcereiro', text: 'Dizem que o inferno tem um coração. Eu comi-o.' }]),
+    lv('Escadaria Invertida', 11, 15, 'rect', 9287, { dyn: 6, shift: 6, loops: 0.08, fog: 4.5, guards: 2 }),
+    lv('O Trono do Carcereiro', 12, 15, 'cross', 6261, { dyn: 6, shift: 6, loops: 0.08, fog: 3.6, guards: 3 }, [
       { who: 'carcereiro', text: 'Chegaste ao meu trono. Ninguém chega ao meu trono.' },
       { who: 'uli', text: 'Estou aqui.' },
     ]),
-    lv('O Último Círculo', 14, 17, 'circle', 208, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [
+    lv('O Último Círculo', 14, 17, 'circle', 4244, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [
       { who: 'carcereiro', text: 'Todas as estrelas. Quem és tu, pequeno?' },
       { who: 'uli', text: 'Uma chama que não quer apagar.' },
       { who: 'carcereiro', text: 'Então arde até ao fim.' },
@@ -257,12 +265,12 @@ const glaciar: WorldDef = {
       { who: 'geada', text: 'Então a minha casa será a tua extinção.' },
     ]),
     lv('Cristais', 8, 10, 'rect', 302, { dyn: 3, loops: 0.05 }, [{ who: 'geada', text: 'O gelo fecha as passagens quando respiro.' }]),
-    lv('Lago Espelhado', 9, 11, 'circle', 303, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'geada', text: 'As minhas sentinelas não sentem frio. Nem pena.' }]),
+    lv('Lago Espelhado', 9, 11, 'circle', 5348, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'geada', text: 'As minhas sentinelas não sentem frio. Nem pena.' }]),
     lv('Tempestade Branca', 9, 12, 'rect', 304, { dyn: 3, loops: 0.07, fog: 3.4, guards: 1 }),
-    lv('Caverna Azul', 10, 13, 'diamond', 305, { dyn: 4, shift: 7, loops: 0.08, guards: 1 }),
-    lv('Palácio de Gelo', 11, 14, 'rect', 306, { dyn: 5, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'geada', text: 'O meu palácio nunca derrete. É o único amor que me restou.' }]),
-    lv('O Trono Congelado', 12, 12, 'ring', 307, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'geada', text: 'Cada passo teu aquece o meu trono. Não gosto.' }]),
-    lv('Coração de Inverno', 13, 15, 'heart', 308, { dyn: 8, shift: 5, loops: 0.09, fog: 3.4, guards: 3, bonus: true }, [
+    lv('Caverna Azul', 10, 13, 'diamond', 5350, { dyn: 4, shift: 7, loops: 0.08, guards: 1 }),
+    lv('Palácio de Gelo', 11, 14, 'rect', 7369, { dyn: 5, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'geada', text: 'O meu palácio nunca derrete. É o único amor que me restou.' }]),
+    lv('O Trono Congelado', 12, 12, 'ring', 7370, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'geada', text: 'Cada passo teu aquece o meu trono. Não gosto.' }]),
+    lv('Coração de Inverno', 13, 15, 'heart', 7371, { dyn: 8, shift: 5, loops: 0.09, fog: 3.4, guards: 3, bonus: true }, [
       { who: 'geada', text: 'Todas as estrelas... és mesmo teimoso.' },
       { who: 'uli', text: 'Tenho de ser.' },
     ], [{ who: 'geada', text: 'Vai. O inverno acaba quando alguém tem a coragem de o atravessar.' }]),
@@ -284,11 +292,11 @@ const relogio: WorldDef = {
       { who: 'relojoeiro', text: 'A saída é só mais uma hora. Dá-me os teus segundos.' },
     ]),
     lv('Engrenagens', 8, 10, 'rect', 402, { dyn: 4, shift: 6 }, [{ who: 'relojoeiro', text: 'As paredes giram de seis em seis passos. Conta comigo.' }]),
-    lv('Torre do Sino', 9, 13, 'diamond', 403, { dyn: 5, shift: 5, loops: 0.07, guards: 1 }, [{ who: 'relojoeiro', text: 'Os autómatos nunca se atrasam. Tu vais atrasar-te.' }]),
+    lv('Torre do Sino', 9, 13, 'diamond', 8475, { dyn: 5, shift: 5, loops: 0.07, guards: 1 }, [{ who: 'relojoeiro', text: 'Os autómatos nunca se atrasam. Tu vais atrasar-te.' }]),
     lv('Fumo e Vapor', 10, 12, 'circle', 404, { dyn: 3, loops: 0.07, fog: 3.4 }),
-    lv('Oficina Infinita', 10, 14, 'rect', 405, { dyn: 6, shift: 5, loops: 0.08, guards: 2 }),
+    lv('Oficina Infinita', 10, 14, 'rect', 7468, { dyn: 6, shift: 5, loops: 0.08, guards: 2 }),
     lv('O Pêndulo', 11, 13, 'heart', 406, { dyn: 6, shift: 4, loops: 0.08, guards: 2 }, [{ who: 'relojoeiro', text: 'Tic. Tac. Tic. Tac. Já ouves?' }]),
-    lv('Meia-Noite', 12, 15, 'ring', 407, { dyn: 8, shift: 4, loops: 0.09, fog: 4, guards: 3 }, [{ who: 'relojoeiro', text: 'À meia-noite tudo reinicia. Menos eu.' }]),
+    lv('Meia-Noite', 12, 15, 'ring', 8479, { dyn: 8, shift: 4, loops: 0.09, fog: 4, guards: 3 }, [{ who: 'relojoeiro', text: 'À meia-noite tudo reinicia. Menos eu.' }]),
     lv('O Relógio Mestre', 14, 16, 'circle', 408, { dyn: 10, shift: 4, loops: 0.09, fog: 3.4, guards: 3, bonus: true }, [
       { who: 'relojoeiro', text: 'Todas as estrelas. Tens tempo de sobra.' },
       { who: 'uli', text: 'Nunca tenho.' },
@@ -312,11 +320,11 @@ const biblioteca: WorldDef = {
     ]),
     lv('Corredor dos Atlas', 8, 11, 'rect', 502, { dyn: 3 }, [{ who: 'bibliotecario', text: 'Os mapas mentem. Os caminhos também.' }]),
     lv('Estantes Móveis', 9, 12, 'rect', 503, { dyn: 6, shift: 6, loops: 0.07 }, [{ who: 'bibliotecario', text: 'Quando fechas os olhos, as estantes dançam.' }]),
-    lv('Sala Sem Luz', 9, 12, 'rect', 504, { dyn: 3, loops: 0.07, fog: 3, guards: 1 }, [{ who: 'bibliotecario', text: 'Os Livros Vivos preferem o escuro. Lêem-te devagar.' }]),
-    lv('Cripta de Pergaminhos', 10, 13, 'diamond', 505, { dyn: 4, shift: 7, loops: 0.08, guards: 2 }),
+    lv('Sala Sem Luz', 9, 12, 'rect', 2522, { dyn: 3, loops: 0.07, fog: 3, guards: 1 }, [{ who: 'bibliotecario', text: 'Os Livros Vivos preferem o escuro. Lêem-te devagar.' }]),
+    lv('Cripta de Pergaminhos', 10, 13, 'diamond', 6559, { dyn: 4, shift: 7, loops: 0.08, guards: 2 }),
     lv('Labirinto de Capas', 11, 14, 'cross', 506, { dyn: 7, shift: 5, loops: 0.08, guards: 2 }),
-    lv('Índice Proibido', 12, 15, 'rect', 507, { dyn: 6, shift: 6, loops: 0.09, fog: 3.8, guards: 3 }, [{ who: 'bibliotecario', text: 'Este corredor não vem no índice. Foi apagado.' }]),
-    lv('O Livro Final', 14, 17, 'heart', 508, { dyn: 9, shift: 5, loops: 0.09, fog: 3.4, guards: 3, bonus: true }, [
+    lv('Índice Proibido', 12, 15, 'rect', 7570, { dyn: 6, shift: 6, loops: 0.09, fog: 3.8, guards: 3 }, [{ who: 'bibliotecario', text: 'Este corredor não vem no índice. Foi apagado.' }]),
+    lv('O Livro Final', 14, 17, 'heart', 2526, { dyn: 9, shift: 5, loops: 0.09, fog: 3.4, guards: 3, bonus: true }, [
       { who: 'bibliotecario', text: 'O último capítulo, só para quem leu tudo. Todas as estrelas.' },
       { who: 'uli', text: 'Quero acabar a história.' },
     ], [{ who: 'bibliotecario', text: 'Escreve tu o final, então. Eu fico a ler-te.' }]),
@@ -353,4 +361,10 @@ export function isUnlocked(wd: WorldDef, i: number, st: { level(w: string, i: nu
   if (!wd.levels[i]?.bonus) return st.unlocked(wd.id, i);
   for (let k = 0; k < i; k++) if ((st.level(wd.id, k)?.stars ?? 0) < 3) return false;
   return true;
+}
+
+/** Parâmetros de geração de um nível: com guardas há sempre voltas (para os poderes contornar) e mais folga no par. */
+export function levelOpts(def: LevelDef): MazeOpts {
+  const g = def.guards ?? 0;
+  return { cols: def.cols, rows: def.rows, mask: def.mask, seed: def.seed, dyn: def.dyn, loops: g ? Math.max(def.loops, 0.15) : def.loops, parExtra: g * 6 };
 }

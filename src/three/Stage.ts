@@ -42,7 +42,7 @@ export class Stage {
   orbs: { m: THREE.Group; life: number; delay: number; base: THREE.Vector3 }[] = [];
   parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
 
-  guards: { g: THREE.Group; x: number; y: number; tx: number; ty: number; dir: number; walk: number }[] = [];
+  guards: { g: THREE.Group; x: number; y: number; tx: number; ty: number; dir: number; walk: number; stun?: boolean }[] = [];
   /** posição do jogador em unidades de grelha (células, fracionário), salto e direção */
   player = { x: 0, y: 0, h: 0, dir: 0 };
   view: ViewMode = 'follow';
@@ -243,6 +243,17 @@ export class Stage {
       this.scene.add(g);
       return { g, x, y, tx: x, ty: y, dir: 0, walk: Math.random() * 6 };
     });
+  }
+  /** Guarda ofuscado pela luz do Vagalume: pára, baixa a cabeça e brilha em dourado. */
+  setGuardStun(i: number, on: boolean) {
+    const G = this.guards[i]; if (!G) return;
+    G.stun = on;
+    const sp = G.g.userData.glow as THREE.Sprite | undefined;
+    if (sp) {
+      const mat = sp.material as THREE.SpriteMaterial;
+      if (G.g.userData.glowHex === undefined) G.g.userData.glowHex = mat.color.getHex();
+      mat.color.setHex(on ? 0xffe9a0 : (G.g.userData.glowHex as number));
+    }
   }
   moveGuard(i: number, cell: number) {
     const G = this.guards[i];
@@ -465,9 +476,11 @@ export class Stage {
       (U.legL as THREE.Object3D).rotation.x = sw; (U.legR as THREE.Object3D).rotation.x = -sw;
       (U.armL as THREE.Object3D).rotation.x = -sw * 0.8; (U.armR as THREE.Object3D).rotation.x = sw * 0.8;
       (U.head as THREE.Object3D).rotation.y = Math.sin(this.t * 1.2 + G.walk) * 0.4;
-      if (U.glow) (U.glow as THREE.Sprite).material.opacity = this.guardsArmed ? 0.55 + 0.2 * Math.sin(this.t * 14) : 0.3;
+      if (U.glow) (U.glow as THREE.Sprite).material.opacity = G.stun ? 0.95 : this.guardsArmed ? 0.55 + 0.2 * Math.sin(this.t * 14) : 0.3;
+      const hd = U.head as THREE.Object3D; hd.rotation.x += ((G.stun ? 0.55 : 0) - hd.rotation.x) * (1 - Math.exp(-dt * 8));
+      if (G.stun) hd.rotation.y = 0;
       const dist = Math.hypot(G.x - this.player.x, G.y - this.player.y);
-      danger = Math.max(danger, Math.max(0, 1 - dist / 4.5));
+      if (!G.stun) danger = Math.max(danger, Math.max(0, 1 - dist / 4.5));
     }
     this.dangerCur += (danger - this.dangerCur) * (1 - Math.exp(-dt * 6));
     this.fx.uniforms.danger.value = this.dangerCur;

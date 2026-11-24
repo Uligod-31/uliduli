@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import { generate, Maze } from '../core/maze';
-import { LevelDef, WorldDef } from '../worlds';
+import { LevelDef, WorldDef, levelOpts } from '../worlds';
 import { CharKind } from './characters';
 import { snap } from '../three/snap';
 
 export function levelMaze(def: LevelDef): Maze {
-  return generate({ cols: def.cols, rows: def.rows, mask: def.mask, seed: def.seed, dyn: def.dyn, loops: def.loops });
+  return generate(levelOpts(def));
 }
 
 const S = 1.5; // supersampling das miniaturas

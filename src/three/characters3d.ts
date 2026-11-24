@@ -246,7 +246,7 @@ function buildPortraitRaw(kind: CharKind): { group: THREE.Group; center: THREE.V
     case 'raposa': return { group: raposa(), center: new THREE.Vector3(-0.1, 1.45, 0), dist: 8.6 };
     case 'rei': return { group: rei(), center: new THREE.Vector3(0.2, 1.9, 0), dist: 9.2 };
     case 'acendedor': return { group: acendedor(), center: new THREE.Vector3(0.4, 2.0, 0), dist: 10.6 };
-    case 'carcereiro': return { group: carcereiroD(), center: new THREE.Vector3(0, 2.55, 0), dist: 8.4 };
+    case 'carcereiro': return { group: carcereiroD(), center: new THREE.Vector3(0, 2.3, 0), dist: 9.2 };
     case 'geada': return { group: geadaD(), center: new THREE.Vector3(0.2, 2.4, 0), dist: 8.8 };
     case 'relojoeiro': return { group: relojoeiroD(), center: new THREE.Vector3(0, 2.2, 0), dist: 8.2 };
     case 'bibliotecario': return { group: bibliotecarioD(), center: new THREE.Vector3(0, 2.5, 0), dist: 8.6 };

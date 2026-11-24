@@ -4,7 +4,7 @@ import { button, gradText, label, roundBtn, Btn } from '../core/ui';
 import { Maze, DIRS, OPP, canPass, neighbor, pathTo, distFrom } from '../core/maze';
 import { mulberry32, shuffle } from '../core/rng';
 import { levelMaze } from '../art/thumb';
-import { LevelDef, WorldDef, getWorld, isUnlocked } from '../worlds';
+import { LevelDef, WorldDef, getWorld, isUnlocked, GUARD_HUNT, GUARD_STUN, GUARD_STUN_R, HINTS, guardEvery } from '../worlds';
 import { sfx } from '../core/audio';
 import { save } from '../core/save';
 import { playDialogue } from './dialogue';
@@ -29,10 +29,11 @@ export class GameScene extends Phaser.Scene {
   private trail: number[] = [];
   private collected = 0;
   private rosas = new Set<number>();
-  private hints = 2;
+  private hints = HINTS;
   private overview = false;
   private guards: number[] = [];
   private guardPrev: number[] = [];
+  private stun: number[] = []; // passos que cada guarda ainda fica ofuscado
 
   private pips!: Phaser.GameObjects.Graphics;
   private guardPips!: Phaser.GameObjects.Graphics;
@@ -49,7 +50,7 @@ export class GameScene extends Phaser.Scene {
     this.def = this.wd.levels[d.level];
     this.skipIntro = !!d.skipIntro;
     this.moves = 0; this.phase = 0; this.moving = false; this.done = false; this.blocked = true;
-    this.run = false; this.lastDir = -1; this.queued = null; this.collected = 0; this.hints = 2; this.overview = false;
+    this.run = false; this.lastDir = -1; this.queued = null; this.collected = 0; this.hints = HINTS; this.overview = false;
     this.pad.id = -1; this.pad.dir = -1; this.pad.kx = 0; this.pad.ky = 0; this.padArrows = [];
   }
 
@@ -74,6 +75,7 @@ export class GameScene extends Phaser.Scene {
       }
       this.guardPrev = this.guards.map(() => -1);
     }
+    this.stun = this.guards.map(() => 0);
     stage.load(m, this.wd, def.seed, { intro: !this.skipIntro });
     stage.setGuards(this.guards, this.wd.guardStyle ?? 0);
     stage.setWeather(def.weather ?? this.wd.weather ?? 'none');
@@ -116,7 +118,7 @@ export class GameScene extends Phaser.Scene {
     if (this.m.dyn.length) label(this, W / 2, 160, 'as sebes mudam em', 18, UI.textDim as string).setDepth(30);
 
     // rodapé: três botões numa linha; o joystick fica por cima deles
-    this.hintBtn = button(this, 175, H - 70, 300, 88, 'Vagalume ✦2', () => this.useHint(), 'primary', 28).setDepth(31);
+    this.hintBtn = button(this, 175, H - 70, 300, 88, 'Vagalume ✦' + HINTS, () => this.useHint(), 'primary', 28).setDepth(31);
     button(this, 385, H - 70, 100, 88, '◎', () => this.toggleView(), 'ghost', 38).setDepth(31);
     button(this, 575, H - 70, 220, 88, 'Reiniciar', () => this.scene.restart({ world: wd.id, level: this.li, skipIntro: true }), 'ghost', 24).setDepth(31);
     this.buildPad();
@@ -208,12 +210,12 @@ export class GameScene extends Phaser.Scene {
         this.pips.fillCircle(x0 + i * gap, 188, 7);
       }
     }
-    // ritmo dos guardas: com o primeiro ponto aceso, o teu próximo passo faz os guardas mexerem-se
+    // ritmo dos guardas: quando só falta um ponto, o teu próximo passo faz os guardas mexerem-se
     this.guardPips.clear();
     if (this.guards.length) {
-      const armed = this.moves % 2 === 1;
-      stage.setGuardsArmed(armed);
-      for (let i = 0; i < 2; i++) { this.guardPips.fillStyle(i < this.moves % 2 ? 0xff3040 : UI.line, 1); this.guardPips.fillCircle(W - 80 + i * 26, 206, 8); }
+      const gp = guardEvery(this.def), done = this.moves % gp, dazzled = this.stun.some((v) => v > 0);
+      stage.setGuardsArmed(done === gp - 1);
+      for (let i = 0; i < gp; i++) { this.guardPips.fillStyle(dazzled ? 0xffd45a : i < done ? 0xff3040 : UI.line, 1); this.guardPips.fillCircle(W - 50 - (gp - 1 - i) * 26, 206, 8); }
     }
     this.hintBtn.txt.setText(`Vagalume ✦${this.hints}`);
     this.hintBtn.setAlpha(this.hints > 0 ? 1 : 0.45);
@@ -302,12 +304,16 @@ export class GameScene extends Phaser.Scene {
       sfx.collect(); stage.removeRose(ni); navigator.vibrate?.(18);
     }
     if (ni === m.exit) { this.updateHud(); this.finish(); return; }
-    if (this.guards.includes(ni)) { this.caught(); return; }
+    if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.caught(); return; }
     if (m.dyn.length && this.moves % this.def.shift === 0) {
       this.phase ^= 1; stage.setPhase(this.phase, true); stop = true;
       sfx.shift(); stage.shake(0.35); navigator.vibrate?.(26);
     }
-    if (this.guards.length && this.moves % 2 === 0) { this.tickGuards(); if (this.done) return; }
+    if (this.guards.length && this.moves % guardEvery(this.def) === 0) { this.tickGuards(); if (this.done) return; }
+    if (this.stun.some((v) => v > 0)) {
+      this.stun = this.stun.map((v, i) => { const n = Math.max(0, v - 1); if (v > 0 && n === 0) stage.setGuardStun(i, false); return n; });
+      if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.caught(); return; }
+    }
     this.updateHud();
 
     if (this.queued) {
@@ -329,16 +335,17 @@ export class GameScene extends Phaser.Scene {
     this.run = false;
   }
 
-  /** Os Espadas movem-se de 2 em 2 passos: caçam se estiveres a ≤ 6 casas, senão patrulham. */
+  /** Os Espadas movem-se de gp em gp passos: caçam se estiveres a ≤ 4 casas, senão patrulham. Ofuscados ficam parados. */
   private tickGuards() {
     const m = this.m;
     const dist = distFrom(m, this.idx, this.phase);
     this.guards.forEach((g, i) => {
+      if (this.stun[i] > 0) return;
       const opts: number[] = [];
       for (let d = 0; d < 4; d++) if (canPass(m, g, d, this.phase)) opts.push(neighbor(m, g, d));
       if (!opts.length) return;
       let pick: number;
-      const hunting = dist[g] >= 0 && dist[g] <= 6;
+      const hunting = dist[g] >= 0 && dist[g] <= GUARD_HUNT;
       if (hunting) {
         const best = Math.min(...opts.map((o) => (dist[o] < 0 ? 99 : dist[o])));
         const cands = opts.filter((o) => (dist[o] < 0 ? 99 : dist[o]) === best && !this.guards.some((h, j) => j !== i && h === o));
@@ -352,7 +359,7 @@ export class GameScene extends Phaser.Scene {
       this.guards[i] = pick;
       stage.moveGuard(i, pick);
     });
-    if (this.guards.includes(this.idx)) { this.blocked = true; this.time.delayedCall(160, () => this.caught()); }
+    if (this.guards.some((g, i) => g === this.idx && !this.stun[i])) { this.blocked = true; this.time.delayedCall(160, () => this.caught()); }
   }
 
   private caught() {
@@ -381,6 +388,18 @@ export class GameScene extends Phaser.Scene {
     if (this.hints <= 0 || this.blocked || this.done) return;
     this.hints--; sfx.hint(); this.updateHud();
     stage.hint(pathTo(this.m, this.idx, this.m.exit, this.phase).slice(1, 12));
+    // a luz do Vagalume ofusca os guardas por perto: ficam parados e podes passar por eles
+    if (this.guards.length) {
+      const d = distFrom(this.m, this.idx, this.phase);
+      let any = false;
+      this.guards.forEach((g, i) => {
+        if (d[g] >= 0 && d[g] <= GUARD_STUN_R) {
+          this.stun[i] = GUARD_STUN; stage.setGuardStun(i, true); any = true;
+          const p = stage.worldPos(g); stage.burst(p.x, p.z, [0xffe9a0, 0xffd45a, 0xffffff], 18, 0.7);
+        }
+      });
+      if (any) { navigator.vibrate?.(30); stage.shake(0.2); this.updateHud(); }
+    }
   }
 
   // ───────────────────────── Fim de nível ─────────────────────────

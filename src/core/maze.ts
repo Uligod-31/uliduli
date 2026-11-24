@@ -41,6 +41,48 @@ export interface MazeOpts {
   dyn?: number;
   loops?: number; // fração de paredes removidas (cria voltas)
   rosas?: number;
+  parExtra?: number; // folga extra no par (ex.: níveis com guardas)
+}
+
+/** Distâncias BFS sobre passagens fixas, sem nunca atravessar `block` (a saída fecha o nível). */
+function distAvoid(m: Maze, from: number, block: number): Int32Array {
+  const dist = new Int32Array(m.cols * m.rows).fill(-1);
+  const q = [from];
+  dist[from] = 0;
+  for (let h = 0; h < q.length; h++) {
+    const cur = q[h];
+    if (cur === block && cur !== from) continue;
+    for (let d = 0; d < 4; d++) {
+      if (!(m.pass[cur] & DIRS[d].b)) continue;
+      const ni = neighbor(m, cur, d);
+      if (ni >= 0 && dist[ni] < 0) { dist[ni] = dist[cur] + 1; q.push(ni); }
+    }
+  }
+  return dist;
+}
+
+function permutations(a: number[]): number[][] {
+  if (a.length <= 1) return [a];
+  const r: number[][] = [];
+  a.forEach((x, i) => permutations([...a.slice(0, i), ...a.slice(i + 1)]).forEach((p) => r.push([x, ...p])));
+  return r;
+}
+
+/** Menor nº de passos para apanhar todas as rosas e acabar na saída (só passagens fixas, sem passar pela saída antes do fim). */
+export function bestTour(m: Maze): number {
+  const pts = [m.start, ...m.rosas];
+  const D = pts.map((p) => distAvoid(m, p, m.exit));
+  const toExit = distFrom(m, m.exit);
+  let best = 1e9;
+  for (const perm of permutations(m.rosas.map((_, i) => i + 1))) {
+    let at = 0, len = 0, ok = true;
+    for (const k of perm) { const d = D[at][pts[k]]; if (d < 0) { ok = false; break; } len += d; at = k; }
+    if (!ok) continue;
+    const dEnd = toExit[pts[at]];
+    if (dEnd < 0) continue;
+    best = Math.min(best, len + dEnd);
+  }
+  return best < 1e9 ? best : m.shortest;
 }
 
 export function inMask(kind: MaskKind, c: number, r: number, cols: number, rows: number): boolean {
@@ -230,17 +272,21 @@ export function generate(o: MazeOpts): Maze {
     rng,
   );
   const wantR = o.rosas ?? 3;
+  const dNoExit = distAvoid(m, A, B); // rosas nunca atrás da saída
   const man = (x: number, y: number) =>
     Math.abs((x % cols) - (y % cols)) + Math.abs(((x / cols) | 0) - ((y / cols) | 0));
   for (const i of deadEnds) {
     if (m.rosas.length >= wantR) break;
-    if (man(i, A) < 3 || man(i, B) < 3) continue;
+    if (man(i, A) < 3 || man(i, B) < 3 || dNoExit[i] < 0) continue;
     if (m.rosas.some((r) => man(r, i) < 4)) continue;
     m.rosas.push(i);
   }
   for (let i = 0; m.rosas.length < wantR && i < n * 3; i++) {
     const c = Math.floor(rng() * n);
-    if (!solid[c] && c !== A && c !== B && !m.rosas.includes(c)) m.rosas.push(c);
+    if (!solid[c] && c !== A && c !== B && !m.rosas.includes(c) && dNoExit[c] >= 0) m.rosas.push(c);
   }
+  // par = melhor rota de 3 estrelas (todas as rosas) + folga, para que 3★ seja sempre possível
+  const tour = bestTour(m);
+  m.par = tour + Math.max(6, Math.round(tour * 0.22)) + (o.parExtra ?? 0);
   return m;
 }
