@@ -83,7 +83,6 @@ export class TitleScene extends Phaser.Scene {
     this.input.once('pointerdown', () => sfx.unlock());
 
     // O Olho: 3D por baixo, segue o dedo e pisca ao toque
-    this.add.text(W / 2, 452, 'ELE JÁ TE VIU.', { fontFamily: FONT_HEAD, fontSize: '26px', color: '#ff86e8', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5).setAlpha(0.8).setStyle({ letterSpacing: 10 } as any);
     this.flash = this.add.rectangle(W / 2, H / 2, W, H, 0xffd6f6, 0).setDepth(100);
     stage.loadEye();
     stage.onEyeFlash = (a) => { this.flash.setAlpha(a); };

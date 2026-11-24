@@ -10,9 +10,9 @@ import { makeUli, animateFlame } from './nightmare';
 const TAU = Math.PI * 2;
 const RS = 6, ZC = -2.4;            // globo ocular (raio e centro em z)
 const RL = 6.9;                      // pele das pálpebras (esfera um pouco maior)
-const PR = 0.72, IR = 2.9, RD = 7;   // pupila, íris, curvatura da íris
-const HW = 3.7, HU = 2.05, HL = 1.45, YC = -0.7;   // abertura: meia-largura, alturas, linha de fecho
-const XO = 5.8, EYO = 4.2;           // extensão da pele (vai esbatendo para o vazio)
+const PR = 0.82, IR = 3.2, RD = 7;   // pupila, íris, curvatura da íris
+const HW = 3.85, HU = 2.7, HL = 2.0, YC = -0.8;   // abertura: meia-largura, alturas, linha de fecho
+const XO = 6.6, EYO = 6.0;           // extensão da pele (vai esbatendo para o vazio)
 const CAM_D = 24;
 
 const sstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -178,6 +178,42 @@ class Lid {
   }
 }
 
+
+/** Faixa que segue a pálpebra (khol, linhas de ouro): fn(u, o) devolve x e as duas bordas em y. */
+class Band {
+  mesh: THREE.Mesh; private pos: Float32Array;
+  constructor(private n: number, private fn: (u: number, o: number) => [number, number, number], mat: THREE.Material, private dz: number) {
+    this.pos = new Float32Array((n + 1) * 2 * 3);
+    const g = new THREE.BufferGeometry(), idx: number[] = [];
+    for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3)); g.setIndex(idx);
+    this.mesh = new THREE.Mesh(g, mat); this.mesh.frustumCulled = false; this.update(1);
+  }
+  update(o: number) {
+    for (let i = 0; i <= this.n; i++) {
+      const [x, ya, yb] = this.fn(i / this.n, o);
+      const za = ZC + Math.sqrt(Math.max(0.01, RL * RL - x * x - ya * ya)) + this.dz, zb = ZC + Math.sqrt(Math.max(0.01, RL * RL - x * x - yb * yb)) + this.dz;
+      this.pos.set([x, ya, za, x, yb, zb], i * 6);
+    }
+    this.mesh.geometry.attributes.position.needsUpdate = true;
+  }
+}
+/** Fita estática sobre a pele: pontos (x,y) com largura que afina. */
+function ribbon(pts: THREE.Vector2[], w: (t: number) => number, mat: THREE.Material, dz: number): THREE.Mesh {
+  const n = pts.length, pos = new Float32Array(n * 2 * 3), idx: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    const tx = b.x - a.x, ty = b.y - a.y, l = Math.hypot(tx, ty) || 1, nx = -ty / l, ny = tx / l, hw = w(i / (n - 1)) / 2;
+    for (const [k, sgn] of [[0, 1], [1, -1]] as const) {
+      const x = pts[i].x + nx * hw * sgn, y = pts[i].y + ny * hw * sgn;
+      pos.set([x, y, ZC + Math.sqrt(Math.max(0.01, RL * RL - x * x - y * y)) + dz], (i * 2 + k) * 3);
+    }
+    if (i < n - 1) { const a2 = i * 2; idx.push(a2, a2 + 1, a2 + 2, a2 + 1, a2 + 3, a2 + 2); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, mat); m.frustumCulled = false; return m;
+}
+
 // ───────────── labirinto polar (com um caminho garantido) ─────────────
 function makeMaze(seed: number) {
   const R = mulberry(seed);
@@ -259,6 +295,8 @@ export class EyeTitle {
   onFlash?: (a: number) => void;
   private tmpV = new THREE.Vector3(); private tmpQ = new THREE.Quaternion(); private tmpQ2 = new THREE.Quaternion(); private tmpM = new THREE.Matrix4();
   private open = 1;
+  private goldMat!: THREE.MeshBasicMaterial;
+  private bands: Band[] = [];
 
   constructor(renderer: THREE.WebGLRenderer) {
     const R = mulberry(77);
@@ -278,7 +316,7 @@ export class EyeTitle {
     envScene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
 
     // globo ocular
-    const sg = new THREE.SphereGeometry(RS, 96, 48, 0, TAU, 0, Math.asin(3.95 / RS)); sg.rotateX(Math.PI / 2);
+    const sg = new THREE.SphereGeometry(RS, 96, 48, 0, TAU, 0, Math.asin(4.3 / RS)); sg.rotateX(Math.PI / 2);
     const p = sg.attributes.position, uvA = sg.attributes.uv as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) uvA.setXY(i, p.getX(i) / 9.6 + 0.5, p.getY(i) / 9.6 + 0.5);
     const sclera = new THREE.Mesh(sg, new THREE.MeshPhysicalMaterial({ map: scleraTexture(), roughness: 0.34, clearcoat: 0.85, clearcoatRoughness: 0.12, envMapIntensity: 1.1 }));
@@ -322,7 +360,7 @@ export class EyeTitle {
     const pg = glowSprite(0xff4fd8, 2.2, 0.1); pg.position.z = domeZ(PR) + 0.1; this.iris.add(pg);
 
     // córnea (vidro)
-    const cg = new THREE.SphereGeometry(3.7, 64, 24, 0, TAU, 0, Math.asin(3.1 / 3.7)); cg.rotateX(Math.PI / 2); cg.translate(0, 0, 0.2 - ZC);
+    const cg = new THREE.SphereGeometry(3.7, 64, 24, 0, TAU, 0, Math.asin(3.55 / 3.7)); cg.rotateX(Math.PI / 2); cg.translate(0, 0, 0.2 - ZC);
     const cornea = new THREE.Mesh(cg, new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, roughness: 0.03, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 3.2, depthWrite: false }));
     cornea.renderOrder = 3; this.ball.add(cornea);
 
@@ -352,7 +390,7 @@ export class EyeTitle {
     this.iris.add(trail);
     this.pathCum = [0]; for (let i = 1; i < this.path.length; i++) this.pathCum.push(this.pathCum[i - 1] + this.path[i].distanceTo(this.path[i - 1]));
     this.pathLen = this.pathCum[this.pathCum.length - 1];
-    this.uli.scale.setScalar(0.62); this.iris.add(this.uli);
+    this.uli.scale.setScalar(0.72); this.iris.add(this.uli);
 
     // pálpebras
     const skin = skinTextures();
@@ -369,7 +407,52 @@ export class EyeTitle {
     const lc = new THREE.Color();
     for (let i = 0; i < 24; i++) this.lashesU.setColorAt(i, i % 5 === 2 ? lc.set(0xff4fd8).multiplyScalar(1.6) : lc.set(0xffffff));
     for (let i = 0; i < 12; i++) this.lashesL.setColorAt(i, lc.set(0xffffff));
+    this.lashesU.visible = this.lashesL.visible = false;
     this.group.add(this.lashesU, this.lashesL);
+
+
+    // ── traços egípcios, à nossa maneira: khol com asa, sobrancelha de glifos-labirinto, linha e espiral por baixo ──
+    const blackMat = new THREE.MeshStandardMaterial({ color: 0x06030c, roughness: 0.22, metalness: 0.65, envMapIntensity: 1.6, side: THREE.DoubleSide });
+    this.goldMat = new THREE.MeshBasicMaterial({ color: hdr(0xffc65a, 1.9), toneMapped: false, side: THREE.DoubleSide });
+    const neonMat = new THREE.MeshBasicMaterial({ color: hdr(0xff4fd8, 1.8), toneMapped: false, side: THREE.DoubleSide });
+    const WX = 6.5;
+    const kohl = (u: number, o: number): [number, number, number] => {
+      const x = -HW - 0.12 + u * (WX + HW + 0.12);
+      if (x <= HW) { const e = edgeY(x, 1, o), q = Math.max(0, 1 - (x / HW) * (x / HW)); return [x, e - 0.04, e + 0.16 + 0.34 * Math.pow(q, 0.6)]; }
+      const k = (x - HW) / (WX - HW), y = -0.15 - 1.05 * Math.pow(k, 1.15), th = 0.2 * (1 - Math.pow(k, 1.4)) + 0.015;
+      return [x, y - th / 2, y + th / 2];
+    };
+    const kb = new Band(90, kohl, blackMat, 0.03);
+    const kg = new Band(90, (u, o) => { const r = kohl(u, o); return [r[0], r[2], r[2] + 0.05]; }, this.goldMat, 0.045);
+    const low = new Band(60, (u, o) => { const x = -HW + u * 2 * HW, e = edgeY(x, -1, o); return [x, e - 0.2 * Math.pow(Math.max(0, 1 - (x / HW) * (x / HW)), 0.5) - 0.03, e - 0.02]; }, blackMat, 0.03);
+    this.bands = [kb, kg, low];
+    this.group.add(kb.mesh, kg.mesh, low.mesh);
+    // sobrancelha: arco largo, com friso de paredes-de-labirinto por baixo
+    const browY = (x: number) => 3.2 + 0.7 * (1 - (x / 5.2) * (x / 5.2)) - 0.35 * Math.pow(Math.abs(x) / 5.2, 3);
+    const brow: THREE.Vector2[] = [];
+    for (let i = 0; i <= 60; i++) { const x = -4.9 + 9.8 * i / 60; brow.push(new THREE.Vector2(x, browY(x))); }
+    this.group.add(ribbon(brow, (t) => 0.34 * Math.sin(Math.PI * t) + 0.08, blackMat, 0.03));
+    this.group.add(ribbon(brow.map((p) => new THREE.Vector2(p.x, p.y + 0.24)), (t) => 0.05 * Math.sin(Math.PI * t) + 0.01, this.goldMat, 0.05));
+    const glyph = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), 26);
+    const gc = new THREE.Color();
+    for (let i = 0; i < 26; i++) {
+      const x = -4.3 + 8.6 * i / 25, y = browY(x) - 0.42, z = ZC + Math.sqrt(RL * RL - x * x - y * y) + 0.05;
+      const horiz = i % 3 === 1, L = 0.16 + ((i * 7) % 4) * 0.07;
+      this.tmpM.compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.35 * (x / 5))), horiz ? new THREE.Vector3(L * 1.6, 0.05, 0.02) : new THREE.Vector3(0.05, L, 0.02));
+      glyph.setMatrixAt(i, this.tmpM); glyph.setColorAt(i, i % 2 ? gc.set(0x7aa8ff).multiplyScalar(1.8) : gc.set(0xff4fd8).multiplyScalar(1.8));
+    }
+    this.group.add(glyph);
+    // linha que desce do olho e acaba numa espiral (o labirinto em miniatura)
+    const spi: THREE.Vector2[] = [];
+    for (let i = 0; i <= 14; i++) spi.push(new THREE.Vector2(0.75, -2.25 - 0.85 * i / 14));
+    const cx = 0.75 + 0.6, cy = -3.1, TT = 3.6 * Math.PI;
+    for (let i = 1; i <= 90; i++) { const th = TT * i / 90, r = 0.6 - 0.48 * th / TT; spi.push(new THREE.Vector2(cx - Math.cos(th) * r, cy - Math.sin(th) * r)); }
+    this.group.add(ribbon(spi, (t) => 0.2 - 0.07 * t, blackMat, 0.03), ribbon(spi, (t) => 0.07 - 0.03 * t, this.goldMat, 0.05));
+    // cauda curva do lado oposto, a acabar num ponto
+    const tl: THREE.Vector2[] = [];
+    for (let i = 0; i <= 40; i++) { const t = i / 40; tl.push(new THREE.Vector2(-1.5 - 1.6 * t - 0.5 * t * t, -2.1 - 1.3 * t + 0.4 * Math.sin(t * Math.PI))); }
+    this.group.add(ribbon(tl, (t) => 0.2 * (1 - t) + 0.03, blackMat, 0.03), ribbon(tl, (t) => 0.06 * (1 - t) + 0.01, neonMat, 0.05));
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), neonMat); dot.position.set(-3.6, -3.4, ZC + Math.sqrt(RL * RL - 3.6 * 3.6 - 3.4 * 3.4) + 0.1); this.group.add(dot);
 
     // lágrima
     this.tear = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), new THREE.MeshPhysicalMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.7, roughness: 0.05, emissive: 0x3a78c8, emissiveIntensity: 0.6, envMapIntensity: 2.5, clearcoat: 1 }));
@@ -442,10 +525,10 @@ export class EyeTitle {
     const wide = this.dive >= 0 ? Math.min(1.15, 1 + this.dive * 0.4) : 1;
     this.open += ((Math.max(0.03, o * breathe * wide) - this.open) * (1 - Math.exp(-dt * 40)));
     this.upper.update(this.open); this.lower.update(this.open);
+    for (const b of this.bands) b.update(this.open);
+    this.goldMat.color.copy(hdr(0xffc65a, 1.6 + 1.1 * pulse + 0.3 * Math.sin(t * 2)));
 
     // pestanas
-    this.placeLashes(this.lashesU, 1, 24, this.open, 0.9);
-    this.placeLashes(this.lashesL, -1, 12, this.open, 0.5);
 
     // Uli percorre a íris; no fim mergulha na pupila e recomeça
     const speed = 1.15, cycle = this.pathLen / speed + 2.4;
@@ -461,7 +544,7 @@ export class EyeTitle {
     const q3 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
     this.uli.quaternion.copy(this.tmpQ).multiply(this.tmpQ2).multiply(q3);
     this.uli.position.copy(p).setZ(p.z - 0.03 + fin * 0.4);
-    this.uli.scale.setScalar(0.62 * (1 - fin));
+    this.uli.scale.setScalar(0.72 * (1 - fin));
     this.uli.visible = fin < 0.99;
     const U = this.uli.userData, sw = Math.sin(t * 9) * 0.85 * (walking ? 1 : 0);
     (U.legL as THREE.Object3D).rotation.x = sw; (U.legR as THREE.Object3D).rotation.x = -sw;
@@ -504,9 +587,9 @@ export class EyeTitle {
     this.halo.material.opacity = 0.3 + 0.12 * pulse;
 
     // câmara: respira; no mergulho voa pela pupila
-    const asp = camera.aspect, d = CAM_D * (asp > 0.62 ? 0.78 : 1) * (1.12 - 0.12 * this.intro);
+    const asp = camera.aspect, d = CAM_D * (asp > 0.62 ? 0.95 : 1.1) * (1.12 - 0.12 * this.intro);
     let fov = 40;
-    const ty = 0.9;
+    const ty = 0.75;
     if (this.dive < 0) {
       camera.position.set(Math.sin(t * 0.3) * 0.5 - this.look.x * 0.5, Math.cos(t * 0.23) * 0.3 + this.look.y * 0.3 + ty * 0, d);
       camera.lookAt(0, ty, 0);
