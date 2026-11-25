@@ -5,7 +5,7 @@ export class Rain {
   mesh: THREE.LineSegments;
   private mat: THREE.ShaderMaterial;
 
-  constructor(n = 700) {
+  constructor(n = 1500) {
     const pos = new Float32Array(n * 2 * 3), tip = new Float32Array(n * 2);
     for (let i = 0; i < n; i++) {
       const x = Math.random(), y = Math.random(), z = Math.random();
@@ -23,11 +23,12 @@ export class Rain {
           vec3 p = position;
           float y = fract(p.y - time * (0.9 + p.x * 0.5));
           vec3 w = center + vec3((p.x - 0.5) * 36.0, y * 24.0 - 3.0, (p.z - 0.5) * 36.0);
-          w += tip * vec3(0.22, 0.95, 0.08);
-          vA = (1.0 - tip * 0.85) * smoothstep(0.0, 0.08, y) * smoothstep(1.0, 0.8, y);
-          gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+          w += tip * vec3(0.1, 0.62, 0.04);
+          vec4 mv = viewMatrix * vec4(w, 1.0);
+          vA = (1.0 - tip * 0.8) * smoothstep(0.0, 0.08, y) * smoothstep(1.0, 0.8, y) * smoothstep(1.2, 4.0, -mv.z) * (1.0 - 0.65 * smoothstep(14.0, 34.0, -mv.z));
+          gl_Position = projectionMatrix * mv;
         }`,
-      fragmentShader: `uniform float strength; varying float vA; void main(){ gl_FragColor = vec4(0.62, 0.76, 1.0, vA * 0.34 * strength); }`,
+      fragmentShader: `uniform float strength; varying float vA; void main(){ gl_FragColor = vec4(0.62, 0.76, 1.0, vA * 0.55 * strength); }`,
     });
     this.mesh = new THREE.LineSegments(g, this.mat);
     this.mesh.frustumCulled = false; this.mesh.renderOrder = 5;

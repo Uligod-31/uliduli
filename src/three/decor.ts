@@ -302,6 +302,74 @@ export function buildDecor(o: DecorOpts): Decor {
     mesh.castShadow = true; group.add(mesh);
   }
 
+  // ── paredes vivas: heras, algas, pingentes de gelo, neve nos topos e fendas de lava ──
+  {
+    const dbl = THREE.DoubleSide;
+    const onWall = () => {
+      const s = o.segs[Math.floor(rng() * o.segs.length)];
+      const horiz = s.y1 === s.y2, u = rng();
+      const cx = s.x1 + (s.x2 - s.x1) * u - cols / 2, cz = s.y1 + (s.y2 - s.y1) * u - rows / 2;
+      const side = rng() < 0.5 ? -1 : 1;
+      return { horiz, side, cx, cz, ry: horiz ? (side > 0 ? 0 : Math.PI) : (side > 0 ? Math.PI / 2 : -Math.PI / 2) };
+    };
+    const lateral = (w: ReturnType<typeof onWall>, d: number, along = 0) => ({ x: w.cx + (w.horiz ? along : w.side * d), z: w.cz + (w.horiz ? w.side * d : along) });
+    const leafShape = new THREE.Shape(); leafShape.moveTo(0, -0.045); leafShape.quadraticCurveTo(0.055, -0.005, 0, 0.05); leafShape.quadraticCurveTo(-0.055, -0.005, 0, -0.045);
+    const vines: Record<string, { c: number[]; n: number; glow?: number }> = {
+      garden: { c: [0x2f5a26, 0x3e7a30, 0x254a20, 0x4a8a38], n: 58 }, elfic: { c: [0x3a7a3a, 0x58a048, 0x2a5a30], n: 64, glow: 0x80f0c0 },
+      animal: { c: [0x5a8a2a, 0x7aa83a, 0x3e6a20], n: 44 }, ink: { c: [0x1a7a6a, 0x2ab090, 0x136a58], n: 44, glow: 0x44e0ff }, planet: { c: [0x2a6a5a, 0x3a9a7a], n: 8, glow: 0x40e0d0 },
+    };
+    const vn = vines[o.style];
+    if (vn && o.segs.length) {
+      const per = 9, total = vn.n * per;
+      const leaves = new THREE.InstancedMesh(new THREE.ShapeGeometry(leafShape), new THREE.MeshStandardMaterial({ roughness: 0.75, side: dbl }), total);
+      const cc = new THREE.Color(); let k = 0;
+      const berries: THREE.Vector3[] = [];
+      for (let s = 0; s < vn.n; s++) {
+        const w = onWall(), top = o.wallH * (0.55 + rng() * 0.45), len = 0.35 + rng() * 0.5 * o.wallH;
+        for (let j = 0; j < per && k < total; j++, k++) {
+          const f = j / per, y = top - f * len, a = lateral(w, o.wallT / 2 + 0.008 + rng() * 0.012, Math.sin(j * 1.7 + s) * 0.05 + (rng() - 0.5) * 0.04);
+          const q = new THREE.Quaternion().setFromEuler(new THREE.Euler((rng() - 0.5) * 0.5, w.ry, (rng() - 0.5) * 2.2));
+          leaves.setMatrixAt(k, new THREE.Matrix4().compose(new THREE.Vector3(a.x, Math.max(0.05, y), a.z), q, new THREE.Vector3().setScalar(1.3 + rng() * 0.9)));
+          leaves.setColorAt(k, cc.setHex(vn.c[(rng() * vn.c.length) | 0]).offsetHSL(0, 0, (rng() - 0.5) * 0.08));
+          if (vn.glow && j % 4 === 3 && rng() < 0.6) berries.push(new THREE.Vector3(a.x, Math.max(0.05, y), a.z));
+        }
+      }
+      leaves.count = k; leaves.receiveShadow = true; group.add(leaves);
+      if (berries.length) {
+        const bm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.013, 6, 5), new THREE.MeshBasicMaterial({ color: hdr(vn.glow!, 2.4), toneMapped: false }), berries.length);
+        berries.forEach((p, i) => bm.setMatrixAt(i, M.makeTranslation(p.x, p.y, p.z))); group.add(bm);
+        berries.filter((_, i) => i % 5 === 0).forEach((p) => glowAt(p.x, p.y, p.z, vn.glow!, 0.22, 0.5));
+      }
+    }
+    // pingentes de gelo e neve nos topos das paredes
+    if ((o.style === 'ice' || o.style === 'viking') && o.segs.length) {
+      const n = o.style === 'ice' ? 56 : 34;
+      const ic = new THREE.InstancedMesh(new THREE.ConeGeometry(0.018, 0.16, 5).rotateX(Math.PI), new THREE.MeshStandardMaterial({ color: 0xd6efff, emissive: 0x3a86b8, emissiveIntensity: 0.55, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.88, envMapIntensity: 2 }), n);
+      const caps = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 5), new THREE.MeshStandardMaterial({ color: 0xf2f8ff, roughness: 0.9 }), n);
+      for (let i = 0; i < n; i++) {
+        const w = onWall(), len = 0.5 + rng() * 1.5, a = lateral(w, o.wallT / 2 - 0.012, (rng() - 0.5) * 0.3);
+        ic.setMatrixAt(i, M.compose(new THREE.Vector3(a.x, o.wallH - 0.08 * len, a.z), Q.identity(), new THREE.Vector3(1, len, 1)).clone());
+        const c = lateral(w, 0, (rng() - 0.5) * 0.5), s = 0.06 + rng() * 0.08;
+        caps.setMatrixAt(i, M.compose(new THREE.Vector3(c.x, o.wallH + 0.005, c.z), Q.setFromEuler(E.set(0, w.horiz ? 0 : Math.PI / 2, 0)), new THREE.Vector3(s * 2.1, s * 0.5, o.wallT * 0.62)).clone());
+      }
+      group.add(ic, caps);
+    }
+    // fendas de lava nas paredes e poças a ferver no chão
+    if (o.style === 'hell' && o.segs.length) {
+      const n = 26, cr = new THREE.InstancedMesh(new THREE.BoxGeometry(0.012, 0.15, 0.006), new THREE.MeshBasicMaterial({ color: hdr(0xff5a14, 2.6), toneMapped: false }), n);
+      for (let i = 0; i < n; i++) {
+        const w = onWall(), a = lateral(w, o.wallT / 2 + 0.004, (rng() - 0.5) * 0.2), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, w.ry, (rng() - 0.5) * 1.4));
+        cr.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(a.x, 0.1 + rng() * o.wallH * 0.7, a.z), q, new THREE.Vector3(1, 0.6 + rng() * 2.2, 1)));
+        if (i % 6 === 0) glowAt(a.x, 0.18 + rng() * 0.3, a.z, 0xff5a14, 0.5, 0.5);
+      }
+      group.add(cr);
+      const lp = pick(0.09);
+      const pools = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: hdr(0xff6a16, 2.4), toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3 }), lp.length);
+      lp.forEach((i, k) => { const x = px(i), z = pz(i), s = 0.12 + rng() * 0.12; pools.setMatrixAt(k, compose(x + (rng() - 0.5) * 0.3, 0.007, z + (rng() - 0.5) * 0.3, 0, s, 1, s * (0.6 + rng() * 0.5))); glowAt(x, 0.1, z, 0xff5a14, 0.9, 0.55); });
+      group.add(pools);
+    }
+  }
+
   // ── velas com chama (os dois mundos) ──
   const flames: { g: THREE.Group; ph: number }[] = [];
   {

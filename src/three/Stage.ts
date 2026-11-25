@@ -128,7 +128,7 @@ export class Stage {
           vec3 col = bl > 0.02 ? vec3(smp(vUv + off, bp).r, smp(vUv, bp).g, smp(vUv - off, bp).b) : vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
           vec3 nb = (texture2D(tDiffuse, vUv + vec2(res.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(res.x, 0.0)).rgb + texture2D(tDiffuse, vUv + vec2(0.0, res.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, res.y)).rgb) * 0.25;
           col = max(col + clamp(col - nb, -0.3, 0.3) * 0.7, 0.0);
-          col = max((col - 0.32) * 1.14 + 0.32, 0.0);
+          col = mix(col, max((col - 0.32) * 1.14 + 0.32, 0.0), smoothstep(0.05, 0.5, dot(col, vec3(0.333))));
           col *= 1.0 - smoothstep(0.2, 0.7, d) * (0.38 + 0.2 * grade);
           float lu = dot(col, vec3(0.299, 0.587, 0.114));
           col = mix(col, vec3(lu), 0.4 * grade);
@@ -421,6 +421,7 @@ export class Stage {
     this.renderer.setSize(r.width, r.height, false);
     this.composer.setSize(r.width, r.height);
     this.fx.uniforms.res.value.set(1 / (r.width * this.renderer.getPixelRatio()), 1 / (r.height * this.renderer.getPixelRatio()));
+    this.weather.setPx(this.renderer.getPixelRatio());
     this.camera.aspect = r.width / Math.max(1, r.height);
     this.camera.updateProjectionMatrix();
   }
@@ -611,7 +612,7 @@ export class Stage {
     this.dark += (this.darkTarget - this.dark) * (1 - Math.exp(-dt * 3));
     const d = this.dark;
     const T = this.th;
-    this.sun.intensity = (T.sunI ?? 2.4) * (1 - 0.82 * d); this.rim.intensity = (T.rimI ?? 1.4) * (1 - 0.7 * d); this.hemi.intensity = (T.hemiI ?? 1.05) * (1 - 0.62 * d) + 0.08 * d;
+    this.sun.intensity = (T.sunI ?? 2.4) * (1 - 0.82 * d); this.rim.intensity = (T.rimI ?? 1.4) * (1 - 0.7 * d); this.hemi.intensity = (T.hemiI ?? 1.05) * 1.3 * (1 - 0.62 * d) + 0.08 * d;
     this.scene.environmentIntensity = 0.9 * (1 - 0.8 * d) + 0.1 * d;
     this.scenery.setDark(d);
     this.lamp.intensity = (T.lampI ?? 0.5) + d * 6.5;

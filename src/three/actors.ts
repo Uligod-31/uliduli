@@ -302,7 +302,7 @@ export function makePortal(): THREE.Group {
   }
   const beam = new THREE.Mesh(
     new THREE.CylinderGeometry(0.2, 0.34, 3.2, 24, 1, true),
-    new THREE.MeshBasicMaterial({ color: hdr(0xa46bff, 1.2), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: hdr(0xa46bff, 1.1), transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
   );
   beam.position.y = 1.6;
   const base = new THREE.Mesh(new THREE.CircleGeometry(0.46, 40), new THREE.MeshBasicMaterial({ color: hdr(0xe02bc0, 1.6), transparent: true, opacity: 0.55, toneMapped: false, depthWrite: false }));

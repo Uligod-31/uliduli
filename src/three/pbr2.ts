@@ -190,7 +190,7 @@ function floors(kind: string): Tex {
     for (let i = 0; i < 6; i++) { let x = r(30, N - 30), y = r(30, N - 30), a = r(0, 6.28); const pts: [number, number][] = [[x, y]]; for (let s = 0; s < 8; s++) { a += r(-0.7, 0.7); x += Math.cos(a) * r(20, 46); y += Math.sin(a) * r(20, 46); pts.push([x, y]); } for (const [g2, col, lw] of [[c, 'rgba(50,30,10,.7)', 2], [h, 'rgba(0,0,0,.85)', 3.5]] as const) { g2.strokeStyle = col; g2.lineWidth = lw; g2.beginPath(); pts.forEach(([px, py], j) => (j ? g2.lineTo(px, py) : g2.moveTo(px, py))); g2.stroke(); } }
     for (let i = 0; i < 420; i++) { c.fillStyle = `rgba(${R() < 0.5 ? '255,236,190' : '100,70,30'},.5)`; c.fillRect(r(6, N - 6), r(6, N - 6), r(1, 2.6), r(1, 2.6)); }
   } else { // obsidiana com fendas de lava
-    c.fillStyle = '#1c1820'; c.fillRect(0, 0, N, N); h.fillStyle = '#d0d0d0'; h.fillRect(0, 0, N, N);
+    c.fillStyle = '#5a4e62'; c.fillRect(0, 0, N, N); h.fillStyle = '#d0d0d0'; h.fillRect(0, 0, N, N);
     c.strokeStyle = '#08060a'; c.lineWidth = 24; c.strokeRect(0, 0, N, N); h.strokeStyle = '#303030'; h.lineWidth = 30; h.strokeRect(0, 0, N, N);
     for (let i = 0; i < 50; i++) blob(c, r(0, N), r(0, N), r(20, 80), R() < 0.5 ? 'rgba(80,60,90,.3)' : 'rgba(0,0,0,.3)');
     glow = true;
@@ -211,11 +211,11 @@ export function wallPBR(kind: string): Tex {
   const hit = cache.get('w' + kind); if (hit) return hit;
   let t: Tex;
   switch (kind) {
-    case 'obsidian': t = blocks({ tones: ['#2a2530', '#221e28', '#332c3a', '#1c1822', '#28222e'], mortar: '#0a080c', rows: 6, seed: 61, cracks: 8, crackCol: '#050407', glow: '#ff6a1a', stain: null }); break;
+    case 'obsidian': t = blocks({ tones: ['#4a3640', '#402e38', '#563f4a', '#352630', '#4c3842'], mortar: '#160c12', rows: 6, seed: 61, cracks: 8, crackCol: '#050407', glow: '#ff6a1a', stain: null }); break;
     case 'ice': t = blocks({ tones: ['#a9cde2', '#9cc4dc', '#b8d8ea', '#8fb8d2', '#a2c8de'], mortar: '#5a86a4', rows: 6, seed: 62, cracks: 7, crackCol: 'rgba(255,255,255,.85)', frost: true, stain: { col: 'rgba(235,248,255,.55)', n: 70 } }); break;
     case 'brass': t = blocks({ tones: ['#a07a34', '#8e6a2a', '#b08a3c', '#7e5e24', '#98762e'], mortar: '#2a1c08', rows: 5, seed: 63, cracks: 5, crackCol: 'rgba(30,18,6,.9)', rivets: true, stain: { col: 'rgba(70,140,110,.5)', n: 60 } }); break;
     case 'shelves': t = shelves(); break;
-    case 'bark': t = blocks({ tones: ['#3a2c1c', '#32261a', '#443222', '#2c2a18', '#3c3420'], mortar: '#100c06', rows: 7, seed: 64, cracks: 8, crackCol: '#0a0805', glow: '#8be060', stain: { col: 'rgba(80,140,50,.6)', n: 110 } }); break;
+    case 'bark': t = blocks({ tones: ['#5e4a32', '#523f2a', '#6c543a', '#483a22', '#604c34'], mortar: '#100c06', rows: 7, seed: 64, cracks: 8, crackCol: '#0a0805', glow: '#8be060', stain: { col: 'rgba(80,140,50,.6)', n: 110 } }); break;
     case 'runes': t = blocks({ tones: ['#363c46', '#2e343e', '#404752', '#2a3039', '#38404a'], mortar: '#0c0f14', rows: 5, seed: 65, cracks: 6, crackCol: '#06080b', runes: '#ff8a30', stain: { col: 'rgba(225,238,250,.4)', n: 60 }, frost: true }); break;
     case 'hiero': t = blocks({ tones: ['#c4a56c', '#b39560', '#cdb078', '#a98b56', '#bd9e66'], mortar: '#3a2a14', rows: 5, seed: 66, cracks: 5, crackCol: '#3a2a14', glyphs: '#2fe6d0', stain: { col: 'rgba(110,72,28,.38)', n: 70 } }); break;
     case 'stone': { const p = stonePBR(); t = { map: p.map, normal: p.normal }; break; }
