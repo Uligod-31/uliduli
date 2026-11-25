@@ -1,6 +1,7 @@
 ﻿import Phaser from 'phaser';
 import { W, H, UI, FONT, FONT_HEAD } from '../core/theme';
 import { neoButton } from '../core/ui';
+import { drawPlate } from '../three/menuArt';
 import { drawLogo } from '../three/menuArt';
 import { sfx } from '../core/audio';
 import { save } from '../core/save';
@@ -16,6 +17,7 @@ export class TitleScene extends Phaser.Scene {
 
   create() {
     this.diving = false;
+    this.cameras.main.fadeIn(220, 5, 6, 11);
 
     // véus para legibilidade sobre o 3D
     const top = this.add.graphics();
@@ -66,7 +68,8 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: sub2, alpha: 0.25, duration: 90, yoyo: true, repeat: -1, repeatDelay: 1700 + Math.random() * 1200 });
     this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 380, 380, 4);
 
-    neoButton(this, W / 2, 1060, 620, 124, 'Jogar', '01', () => this.dive(), true, 52);
+    neoButton(this, 293, 1060, 486, 124, 'Jogar', '01', () => this.dive(), true, 52);
+    this.infoButton(608, 1060, 124);
     neoButton(this, W / 2 - 160, 1178, 300, 88, 'Galeria', '02', () => this.scene.start('Gallery'), false, 30);
     const snd = neoButton(this, W / 2 + 160, 1178, 300, 88, save.mute ? 'Som: off' : 'Som: on', '03', () => {
       sfx.setMute(!save.mute);
@@ -95,6 +98,24 @@ export class TitleScene extends Phaser.Scene {
     window.addEventListener('deviceorientation', tilt);
     warmMenus(this, () => this.scene.isActive() && !this.diving);
     this.events.once('shutdown', () => { stage.onEyeFlash = undefined; window.removeEventListener('deviceorientation', tilt); stage.stop(); });
+  }
+
+  /** Botão quadrado «i»: abre o tutorial. */
+  private infoButton(x: number, y: number, s: number) {
+    const key = `plate_${s}_${s}_0`;
+    if (!this.textures.exists(key)) this.textures.addCanvas(key, drawPlate(s, s, false, 2));
+    const img = this.add.image(0, -22, key).setScale(0.5);
+    const t = this.add.text(0, 2, 'i', { fontFamily: "Georgia,'Times New Roman',serif", fontSize: '84px', color: '#f4f7ff', fontStyle: 'bold italic', stroke: '#05060b', strokeThickness: 7 }).setOrigin(0.5);
+    try { (t as any).postFX?.addGlow(0xff4fd8, 2.5, 0, false, 0.1, 8); } catch { /* sem FX */ }
+    const c = this.add.container(x, y, [img, t]);
+    c.setSize(s, s).setInteractive({ useHandCursor: true });
+    c.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (p.getDistance() > 16 || this.diving) return;
+      sfx.unlock(); sfx.ui();
+      this.tweens.add({ targets: c, scale: 0.93, duration: 60, yoyo: true });
+      this.cameras.main.fadeOut(180, 5, 6, 11);
+      this.time.delayedCall(190, () => this.scene.start('Tutorial'));
+    });
   }
 
   /** Jogar: a câmara mergulha pela pupila e só depois abre os Mundos. */
