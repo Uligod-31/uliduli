@@ -254,30 +254,32 @@ export function makeGuardSpade(): THREE.Group {
   return root;
 }
 
-export function makeRose(accent: number): THREE.Group {
+/** Chama de vela flutuante (o coletável): gota laranja com núcleo creme e halo de brasa. */
+export function makeFlame(_accent: number): THREE.Group {
   const g = new THREE.Group();
-  const petal = new THREE.MeshStandardMaterial({ color: 0xff3f9c, emissive: 0xff2b88, emissiveIntensity: 0.9, roughness: 0.35 });
-  for (let ring = 0; ring < 3; ring++) {
-    const n = 5 - ring;
-    for (let i = 0; i < n; i++) {
-      const p = new THREE.Mesh(new THREE.SphereGeometry(0.1 - ring * 0.018, 14, 10), petal);
-      p.scale.set(1, 0.55, 1.1);
-      const a = (i / n) * Math.PI * 2 + ring;
-      p.position.set(Math.cos(a) * (0.11 - ring * 0.035), 0.05 + ring * 0.05, Math.sin(a) * (0.11 - ring * 0.035));
-      p.rotation.set(0.5, -a, 0);
-      g.add(p);
+  const prof = (k: number) => [[0, 0], [0.06, 0.01], [0.105, 0.07], [0.1, 0.14], [0.065, 0.24], [0.03, 0.33], [0, 0.43]].map(([r, y]) => new THREE.Vector2(r * k * 1.35, y * k * 1.35));
+  const mk = (k: number, lo: number[], hi: number[]) => {
+    const geo = new THREE.LatheGeometry(prof(k), 18);
+    const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const t = Math.min(1, Math.max(0, pos.getY(i) / (0.43 * k * 1.35)));
+      for (let c = 0; c < 3; c++) col[i * 3 + c] = lo[c] + (hi[c] - lo[c]) * t;
     }
-  }
-  const core = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: hdr(0xffd0ec, 2), toneMapped: false }));
-  core.position.y = 0.17;
-  const halo = glowSprite(accent, 0.9, 0.8); halo.position.y = 0.12;
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), new THREE.MeshPhysicalMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.16, roughness: 0.05, clearcoat: 1, depthWrite: false }));
-  dome.position.y = 0.02;
-  g.add(core, halo, dome);
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
+  };
+  const outer = mk(1, [1.15, 0.32, 0.03], [1.3, 0.78, 0.2]);
+  const inner = mk(0.62, [1.5, 1.05, 0.4], [1.7, 1.45, 0.85]);
+  inner.position.y = 0.02;
+  const halo = glowSprite(0xff8a2a, 1.0, 0.9); halo.position.y = 0.17;
+  const body = new THREE.Group();
+  body.add(outer, inner);
+  body.position.y = -0.17;
+  g.add(body, halo);
   g.position.y = 0.45;
   const root = new THREE.Group();
   root.add(g);
-  root.userData = { body: g };
+  root.userData = { body: g, flame: body };
   return root;
 }
 

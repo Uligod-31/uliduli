@@ -62,7 +62,7 @@ export class GameScene extends Phaser.Scene {
     this.trail = [m.start];
     this.rosas = new Set(m.rosas);
 
-    // Espadas: nascem longe do início, nunca em cima de rosas ou da saída
+    // Espadas: nascem longe do início, nunca em cima de chamas ou da saída
     this.guards = []; this.guardPrev = [];
     if (def.guards) {
       const rng = mulberry32(def.seed * 17 + 3);
@@ -203,7 +203,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHud() {
-    this.rosaTxt.setText(`✿ ${this.collected}/${this.m.rosas.length}` + (this.guards.length ? `   ☠ ${this.guards.length}` : ''));
+    this.rosaTxt.setText(`🔥 ${this.collected}/${this.m.rosas.length}` + (this.guards.length ? `   ☠ ${this.guards.length}` : ''));
     this.movesTxt.setText(`Passos ${this.moves}  (par ${this.m.par})`);
     this.pips.clear();
     if (this.m.dyn.length) {
@@ -511,7 +511,7 @@ export class GameScene extends Phaser.Scene {
       root.add(s);
       this.tweens.add({ targets: s, scale: 1, duration: 380, delay: 300 + i * 260, ease: 'Back.Out', onStart: () => { if (i < stars) sfx.collect(); } });
     }
-    root.add(this.add.text(cx, cy - 10, `Passos ${this.moves} (par ${this.m.par})  ·  Rosas ${this.collected}/${this.m.rosas.length}`, { fontFamily: FONT, fontSize: '24px', color: UI.text }).setOrigin(0.5));
+    root.add(this.add.text(cx, cy - 10, `Passos ${this.moves} (par ${this.m.par})  ·  Chamas ${this.collected}/${this.m.rosas.length}`, { fontFamily: FONT, fontSize: '24px', color: UI.text }).setOrigin(0.5));
 
     const nextIdx = this.li + 1, levels = this.wd.levels;
     const hasNext = nextIdx < levels.length && isUnlocked(this.wd, nextIdx, save);

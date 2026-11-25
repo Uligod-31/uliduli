@@ -1,48 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <radialGradient id="bg" cx="0.5" cy="0.52" r="0.78">
+      <stop offset="0" stop-color="#2a2623"/>
+      <stop offset="0.55" stop-color="#15151a"/>
+      <stop offset="1" stop-color="#08090c"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff8a2a" stop-opacity="0.62"/>
+      <stop offset="0.45" stop-color="#ff5a1a" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ff4fd8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fl" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff6a14"/>
+      <stop offset="0.5" stop-color="#ff9a30"/>
+      <stop offset="1" stop-color="#ffe2a0"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ffe9b0"/>
+      <stop offset="1" stop-color="#fffaf0"/>
+    </linearGradient>
+    <linearGradient id="sig" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#3b74f2"/>
       <stop offset="0.55" stop-color="#8a4bea"/>
       <stop offset="1" stop-color="#e02bc0"/>
     </linearGradient>
-    <radialGradient id="bg" cx="0.5" cy="0.45" r="0.75">
-      <stop offset="0" stop-color="#262a33"/>
-      <stop offset="1" stop-color="#0b0c10"/>
-    </radialGradient>
-    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#ff9a3a" stop-opacity="0.55"/>
-      <stop offset="0.5" stop-color="#e02bc0" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#3b74f2" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="fl" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0" stop-color="#ff6a14"/>
-      <stop offset="0.6" stop-color="#ffa63a"/>
-      <stop offset="1" stop-color="#ffe2a0"/>
-    </linearGradient>
-    <linearGradient id="core" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0" stop-color="#ffd27a"/>
-      <stop offset="1" stop-color="#fffbe8"/>
-    </linearGradient>
-    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="8" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <filter id="soft" filterUnits="userSpaceOnUse" x="150" y="740" width="724" height="240"><feGaussianBlur stdDeviation="26"/></filter>
+    <filter id="drop" filterUnits="userSpaceOnUse" x="-80" y="-60" width="260" height="260">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14" result="b"/>
+      <feFlood flood-color="#ff8a2a" flood-opacity="0.75"/>
+      <feComposite in2="b" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <rect width="512" height="512" fill="url(#bg)"/>
-  <path d="M70 120H442M70 120V392M442 120V392M130 120V300H210V180H300V300H382V200M130 392H442M210 300V392M300 300V392"
-        fill="none" stroke="url(#g)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.32"/>
-  <circle cx="256" cy="250" r="230" fill="url(#halo)"/>
-  <path d="M96 512C100 440 160 404 256 404C352 404 412 440 416 512Z" fill="#2b3a52"/>
-  <path d="M190 404C210 424 302 424 322 404L322 430C300 446 212 446 190 430Z" fill="#f2b73c"/>
-  <path d="M312 424C352 424 400 436 430 470C392 462 356 456 322 456Z" fill="#e0a02c"/>
-  <g filter="url(#glow)">
-    <path d="M262 72C286 128 350 176 350 262C350 330 308 380 256 380C204 380 162 330 162 262C162 200 206 160 232 112C240 144 250 150 262 72Z" fill="url(#fl)"/>
-    <path d="M258 168C276 206 312 236 312 278C312 322 288 350 256 350C224 350 200 322 200 278C200 240 232 214 246 184C250 200 254 198 258 168Z" fill="url(#core)" opacity="0.95"/>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="540" r="470" fill="url(#halo)"/>
+  <ellipse cx="512" cy="860" rx="190" ry="26" fill="#ff8a2a" opacity="0.28" filter="url(#soft)"/>
+  <g transform="translate(242 179) scale(5.4)" filter="url(#drop)">
+    <path d="M52 4C58 30 84 48 84 82C84 110 68 126 50 126C32 126 16 110 16 82C16 56 34 42 42 22C45 36 48 34 52 4Z" fill="url(#fl)"/>
+    <path d="M51 50C58 66 72 76 72 92C72 108 62 118 50 118C38 118 28 108 28 92C28 78 42 68 47 58C49 64 50 62 51 50Z" fill="url(#core)"/>
+    <ellipse cx="39" cy="92" rx="5" ry="9" fill="#1a0c05"/>
+    <ellipse cx="62" cy="92" rx="5" ry="9" fill="#1a0c05"/>
+    <ellipse cx="40.4" cy="88.5" rx="1.5" ry="2.4" fill="#fff" opacity="0.85"/>
+    <ellipse cx="63.4" cy="88.5" rx="1.5" ry="2.4" fill="#fff" opacity="0.85"/>
   </g>
-  <ellipse cx="256" cy="384" rx="46" ry="12" fill="#3a6bff" opacity="0.85"/>
-  <ellipse cx="224" cy="282" rx="14" ry="25" fill="#1a0c05"/>
-  <ellipse cx="288" cy="282" rx="14" ry="25" fill="#1a0c05"/>
-  <circle cx="229" cy="272" r="4" fill="#fff"/>
-  <circle cx="293" cy="272" r="4" fill="#fff"/>
-  <rect x="10" y="10" width="492" height="492" fill="none" stroke="url(#g)" stroke-width="6" opacity="0.9"/>
+  <rect x="14" y="14" width="996" height="996" fill="none" stroke="url(#sig)" stroke-width="8" opacity="0.85"/>
 </svg>

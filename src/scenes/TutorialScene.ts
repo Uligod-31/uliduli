@@ -155,11 +155,19 @@ export class TutorialScene extends Phaser.Scene {
     return g;
   }
 
+  /** Chama de vela (o coletável): gota laranja com núcleo creme, a tremeluzir. */
   private rose(root: Root, x: number, y: number, cs: number) {
-    const t = this.add.text(x, y, '✿', { fontFamily: FONT, fontSize: `${Math.round(cs * 0.78)}px`, color: '#ff7ac8', stroke: '#05060b', strokeThickness: 4 }).setOrigin(0.5);
-    root.add(t);
-    this.anim.push(this.tweens.add({ targets: t, scale: 1.18, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' }));
-    return t;
+    const c = this.add.container(x, y + cs * 0.3);
+    const prof: Pt[] = [[0, 0], [0.06, 0.01], [0.105, 0.07], [0.1, 0.14], [0.065, 0.24], [0.03, 0.33], [0, 0.43]];
+    const poly = (k: number) => [...prof.map(([r, h]) => new Phaser.Math.Vector2(r * k, -h * k)), ...prof.slice(0, -1).reverse().map(([r, h]) => new Phaser.Math.Vector2(-r * k, -h * k))];
+    const g = this.add.graphics();
+    g.fillStyle(0xff8a2a, 0.22); g.fillCircle(0, -cs * 0.55, cs * 0.62);
+    g.fillStyle(0xff7a1a, 1); g.fillPoints(poly(cs * 2.1), true);
+    g.fillStyle(0xffc457, 1); g.fillPoints(poly(cs * 1.6), true);
+    g.fillStyle(0xfff1c4, 1); g.fillPoints(poly(cs * 1.2), true);
+    c.add(g); root.add(c);
+    this.anim.push(this.tweens.add({ targets: c, scaleY: 1.14, scaleX: 0.94, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.InOut' }));
+    return c;
   }
 
   private guard(root: Root, x: number, y: number, cs: number) {
@@ -283,21 +291,21 @@ export class TutorialScene extends Phaser.Scene {
         },
       },
       {
-        title: 'Rosas',
-        body: 'As rosas ✿ estão escondidas pelo labirinto. Ao apanhares uma, a personagem pára um instante, e ela conta para as tuas estrelas.\nO contador ✿ no topo diz quantas já tens.',
+        title: 'Chamas',
+        body: 'As chamas 🔥 estão escondidas pelo labirinto. Ao apanhares uma, a personagem pára um instante, e ela conta para as tuas estrelas.\nO contador 🔥 no topo diz quantas já tens.',
         draw: (root) => {
           const mp = this.map(root, ox, oy, CS, MAP_A);
           this.portal(root, mp.cx(7), mp.cy(5), CS);
           const spots: { i: number; p: Pt }[] = [{ i: 4, p: [3, 3] }, { i: 8, p: [5, 1] }, { i: 12, p: [7, 3] }];
           const roses = spots.map((s) => this.rose(root, mp.cx(s.p[0]), mp.cy(s.p[1]), CS));
-          const plus = this.add.text(0, 0, '+1 ✿', { fontFamily: FONT_HEAD, fontSize: '34px', color: '#ffb0e0', stroke: '#05060b', strokeThickness: 6 }).setOrigin(0.5).setAlpha(0);
+          const plus = this.add.text(0, 0, '+1 🔥', { fontFamily: FONT_HEAD, fontSize: '34px', color: '#ffb0e0', stroke: '#05060b', strokeThickness: 6 }).setOrigin(0.5).setAlpha(0);
           const hud = this.add.text(PX + 34, PY + 30, '', { fontFamily: FONT, fontSize: '30px', color: '#ff9ecb', fontStyle: 'bold' });
           root.add([plus, hud]);
           let last = -1;
           this.walk(root, mp, ROUTE, 6400, false, (t) => {
             let got = 0;
             spots.forEach((s, k) => { const on = t < s.i; roses[k].setVisible(on); if (!on) got++; });
-            hud.setText(`✿ ${got}/3`);
+            hud.setText(`🔥 ${got}/3`);
             if (got !== last && got > 0) {
               const s = spots[got - 1]; plus.setPosition(mp.cx(s.p[0]), mp.cy(s.p[1]) - 30).setAlpha(1);
               this.tweens.add({ targets: plus, y: plus.y - 40, alpha: 0, duration: 800 });
@@ -308,9 +316,9 @@ export class TutorialScene extends Phaser.Scene {
       },
       {
         title: 'As estrelas',
-        body: 'Cada nível dá até 3 estrelas. O «par» aparece no topo, ao lado dos teus passos.\nÉ sempre possível fazer as 3 estrelas: o par já conta com as rosas.',
+        body: 'Cada nível dá até 3 estrelas. O «par» aparece no topo, ao lado dos teus passos.\nÉ sempre possível fazer as 3 estrelas: o par já conta com as chamas.',
         draw: (root) => {
-          const rows: [number, string][] = [[1, 'Chegar à saída'], [2, 'Apanhar todas as rosas ✿'], [3, 'Chegar dentro do par']];
+          const rows: [number, string][] = [[1, 'Chegar à saída'], [2, 'Apanhar todas as chamas 🔥'], [3, 'Chegar dentro do par']];
           rows.forEach(([n, label], r) => {
             const y = PY + 90 + r * 135;
             for (let i = 0; i < 3; i++) {
@@ -325,7 +333,7 @@ export class TutorialScene extends Phaser.Scene {
           const hud = this.add.graphics(); root.add(hud);
           hud.fillStyle(0x1e2025, 1); hud.fillRoundedRect(W / 2 - 250, PY + PH - 78, 500, 54, 16);
           hud.lineStyle(2, UI.blue, 0.6); hud.strokeRoundedRect(W / 2 - 250, PY + PH - 78, 500, 54, 16);
-          root.add(this.add.text(W / 2 - 220, PY + PH - 51, '✿ 3/3', { fontFamily: FONT, fontSize: '26px', color: '#ff9ecb', fontStyle: 'bold' }).setOrigin(0, 0.5));
+          root.add(this.add.text(W / 2 - 220, PY + PH - 51, '🔥 3/3', { fontFamily: FONT, fontSize: '26px', color: '#ff9ecb', fontStyle: 'bold' }).setOrigin(0, 0.5));
           root.add(this.add.text(W / 2 + 220, PY + PH - 51, 'Passos 14  (par 16)', { fontFamily: FONT, fontSize: '26px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(1, 0.5));
         },
       },
@@ -477,7 +485,7 @@ export class TutorialScene extends Phaser.Scene {
       },
       {
         title: 'Dicas',
-        body: '• Usa ◎ para ver o mapa todo antes de arriscares.\n• Rosas primeiro, saída depois: o par já conta com elas.\n• Com guardas por perto, gasta um vagalume e passa.\n• Preso? «Reiniciar» não custa nada.',
+        body: '• Usa ◎ para ver o mapa todo antes de arriscares.\n• Chamas primeiro, saída depois: o par já conta com elas.\n• Com guardas por perto, gasta um vagalume e passa.\n• Preso? «Reiniciar» não custa nada.',
         draw: (root) => {
           const cx = W / 2, cy = PY + PH / 2;
           const g = this.add.graphics({ x: cx, y: cy }); root.add(g);

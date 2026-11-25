@@ -8,7 +8,7 @@ import { Maze } from '../core/maze';
 import { WorldDef } from '../worlds';
 import { buildIsland, Island } from './island';
 import { Scenery, themeFor } from './scenery';
-import { makeRose, makePortal, Trail } from './actors';
+import { makeFlame, makePortal, Trail } from './actors';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
 import { makeTitleGiant, TitleGiant } from './titlegiant';
 import { EyeTitle } from './eye';
@@ -189,7 +189,7 @@ export class Stage {
     this.tintPortal(this.planet);
     const accent = pal.accent;
     for (const ri of m.rosas) {
-      const r = makeRose(accent);
+      const r = makeFlame(accent);
       r.position.copy(this.island.cellPos(ri));
       this.scene.add(r); this.roses.set(ri, r);
     }
@@ -314,7 +314,7 @@ export class Stage {
     const r = this.roses.get(idx);
     if (!r) return;
     this.roses.delete(idx);
-    this.burst(r.position.x, r.position.z, [0xff3f9c, 0xff9ecb, 0xffffff]);
+    this.burst(r.position.x, r.position.z, [0xff8a2a, 0xffc457, 0xffffff]);
     this.scene.remove(r); disposeTree(r);
   }
 
@@ -593,6 +593,8 @@ export class Stage {
     for (const [i, r] of this.roses) {
       const b = r.userData.body as THREE.Group;
       b.rotation.y += dt * 1.3; b.position.y = 0.45 + Math.sin(this.t * 2 + i) * 0.07;
+      const fl = r.userData.flame as THREE.Group | undefined;
+      if (fl) fl.scale.set(1 + 0.07 * Math.sin(this.t * 11 + i * 2), 1 + 0.12 * Math.sin(this.t * 8.3 + i) + 0.05 * Math.sin(this.t * 17 + i), 1 + 0.07 * Math.cos(this.t * 9 + i));
     }
     const rings = this.portal.userData.rings as THREE.Mesh[];
     rings.forEach((r, k) => { r.rotation.x += dt * (0.9 + k * 0.5); r.rotation.y += dt * (1.3 - k * 0.4); });

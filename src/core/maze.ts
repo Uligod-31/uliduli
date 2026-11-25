@@ -68,7 +68,7 @@ function permutations(a: number[]): number[][] {
   return r;
 }
 
-/** Menor nº de passos para apanhar todas as rosas e acabar na saída (só passagens fixas, sem passar pela saída antes do fim). */
+/** Menor nº de passos para apanhar todas as chamas e acabar na saída (só passagens fixas, sem passar pela saída antes do fim). */
 export function bestTour(m: Maze): number {
   const pts = [m.start, ...m.rosas];
   const D = pts.map((p) => distAvoid(m, p, m.exit));

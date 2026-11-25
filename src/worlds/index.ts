@@ -56,11 +56,11 @@ const lv = (title: string, cols: number, rows: number, mask: MaskKind, seed: num
 
 // ───────────────────────── Mundo 0: Asteroide B-612 ─────────────────────────
 // Pequenos planetas à deriva, no espírito do pequeno príncipe, vistos por um pesadelo:
-// adultos altos demais, uma rosa sob vidro e uma raposa que sabe mais do que diz.
+// adultos altos demais, uma chama sob vidro e uma raposa que sabe mais do que diz.
 const b612: WorldDef = {
   id: 'b612',
   name: 'Asteroide B-612',
-  tagline: 'Planetas do tamanho de uma casa, uma rosa sob vidro e adultos demasiado altos.',
+  tagline: 'Planetas do tamanho de uma casa, uma chama sob vidro e adultos demasiado altos.',
   rule: 'Os Crescidos caçam-te. Foge-lhes de lado.',
   pal: mkPal(0x0a1012, 0x6e6452, 0x34452f, 0xf0b44a),
   ready: true,
@@ -73,7 +73,7 @@ const b612: WorldDef = {
         { who: 'raposa', text: 'Pequeno. Estás longe de casa. Toda a gente está.' },
         { who: 'uli', text: '...' },
         { who: 'raposa', text: 'Cativa o caminho e ele cativa-te. Dá um passo, depois outro. Aqui um toque é um passo, segurar é correr.' },
-        { who: 'raposa', text: 'As rosas sob vidro são tuas. Apanha-as, ninguém mais as quer.' },
+        { who: 'raposa', text: 'As chamas sob vidro são tuas. Apanha-as, ninguém mais as quer.' },
       ],
       outro: [{ who: 'raposa', text: 'O essencial é invisível aos olhos. O resto são paredes.' }],
     },
@@ -127,11 +127,11 @@ const b612: WorldDef = {
       { who: 'acendedor', text: 'Este planeta ninguém visita. Os Crescidos esqueceram-se dele.' },
       { who: 'raposa', text: 'Esqueceram-se do planeta, não de ti. Cuidado com o escuro.' },
     ]),
-    lv('A Rosa Sob o Vidro', 13, 15, 'circle', 6162, { dyn: 8, shift: 6, loops: 0.09, fog: 4, guards: 3, bonus: true }, [
+    lv('A Chama Sob o Vidro', 13, 15, 'circle', 6162, { dyn: 8, shift: 6, loops: 0.09, fog: 4, guards: 3, bonus: true }, [
       { who: 'raposa', text: 'Só chega aqui quem apanhou todas as estrelas. O Pequeno Príncipe teria orgulho.' },
-      { who: 'uli', text: 'Quero a minha rosa.' },
+      { who: 'uli', text: 'Quero a minha chama.' },
       { who: 'raposa', text: 'Então cativa-a. Três Crescidos, névoa e sebes que mentem. Boa sorte.' },
-    ], [{ who: 'raposa', text: 'És o único que cativou a rosa sem a apanhar. Isso sim é magia.' }]),
+    ], [{ who: 'raposa', text: 'És o único que cativou a chama sem a apanhar. Isso sim é magia.' }]),
   ],
 };
 
@@ -153,7 +153,7 @@ const jardim: WorldDef = {
         { who: 'pimpa', text: 'Estás atrasado. Eu também. A diferença é que eu não peço desculpa a ninguém.' },
         { who: 'pimpa', text: 'Bem-vindo ao Jardim Sebe. Aqui as sebes têm opinião, e não é boa.' },
         { who: 'uli', text: 'Só quero a saída. Sem conversa.' },
-        { who: 'pimpa', text: 'Gosto de ti. Usa o joystick, um toque é um passo, segura para arrancar. Rosas? Apanha-as. Ou não. Ninguém te manda.' },
+        { who: 'pimpa', text: 'Gosto de ti. Usa o joystick, um toque é um passo, segura para arrancar. Chamas? Apanha-as. Ou não. Ninguém te manda.' },
       ],
       outro: [{ who: 'pimpa', text: 'Hm. Nada mau para um principiante. Não te habitues.' }],
     },
