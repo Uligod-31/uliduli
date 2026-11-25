@@ -42,7 +42,7 @@ export interface WorldDef {
   levels: LevelDef[];
   weather?: Weather; // clima base do mundo
   planet?: boolean; // visual de asteroide (Pequenos Pesadelos)
-  guardStyle?: number; // aspeto dos guardas (0-2 Crescidos, 3 Carcereiro, 4 Sentinela de gelo, 5 Autómato, 6 Livro vivo, 7 Espírito de Raiz, 8 Draugr, 9 Guarda de Anúbis)
+  guardStyle?: number; // aspeto dos guardas (0-2 Crescidos, 3 Carcereiro, 4 Sentinela de gelo, 5 Autómato, 6 Livro vivo, 7 Espírito de Raiz, 8 Draugr, 9 Guarda de Anúbis, 10-17 guardas dos mundos novos)
   look?: { wall: string; floor: string; decor: string }; // texturas e adereços do mundo
 }
 
@@ -425,6 +425,159 @@ const egipto: WorldDef = {
   ],
 };
 
+// ───────────────────────── Mundos 10-17 ─────────────────────────
+const mandala: WorldDef = {
+  id: 'mandala', name: 'Mandala Solar',
+  tagline: "Anéis de luz que giram devagar, sem pressa e sem piedade.",
+  rule: "Os anéis rodam e abrem as portas ao ritmo do sol. Os Monges de Luz seguem-te.",
+  pal: mkPal(0x2a1608, 0xffe2a8, 0xd9822b, 0xffd24a), ready: true, guardStyle: 10, weather: 'dust',
+  look: { wall: 'mandala', floor: 'mosaic', decor: 'mandala' },
+  preview: { mask: 'circle', cols: 9, rows: 9, seed: 3 },
+  levels: [
+    lv('Pétala Inicial', 7, 9, 'rect', 901, {  }, [{ who: 'mestra', text: 'Uma chama pequena a entrar no meu círculo. Bem-vinda ao centro de tudo.' }, { who: 'uli', text: 'Só quero atravessar.' }, { who: 'mestra', text: 'Todos atravessam. Poucos chegam ao centro.' }]),
+    lv('Jardim dos Anéis', 8, 10, 'rect', 902, { dyn: 3, loops: 0.05 }, [{ who: 'mestra', text: 'Os anéis giram sem pressa. Aprende o compasso e as portas abrem-se.' }]),
+    lv('Templo dos Sinos', 9, 12, 'diamond', 5948, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'mestra', text: 'Os Monges de Luz meditam em movimento: três passos teus, um passo deles. Cheiram-te a quatro casas.' }]),
+    lv('Névoa de Incenso', 9, 12, 'rect', 1913, { dyn: 4, shift: 7, loops: 0.07, fog: 3.6, guards: 1, weather: 'mist' }, [{ who: 'mestra', text: 'O incenso esconde o caminho. Confia na tua própria luz.' }]),
+    lv('Salão do Ouro', 10, 13, 'rect', 5950, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'mestra', text: 'Cada espelho de ouro mostra um caminho. Só um é verdadeiro.' }]),
+    lv('Roda do Sol', 11, 14, 'cross', 4942, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'mestra', text: 'A roda do sol não pára. Corre com ela, pequena chama.' }]),
+    lv('Santuário da Luz', 12, 15, 'rect', 5952, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'mestra', text: 'O santuário. Aqui até a luz tem de pedir licença.' }, { who: 'uli', text: 'Eu não peço.' }, { who: 'mestra', text: 'Por isso és interessante.' }]),
+    lv('A Mandala Perfeita', 14, 17, 'circle', 8980, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [{ who: 'mestra', text: 'Todas as estrelas. A mandala só se completa com quem a percorre.' }, { who: 'uli', text: 'E depois?' }, { who: 'mestra', text: 'Depois começa outra.' }], [{ who: 'mestra', text: "Leva um anel de luz. Para a próxima mandala que não souberes terminar." }]),
+  ],
+};
+
+const tinta: WorldDef = {
+  id: 'tinta', name: 'Oceano de Tinta',
+  tagline: "Nadas às cegas: só a tinta revela o caminho.",
+  rule: "A corrente levanta e baixa as paredes. As Lulas de Tinta seguem-te.",
+  pal: mkPal(0x06162e, 0x9fd3ff, 0x1d4f9c, 0x44e0ff), ready: true, guardStyle: 11, weather: 'mist',
+  look: { wall: 'ink', floor: 'wet', decor: 'ink' },
+  preview: { mask: 'diamond', cols: 9, rows: 9, seed: 5 },
+  levels: [
+    lv('Maré Baixa', 7, 9, 'rect', 911, {  }, [{ who: 'polvo', text: 'Uma luz no meu oceano! Cuidado, pinga! Estou a meio de uma frase.' }, { who: 'uli', text: 'Quem és tu?' }, { who: 'polvo', text: 'O escritor. Oito braços, nenhum rascunho.' }]),
+    lv('Recife de Páginas', 8, 10, 'rect', 912, { dyn: 3, loops: 0.05 }, [{ who: 'polvo', text: 'As paredes sobem e descem com a corrente. É a minha pontuação.' }]),
+    lv('Gruta das Medusas', 9, 12, 'diamond', 2931, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'polvo', text: 'As minhas Lulas de Tinta nadam de três em três passos teus e cheiram-te a quatro casas.' }]),
+    lv('Corrente Negra', 9, 12, 'rect', 914, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1 }, [{ who: 'polvo', text: 'A corrente negra apaga tudo. Até as minhas ideias.' }]),
+    lv('Biblioteca Afundada', 10, 13, 'rect', 3942, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'polvo', text: 'Estes livros já não se secam. Mas ainda se lêem.' }]),
+    lv('Abismo de Tinta', 11, 14, 'cross', 3943, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'polvo', text: 'Lá em baixo, até a escuridão tem medo do escuro.' }]),
+    lv('Coração do Polvo', 12, 15, 'rect', 9998, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'polvo', text: 'Estás no meu coração. Bate três vezes por capítulo.' }]),
+    lv('O Grande Tinteiro', 14, 17, 'diamond', 9999, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [{ who: 'polvo', text: 'Todas as estrelas. O tinteiro é teu. Escreve o que quiseres.' }, { who: 'uli', text: 'Escrevo uma saída.' }, { who: 'polvo', text: 'Boa primeira linha.' }], [{ who: 'polvo', text: "Leva uma gota de tinta. Nunca se sabe quando falta uma palavra." }]),
+  ],
+};
+
+const neon: WorldDef = {
+  id: 'neon', name: 'Neon Glitch',
+  tagline: "Uma cidade que se reescreve a cada passo errado.",
+  rule: "As paredes reescrevem-se ao ritmo da cidade. Os Glitch seguem-te.",
+  pal: mkPal(0x0b0714, 0x1b1530, 0x27d3ff, 0xff2bd6), ready: true, guardStyle: 12, weather: 'rain',
+  look: { wall: 'circuit', floor: 'grid', decor: 'neon' },
+  preview: { mask: 'cross', cols: 9, rows: 9, seed: 8 },
+  levels: [
+    lv('Beco do Pixel', 7, 9, 'rect', 921, {  }, [{ who: 'glitch', text: 'ERRO: utilizador inesperado. A reiniciar boas-vindas... bem-vindo.' }, { who: 'uli', text: 'És uma máquina?' }, { who: 'glitch', text: 'Sou a cidade. Tu és o bug.' }]),
+    lv('Rua dos Sinais', 8, 10, 'rect', 922, { dyn: 3, loops: 0.05 }, [{ who: 'glitch', text: 'Os semáforos reescrevem as paredes. Verde, vermelho, labirinto.' }]),
+    lv('Metro Corrompido', 9, 12, 'diamond', 1932, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'glitch', text: 'Os meus Glitch patrulham de três em três passos teus e farejam-te a quatro casas.' }]),
+    lv('Chuva Ácida', 9, 12, 'rect', 5969, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1, weather: 'rain' }, [{ who: 'glitch', text: 'Chove código. Não abras a boca.' }]),
+    lv('Servidor 404', 10, 13, 'rect', 1934, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'glitch', text: 'Este corredor não foi encontrado. Tu também não devias ter sido.' }]),
+    lv('Arranha-Céus', 11, 14, 'cross', 8998, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'glitch', text: 'Cem andares de anúncios. Nenhum é para ti.' }]),
+    lv('Núcleo da IA', 12, 15, 'rect', 12026, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'glitch', text: 'O meu núcleo. Aqui dentro tudo é verdade. Menos eu.' }]),
+    lv('Reboot', 14, 17, 'cross', 2946, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [{ who: 'glitch', text: 'Todas as estrelas. Vou reiniciar-me por tua causa.' }, { who: 'uli', text: 'Obrigado.' }, { who: 'glitch', text: 'Não agradeças. Ainda vou lembrar-me de ti.' }], [{ who: 'glitch', text: "Leva este fragmento de código. Se me esqueceres, ele lembra-te." }]),
+  ],
+};
+
+const galactico: WorldDef = {
+  id: 'galactico', name: 'Intergaláctico',
+  tagline: "Estações perdidas entre nebulosas e buracos negros.",
+  rule: "As escotilhas abrem e fecham com o pulsar da estação. Os Alienígenas seguem-te.",
+  pal: mkPal(0x070a1f, 0x1a1f4a, 0x5a3fd6, 0x39f2d0), ready: true, guardStyle: 13, weather: 'dust',
+  look: { wall: 'hull', floor: 'deck', decor: 'space' },
+  preview: { mask: 'ring', cols: 9, rows: 9, seed: 10 },
+  levels: [
+    lv('Doca de Partida', 7, 9, 'rect', 931, {  }, [{ who: 'comandante', text: 'Terráqueo! Não. Chama. Uma chama a bordo da minha estação. Fascinante.' }, { who: 'uli', text: 'Procuro a saída.' }, { who: 'comandante', text: 'Aqui, a saída é sempre outra estação.' }]),
+    lv('Corredor de Gravidade', 8, 10, 'rect', 932, { dyn: 3, loops: 0.05 }, [{ who: 'comandante', text: 'As escotilhas obedecem ao pulsar da estação. Conta as batidas.' }]),
+    lv('Estufa Orbital', 9, 12, 'diamond', 13041, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'comandante', text: 'Os meus Alienígenas deslizam de três em três passos teus e cheiram-te a quatro casas.' }]),
+    lv('Tempestade Solar', 9, 12, 'rect', 17078, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1 }, [{ who: 'comandante', text: 'Radiação a bombordo. Mantém a luz baixa.' }]),
+    lv('Sala de Máquinas', 10, 13, 'rect', 17079, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'comandante', text: 'Os motores cantam em frequências que não gostas.' }]),
+    lv('Nebulosa Roxa', 11, 14, 'cross', 9008, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'comandante', text: 'Aqui nascem estrelas. E desaparecem sondas.' }]),
+    lv('Ponte de Comando', 12, 15, 'rect', 26162, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'comandante', text: 'A minha ponte. Podes sentar-te no leme. Ou tentar.' }]),
+    lv('Buraco Negro', 14, 17, 'ring', 31208, { dyn: 7, shift: 5, loops: 0.12, fog: 3.2, guards: 3, bonus: true }, [{ who: 'comandante', text: 'Todas as estrelas. Nem a luz foge do buraco negro. Tu és a exceção.' }], [{ who: 'comandante', text: "Leva este mapa de estrelas. Mostra onde ainda há luz." }]),
+  ],
+};
+
+const estelar: WorldDef = {
+  id: 'estelar', name: 'Estelar',
+  tagline: "Constelações que se desenham enquanto andas.",
+  rule: "Ligas estrelas para abrir o caminho: as portas seguem o céu. As Sentinelas Estelares seguem-te.",
+  pal: mkPal(0x070d24, 0x16224f, 0xc8a34a, 0xffe08a), ready: true, guardStyle: 14, weather: 'fireflies',
+  look: { wall: 'astral', floor: 'chart', decor: 'stars' },
+  preview: { mask: 'ring', cols: 9, rows: 9, seed: 13 },
+  levels: [
+    lv('Observatório Velho', 7, 9, 'rect', 941, {  }, [{ who: 'cartografa', text: 'Uma estrela que anda! Fica quieta um instante. Preciso de te marcar no mapa.' }, { who: 'uli', text: 'Estou com pressa.' }, { who: 'cartografa', text: 'As estrelas também. E ainda aqui estão.' }]),
+    lv('Mapa de Cassiopeia', 8, 10, 'rect', 942, { dyn: 3, loops: 0.05 }, [{ who: 'cartografa', text: 'As portas seguem as constelações. Quando o céu muda, o caminho muda.' }]),
+    lv('Cometa Perdido', 9, 12, 'diamond', 9015, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'cartografa', text: 'As Sentinelas Estelares cintilam de três em três passos teus e farejam-te a quatro casas.' }]),
+    lv('Eclipse', 9, 12, 'rect', 16079, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1 }, [{ who: 'cartografa', text: 'Um eclipse. Durante o escuro, só se vê quem brilha.' }]),
+    lv('Roda dos Signos', 10, 13, 'rect', 19107, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'cartografa', text: 'Doze signos, doze portas. Nenhum diz a verdade ao primeiro olhar.' }]),
+    lv('Via Láctea', 11, 14, 'cross', 946, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'cartografa', text: 'A estrada de leite do céu. Mas ninguém a pavimentou para pés.' }]),
+    lv('Trono das Constelações', 12, 15, 'rect', 15073, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'cartografa', text: 'O trono onde se sentam as constelações. Hoje está vago. Convém não o aquecer.' }]),
+    lv('Big Bang', 14, 17, 'ring', 17092, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 3, bonus: true }, [{ who: 'cartografa', text: 'Todas as estrelas. O mapa completo é o princípio de tudo.' }, { who: 'uli', text: 'E a saída?' }, { who: 'cartografa', text: 'É o início de outro mapa.' }], [{ who: 'cartografa', text: "Leva esta estrela de bolso. Desenha o teu próprio céu." }]),
+  ],
+};
+
+const angelico: WorldDef = {
+  id: 'angelico', name: 'Céu Angélico',
+  tagline: "Nuvens, harpas e escadas de luz.",
+  rule: "As nuvens sustentam-te só por instantes: as paredes dissolvem e voltam. Os Anjos Caídos seguem-te.",
+  pal: mkPal(0x1b2440, 0xfff7e0, 0xc9b6ff, 0xffd86b), ready: true, guardStyle: 15, weather: 'snow',
+  look: { wall: 'cloud', floor: 'pearl', decor: 'angel' },
+  preview: { mask: 'circle', cols: 9, rows: 9, seed: 16 },
+  levels: [
+    lv('Portão de Nuvem', 7, 9, 'rect', 951, {  }, [{ who: 'serafim', text: 'Uma chama no céu! Ninguém sobe com fogo. Deves ser ou muito corajosa ou muito perdida.' }, { who: 'uli', text: 'As duas.' }, { who: 'serafim', text: 'Então entra.' }]),
+    lv('Jardim das Harpas', 8, 10, 'rect', 952, { dyn: 3, loops: 0.05 }, [{ who: 'serafim', text: 'As nuvens dissolvem-se e voltam ao som das harpas. Escuta.' }]),
+    lv('Escada de Luz', 9, 12, 'diamond', 12052, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'serafim', text: 'Os Anjos Caídos descem de três em três passos teus e cheiram-te a quatro casas.' }]),
+    lv('Nevoeiro Dourado', 9, 12, 'rect', 4990, { dyn: 4, shift: 7, loops: 0.07, fog: 3.6, guards: 1 }, [{ who: 'serafim', text: 'A bruma dourada esconde o caminho. Segue o brilho que não é teu.' }]),
+    lv('Coro Celestial', 10, 13, 'rect', 8018, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'serafim', text: 'O coro canta uma nota só. Quando muda, o caminho muda.' }]),
+    lv('Ponte Arco-Íris', 11, 14, 'cross', 1965, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'serafim', text: 'Sete cores, sete degraus. Só se atravessa por cima dos medos.' }]),
+    lv('Trono Celeste', 12, 15, 'rect', 10038, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'serafim', text: 'O trono celeste. Só se senta quem não quer sentar-se.' }]),
+    lv('Paraíso', 14, 17, 'circle', 9030, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [{ who: 'serafim', text: 'Todas as estrelas. O paraíso também tem labirinto. Chama-se saudade.' }], [{ who: 'serafim', text: "Vai, chama. O céu ficará um pouco mais quente por tua causa." }]),
+  ],
+};
+
+const animal: WorldDef = {
+  id: 'animal', name: 'Reino Animal',
+  tagline: "Savana, selva e quintal: cada bicho tem o seu caminho.",
+  rule: "Os portões de bambu abrem ao ritmo da manada. Os Leões seguem-te.",
+  pal: mkPal(0x1c1408, 0xf3e0a8, 0x8a6a2b, 0x7be08f), ready: true, guardStyle: 16, weather: 'dust',
+  look: { wall: 'jungle', floor: 'savanna', decor: 'animal' },
+  preview: { mask: 'rect', cols: 9, rows: 9, seed: 18 },
+  levels: [
+    lv('Clareira', 7, 9, 'rect', 961, {  }, [{ who: 'leao', text: 'Um fogo pequeno no meu reino. Há quanto tempo não via luz que andasse.' }, { who: 'uli', text: 'És o rei?' }, { who: 'leao', text: 'Já fui. Agora sou apenas o mais velho.' }]),
+    lv('Poço de Água', 8, 10, 'rect', 962, { dyn: 3, loops: 0.05 }, [{ who: 'leao', text: 'Os portões de bambu abrem com a manada. Segue o ritmo dos passos.' }]),
+    lv('Termiteiro', 9, 12, 'diamond', 1972, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'leao', text: 'As minhas leoas andam de três em três passos teus e cheiram-te a quatro casas.' }]),
+    lv('Selva Densa', 9, 12, 'rect', 10045, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1 }, [{ who: 'leao', text: 'Na selva, tudo te vê. Poucos te avisam.' }]),
+    lv('Planície dos Gnus', 10, 13, 'rect', 1974, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'leao', text: 'Mil gnus a correr. Não te metas no meio.' }]),
+    lv('Pântano', 11, 14, 'cross', 966, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2, weather: 'mist' }, [{ who: 'leao', text: 'O pântano guarda segredos. E crocodilos.' }]),
+    lv('Toca do Leão', 12, 15, 'rect', 967, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'leao', text: 'A minha toca. Cheira a história e a ossos.' }]),
+    lv('A Grande Migração', 14, 17, 'rect', 7022, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [{ who: 'leao', text: 'Todas as estrelas. Mereces a minha juba. Guarda-a bem.' }], [{ who: 'leao', text: "Vai, pequena chama. A savana vai falar de ti ao pôr do sol." }]),
+  ],
+};
+
+const rockstar: WorldDef = {
+  id: 'rockstar', name: 'Palco Rockstar',
+  tagline: "Amplificadores, luzes e um solo de guitarra a abrir portas.",
+  rule: "O ritmo abre e fecha as paredes. Os Seguranças seguem-te.",
+  pal: mkPal(0x0a0a0f, 0x1a1a22, 0xff2b8a, 0xffe14a), ready: true, guardStyle: 17, weather: 'embers',
+  look: { wall: 'amp', floor: 'stage', decor: 'rock' },
+  preview: { mask: 'heart', cols: 9, rows: 9, seed: 19 },
+  levels: [
+    lv('Bastidores', 7, 9, 'rect', 971, {  }, [{ who: 'lenda', text: 'Ei, uma chama! Perfeito para o espetáculo. Entras já no encore.' }, { who: 'uli', text: 'Que espetáculo?' }, { who: 'lenda', text: 'O meu último. Dura para sempre.' }]),
+    lv('Passagem de Som', 8, 10, 'rect', 972, { dyn: 3, loops: 0.05 }, [{ who: 'lenda', text: 'Cada riff abre uma porta. Cada pausa fecha-a. Toca ao ritmo.' }]),
+    lv('Camarins', 9, 12, 'diamond', 973, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'lenda', text: 'Os meus Seguranças andam de três em três passos teus e cheiram-te a quatro casas. Têm óculos escuros. Não os provoques.' }]),
+    lv('Fumo e Strobes', 9, 12, 'rect', 5010, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1 }, [{ who: 'lenda', text: 'Fumo e luzes a piscar. Não vês nada? É o espetáculo.' }]),
+    lv('Pit da Multidão', 10, 13, 'rect', 1984, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'lenda', text: 'Dez mil pessoas a gritar o teu nome. Mesmo que não saibam qual é.' }]),
+    lv('Truss Suspenso', 11, 14, 'cross', 976, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'lenda', text: 'Lá em cima, nos holofotes. Cuidado: queimam.' }]),
+    lv('Palco Principal', 12, 15, 'rect', 7031, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'lenda', text: 'O palco principal. Dá o teu melhor solo.' }]),
+    lv('Encore', 14, 17, 'heart', 2996, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 4, bonus: true }, [{ who: 'lenda', text: 'Todas as estrelas. O público pede mais uma. Tu és a música.' }], [{ who: 'lenda', text: "Fica com a palheta. O resto do concerto é teu." }]),
+  ],
+};
+
 // ───────────────────── Próximos mundos (em desenvolvimento) ─────────────────────
 export const WORLDS: WorldDef[] = [
   egipto,
@@ -436,17 +589,17 @@ export const WORLDS: WorldDef[] = [
   biblioteca,
   elfico,
   viking,
-  soon('mandala', 'Mandala Solar', 'Anéis de luz que giram devagar, sem pressa e sem piedade.', 'Os anéis rodam: sincroniza as aberturas.', mkPal(0x2a1608, 0xffe2a8, 0xd9822b, 0xffd24a), 'circle', 3),
-  soon('tinta', 'Oceano de Tinta', 'Nadas às cegas: só a tinta revela o caminho.', 'As paredes só aparecem quando lá tocas.', mkPal(0x06162e, 0x9fd3ff, 0x1d4f9c, 0x44e0ff), 'diamond', 5),
-  soon('neon', 'Neon Glitch', 'Uma cidade que se reescreve a cada passo errado.', 'Certas casas reescrevem o labirinto.', mkPal(0x0b0714, 0x1b1530, 0x27d3ff, 0xff2bd6), 'cross', 8),
+  mandala,
+  tinta,
+  neon,
+  galactico,
+  estelar,
+  angelico,
+  animal,
+  rockstar,
   soon('escher', 'Sonho Escher', 'Escadas impossíveis e gravidade que se dobra.', 'A gravidade muda de lado.', mkPal(0x1b1830, 0xe9e2ff, 0x7a6bd6, 0xffa6e0), 'circle', 9),
-  soon('galactico', 'Intergaláctico', 'Estações perdidas entre nebulosas e buracos negros.', 'Portais ligam salas distantes.', mkPal(0x070a1f, 0x1a1f4a, 0x5a3fd6, 0x39f2d0), 'ring', 10),
   soon('abstrato', 'Abstrato', 'Linhas, cor e geometria pura: o labirinto é uma pintura.', 'As cores definem as regras.', mkPal(0x101010, 0xf4f0e6, 0x161616, 0xe63a2a), 'cross', 12),
-  soon('estelar', 'Estelar', 'Constelações que se desenham enquanto andas.', 'Ligas estrelas para abrir o caminho.', mkPal(0x070d24, 0x16224f, 0xc8a34a, 0xffe08a), 'ring', 13),
-  soon('angelico', 'Céu Angélico', 'Nuvens, harpas e escadas de luz.', 'Nuvens sustentam-te só por instantes.', mkPal(0x1b2440, 0xfff7e0, 0xc9b6ff, 0xffd86b), 'circle', 16),
   soon('elementais', 'Reino dos Elementos', 'Fogo, água, terra e ar: quatro povos, quatro regras.', 'Mudas de elemento para atravessar.', mkPal(0x0d1c24, 0xe6f2e0, 0x2c8f8f, 0xff8a3b), 'cross', 17),
-  soon('animal', 'Reino Animal', 'Savana, selva e quintal: cada bicho tem o seu caminho.', 'Cada animal tem uma habilidade.', mkPal(0x1c1408, 0xf3e0a8, 0x8a6a2b, 0x7be08f), 'rect', 18),
-  soon('rockstar', 'Palco Rockstar', 'Amplificadores, luzes e um solo de guitarra a abrir portas.', 'O ritmo abre e fecha as paredes.', mkPal(0x0a0a0f, 0x1a1a22, 0xff2b8a, 0xffe14a), 'heart', 19),
 ];
 
 export const getWorld = (id: string) => WORLDS.find((w) => w.id === id)!;

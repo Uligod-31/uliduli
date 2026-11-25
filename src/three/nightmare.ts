@@ -93,12 +93,12 @@ export function makeGuard(variant = 0, style = 0): THREE.Group {
   root.add(fig);
   const v = variant % 3;
   const S = style >= 3 ? style - 3 : -1;   // 0 Carcereiro, 1 Sentinela de gelo, 2 Autómato, 3 Livro vivo
-  const cloth = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x140a0a, 0x7fa8c4, 0x5a4220, 0x2a1c14, 0x2e2416, 0x2a3238, 0x14141c][S] : [0x2a2224, 0x23262d, 0x1f2a25][v], roughness: S === 1 ? 0.25 : S === 2 ? 0.4 : S === 5 ? 0.5 : 0.95, metalness: S === 2 ? 0.8 : S === 1 ? 0.15 : S === 5 ? 0.5 : 0 });
-  const clothL = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x3a1612, 0xaed4ea, 0x8a6a2f, 0x4a2a1a, 0x4e3c22, 0x56646e, 0xc9a13a][S] : [0x4a2f2c, 0x3a3f4a, 0x2d3d35][v], roughness: S === 1 ? 0.2 : S === 2 ? 0.35 : S === 5 ? 0.45 : 0.95, metalness: S === 2 ? 0.85 : S === 5 ? 0.55 : 0 });
-  const skin = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0xcdbfa6, 0xcfe6f2, 0xb98a3a, 0xcdbfa6, 0x7a6a44, 0x9fb4b8, 0x1a1a22][S] : 0xcdbfa6, roughness: S === 1 ? 0.2 : 0.85, metalness: S === 2 ? 0.8 : 0 });
+  const cloth = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x140a0a, 0x7fa8c4, 0x5a4220, 0x2a1c14, 0x2e2416, 0x2a3238, 0x14141c, 0x7a3a0a, 0x0a1a3a, 0x14101e, 0x2a3a4a, 0x10163a, 0xe8e0d0, 0x5a3a1a, 0x14141a][S] : [0x2a2224, 0x23262d, 0x1f2a25][v], roughness: S === 1 ? 0.25 : S === 2 ? 0.4 : S === 5 ? 0.5 : 0.95, metalness: S === 2 ? 0.8 : S === 1 ? 0.15 : S === 5 ? 0.5 : 0 });
+  const clothL = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0x3a1612, 0xaed4ea, 0x8a6a2f, 0x4a2a1a, 0x4e3c22, 0x56646e, 0xc9a13a, 0xffb347, 0x1c4a8a, 0x27d3ff, 0x6a8aa8, 0xc8a34a, 0xfff4d0, 0xd08a3a, 0x2a2a34][S] : [0x4a2f2c, 0x3a3f4a, 0x2d3d35][v], roughness: S === 1 ? 0.2 : S === 2 ? 0.35 : S === 5 ? 0.45 : 0.95, metalness: S === 2 ? 0.85 : S === 5 ? 0.55 : 0 });
+  const skin = new THREE.MeshStandardMaterial({ color: S >= 0 ? [0xcdbfa6, 0xcfe6f2, 0xb98a3a, 0xcdbfa6, 0x7a6a44, 0x9fb4b8, 0x1a1a22, 0xe0b070, 0x0e2a4a, 0x1a1a2a, 0x9ab0a8, 0xdcd0a0, 0xf0e0d0, 0xc89048, 0xc8a890][S] : 0xcdbfa6, roughness: S === 1 ? 0.2 : 0.85, metalness: S === 2 ? 0.8 : 0 });
   const darkM = new THREE.MeshStandardMaterial({ color: 0x0d0c0b, roughness: 0.7 });
   const goldM = new THREE.MeshStandardMaterial({ color: 0xc9a13a, emissive: 0x5a3c08, emissiveIntensity: 0.8, roughness: 0.4, metalness: 0.6 });
-  const eyeM = new THREE.MeshBasicMaterial({ color: hdr(S >= 0 ? [0xff4a1a, 0x7fd8ff, 0xff3030, 0xffa040, 0xa8ff6a, 0xff8a30, 0x2fe6d0][S] : 0xffd36a, 2.6), toneMapped: false });
+  const eyeM = new THREE.MeshBasicMaterial({ color: hdr(S >= 0 ? [0xff4a1a, 0x7fd8ff, 0xff3030, 0xffa040, 0xa8ff6a, 0xff8a30, 0x2fe6d0, 0xffd45a, 0x44e0ff, 0xff2bd6, 0x39f2d0, 0xffe08a, 0xffd86b, 0xffe040, 0xff2b8a][S] : 0xffd36a, 2.6), toneMapped: false });
 
   const mkLeg = (x: number) => {
     const p = new THREE.Group(); p.position.set(x, 0.66, 0);
@@ -188,6 +188,48 @@ export function makeGuard(variant = 0, style = 0): THREE.Group {
       const loop = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.012, 6, 14), turq); loop.position.y = 1.36; staff.add(loop);
       const bar = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.014, 0.014), turq); bar.position.y = 1.24; staff.add(bar);
       const tipG = glowSprite(0x2fe6d0, 0.28, 0.6); tipG.position.y = 1.36; staff.add(tipG);
+    } else if (S === 7) {     // Monge de Luz: halo de anéis dourados, hábito açafrão e missangas
+      const gl2 = new THREE.MeshBasicMaterial({ color: hdr(0xffc860, 2), toneMapped: false });
+      for (const [r2, w] of [[0.2, 0.012], [0.15, 0.01], [0.1, 0.008]] as const) { const h2 = new THREE.Mesh(new THREE.TorusGeometry(r2, w, 6, 28), gl2); h2.position.set(0, 0.06, -0.09); head.add(h2); }
+      const robe = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.3, 0.42, 14, 1, true), new THREE.MeshStandardMaterial({ color: 0xe88a1a, roughness: 0.9, side: THREE.DoubleSide }))); robe.position.set(0, 0.12, 0.02); up.add(robe);
+      const mala = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.014, 6, 20), goldM); mala.rotation.x = Math.PI / 2; mala.position.set(0, 0.6, 0.06); up.add(mala);
+      const lot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), gl2); lot.position.set(0, 0.45, 0.19); up.add(lot);
+    } else if (S === 8) {     // Lula de Tinta: tentáculos a escorrer da cabeça e pontos de luz
+      const tent = new THREE.MeshStandardMaterial({ color: 0x0a2a5a, roughness: 0.3, emissive: 0x0a3a6a, emissiveIntensity: 0.6 }), dot = new THREE.MeshBasicMaterial({ color: hdr(0x44e0ff, 2), toneMapped: false });
+      for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2, c = new THREE.CatmullRomCurve3([new THREE.Vector3(Math.cos(a) * 0.05, -0.04, 0.06 + Math.sin(a) * 0.04), new THREE.Vector3(Math.cos(a) * 0.1, -0.14, 0.1 + Math.sin(a) * 0.06), new THREE.Vector3(Math.cos(a) * 0.12, -0.26, 0.06 + Math.sin(a) * 0.1), new THREE.Vector3(Math.cos(a) * 0.06, -0.36, 0.1)]); const t = cast(new THREE.Mesh(new THREE.TubeGeometry(c, 10, 0.014, 5), tent)); head.add(t); const d = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), dot); d.position.copy(c.getPoint(0.7)); head.add(d); }
+      skull.scale.set(0.9, 1.5, 1); const cape = cast(new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.4, 8, 1, true), tent)); cape.position.set(0, 0.2, -0.05); cape.rotation.x = 0.25; head.add(cape);
+    } else if (S === 9) {     // Glitch: ecrã por cara, antena e ombros de neon
+      skull.visible = false; const scr = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.14, 0.05), new THREE.MeshStandardMaterial({ color: 0x0a0814, roughness: 0.3, metalness: 0.5 })); head.add(scr);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.11), new THREE.MeshBasicMaterial({ color: hdr(0xff2bd6, 1.6), toneMapped: false })); face.position.z = 0.027; head.add(face);
+      for (const sd of [-1, 1]) { const e2 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.01), new THREE.MeshBasicMaterial({ color: 0x0a0814 })); e2.position.set(sd * 0.04, 0.01, 0.03); head.add(e2); const sh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.06), new THREE.MeshBasicMaterial({ color: hdr(0x27d3ff, 2), toneMapped: false })); sh.position.set(sd * 0.2, 0.62, 0.02); up.add(sh); }
+      const an = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.22, 4), darkM); an.position.set(0.06, 0.18, 0); head.add(an); const tip = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 5), new THREE.MeshBasicMaterial({ color: hdr(0xffe14a, 2.4), toneMapped: false })); tip.position.set(0.06, 0.3, 0); head.add(tip);
+    } else if (S === 10) {    // Alienígena: cabeça grande, olhos negros inclinados, capacete de vidro
+      skull.scale.set(1.05, 1.5, 1.1);
+      for (const sd of [-1, 1]) { const ey = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), new THREE.MeshStandardMaterial({ color: 0x020204, roughness: 0.1, metalness: 0.4 })); ey.scale.set(1.4, 0.7, 0.4); ey.rotation.z = -sd * 0.45; ey.position.set(sd * 0.055, 0.01, 0.1); head.add(ey); const gl3 = new THREE.Mesh(new THREE.SphereGeometry(0.01, 6, 5), eyeM); gl3.position.set(sd * 0.055, 0.01, 0.12); head.add(gl3); }
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), new THREE.MeshPhysicalMaterial({ color: 0xaaddff, transparent: true, opacity: 0.18, roughness: 0.02, clearcoat: 1 })); dome.position.y = 0.03; head.add(dome);
+      const rg = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.015, 6, 20), new THREE.MeshStandardMaterial({ color: 0x8a98a8, metalness: 0.8, roughness: 0.3 })); rg.rotation.x = Math.PI / 2; rg.position.y = -0.1; head.add(rg);
+    } else if (S === 11) {    // Sentinela Estelar: cabeça-estrela a brilhar
+      skull.visible = false; const stM = new THREE.MeshBasicMaterial({ color: hdr(0xffe08a, 2.2), toneMapped: false });
+      for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2 + Math.PI / 2, c = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.16, 4), stM); c.position.set(Math.cos(a) * 0.1, Math.sin(a) * 0.1, 0); c.rotation.z = a - Math.PI / 2; head.add(c); }
+      head.add(new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 8), stM));
+      for (let k = 0; k < 3; k++) { const o2 = new THREE.Mesh(new THREE.OctahedronGeometry(0.018, 0), stM); o2.position.set(Math.cos(k * 2.1) * 0.22, 0.05 + k * 0.04, Math.sin(k * 2.1) * 0.22); head.add(o2); }
+      const rb = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.01, 6, 28), goldM); rb.rotation.x = 1.2; rb.position.y = 0.55; up.add(rb);
+    } else if (S === 12) {    // Anjo Caído: asas de penas, halo partido e túnica clara
+      const wing = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, emissive: 0x8a90b0, emissiveIntensity: 0.4 });
+      for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) { const f = cast(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4 - k * 0.04, 0.012).translate(0, 0.2, 0), wing)); f.position.set(sd * 0.1, 0.4, -0.12); f.rotation.z = sd * (0.5 + k * 0.22); up.add(f); }
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 6, 24, Math.PI * 1.6), new THREE.MeshBasicMaterial({ color: hdr(0xffd86b, 2.2), toneMapped: false })); halo.rotation.x = Math.PI / 2; halo.position.y = 0.2; head.add(halo);
+      const rb = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.3, 0.4, 14, 1, true), new THREE.MeshStandardMaterial({ color: 0xfff4e0, roughness: 0.8, side: THREE.DoubleSide }))); rb.position.set(0, 0.1, 0.02); up.add(rb);
+    } else if (S === 13) {    // Leão: juba de cones, focinho e orelhas redondas
+      const mane = new THREE.MeshStandardMaterial({ color: 0xb8561a, roughness: 1 });
+      for (let k = 0; k < 18; k++) { const a = (k / 18) * Math.PI * 2, c = cast(new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.16, 5), mane)); c.position.set(Math.cos(a) * 0.12, Math.sin(a) * 0.12, -0.02); c.rotation.z = a - Math.PI / 2; c.rotation.x = 0.2; head.add(c); }
+      const sn = cast(new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), skin)); sn.scale.set(1.1, 0.8, 1.3); sn.position.set(0, -0.03, 0.12); head.add(sn); const ns = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 5), darkM); ns.position.set(0, -0.01, 0.18); head.add(ns);
+      for (const sd of [-1, 1]) { const ea = cast(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), skin)); ea.position.set(sd * 0.09, 0.12, 0.0); head.add(ea); }
+    } else if (S === 14) {    // Segurança de rock: óculos escuros, crista rosa, jaqueta com tachas
+      const shades = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.04, 0.03), new THREE.MeshStandardMaterial({ color: 0x050507, roughness: 0.1, metalness: 0.6 })); shades.position.set(0, 0.015, 0.1); head.add(shades);
+      for (const sd of [-1, 1]) { const g2 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 0.005), new THREE.MeshBasicMaterial({ color: hdr(0xff2b8a, 2.2), toneMapped: false })); g2.position.set(sd * 0.04, 0.02, 0.117); head.add(g2); }
+      for (let k = 0; k < 7; k++) { const c = cast(new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.1 + (k % 3) * 0.03, 4), new THREE.MeshBasicMaterial({ color: hdr(0xff2b8a, 1.8), toneMapped: false }))); c.position.set(0, 0.08 + (k % 2) * 0.01, -0.07 + k * 0.025); head.add(c); }
+      for (let k = 0; k < 6; k++) { const st = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.03, 5), new THREE.MeshStandardMaterial({ color: 0xc0c0cc, metalness: 0.9, roughness: 0.3 })); st.position.set(-0.12 + k * 0.05, 0.62, 0.1); st.rotation.x = Math.PI / 2; up.add(st); }
+      const gt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.34, 0.03), new THREE.MeshStandardMaterial({ color: 0xff2b8a, roughness: 0.4, emissive: 0x6a0a30, emissiveIntensity: 0.5 })); gt.position.set(0.2, 0.15, -0.2); gt.rotation.z = -0.4; up.add(gt);
     } else {                  // Livro vivo: um livro aberto no lugar da cara
       skull.visible = false;
       for (const sd of [-1, 1]) {
@@ -217,7 +259,7 @@ export function makeGuard(variant = 0, style = 0): THREE.Group {
     const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.075), goldM); clasp.position.set(0, -0.93, 0); armR.add(clasp);
   }
 
-  const glow = glowSprite(S >= 0 ? [0xff5a2a, 0x7fd8ff, 0xffb347, 0xffd98a, 0xa8ff6a, 0xff8a30, 0x2fe6d0][S] : 0xffb347, 1.4, 0.32); glow.position.set(0, 0.95, 0); fig.add(glow);
+  const glow = glowSprite(S >= 0 ? [0xff5a2a, 0x7fd8ff, 0xffb347, 0xffd98a, 0xa8ff6a, 0xff8a30, 0x2fe6d0, 0xffd45a, 0x44e0ff, 0xff2bd6, 0x39f2d0, 0xffe08a, 0xffd86b, 0xffe040, 0xff2b8a][S] : 0xffb347, 1.4, 0.32); glow.position.set(0, 0.95, 0); fig.add(glow);
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.3, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.012; root.add(shadow);
   root.userData = { body: fig, legL, legR, armL, armR, head, glow };

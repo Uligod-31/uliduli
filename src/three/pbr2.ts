@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { heightToNormal, stonePBR, flagPBR } from './pbr';
+import { wall3, floor3 } from './pbr3';
 
 // Texturas dos mundos novos: obsidiana com fendas de lava, gelo, latão com pátina, estantes de livros; e os chãos respetivos.
 
@@ -218,7 +219,7 @@ export function wallPBR(kind: string): Tex {
     case 'runes': t = blocks({ tones: ['#363c46', '#2e343e', '#404752', '#2a3039', '#38404a'], mortar: '#0c0f14', rows: 5, seed: 65, cracks: 6, crackCol: '#06080b', runes: '#ff8a30', stain: { col: 'rgba(225,238,250,.4)', n: 60 }, frost: true }); break;
     case 'hiero': t = blocks({ tones: ['#c4a56c', '#b39560', '#cdb078', '#a98b56', '#bd9e66'], mortar: '#3a2a14', rows: 5, seed: 66, cracks: 5, crackCol: '#3a2a14', glyphs: '#2fe6d0', stain: { col: 'rgba(110,72,28,.38)', n: 70 } }); break;
     case 'stone': { const p = stonePBR(); t = { map: p.map, normal: p.normal }; break; }
-    default: { const p = stonePBR(); t = { map: p.map, normal: p.normal }; }
+    default: { const x = wall3(kind); if (x) { t = x; break; } const p = stonePBR(); t = { map: p.map, normal: p.normal }; }
   }
   cache.set('w' + kind, t); return t;
 }
@@ -227,6 +228,6 @@ export function floorPBR(kind: string): Tex {
   const hit = cache.get('f' + kind); if (hit) return hit;
   let t: Tex;
   if (kind === 'wood' || kind === 'metal' || kind === 'ice' || kind === 'obsidian' || kind === 'moss' || kind === 'planks' || kind === 'sand') t = floors(kind);
-  else { const p = flagPBR(); t = { map: p.map, normal: p.normal }; }
+  else { const x = floor3(kind); if (x) t = x; else { const p = flagPBR(); t = { map: p.map, normal: p.normal }; } }
   cache.set('f' + kind, t); return t;
 }

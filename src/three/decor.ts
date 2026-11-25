@@ -10,7 +10,7 @@ export interface DecorOpts {
   reserved: Set<number>;
   segs: { x1: number; y1: number; x2: number; y2: number }[];
   rng: () => number;
-  style: 'garden' | 'planet' | 'ice' | 'hell' | 'clock' | 'library' | 'elfic' | 'viking' | 'egypt';
+  style: 'garden' | 'planet' | 'ice' | 'hell' | 'clock' | 'library' | 'elfic' | 'viking' | 'egypt' | 'mandala' | 'ink' | 'neon' | 'space' | 'stars' | 'angel' | 'animal' | 'rock';
   accent: number;
   wallH: number;
   wallT: number;
@@ -67,7 +67,7 @@ export function buildDecor(o: DecorOpts): Decor {
   }
   // ── manchas do mundo: geada, lava, óleo, pó ──
   if (o.style !== 'garden' && o.style !== 'planet') {
-    const spec = { ice: [0xeaf6ff, 0.38, false, 0.28], hell: [0xff5a1a, 0.6, true, 0.2], clock: [0x2a1a08, 0.5, false, 0.2], library: [0xd8c8a0, 0.2, false, 0.3], elfic: [0x9be07a, 0.4, true, 0.22], viking: [0xe6f0fa, 0.34, false, 0.3], egypt: [0xeed49a, 0.34, false, 0.3] }[o.style] as [number, number, boolean, number];
+    const spec = { ice: [0xeaf6ff, 0.38, false, 0.28], hell: [0xff5a1a, 0.6, true, 0.2], clock: [0x2a1a08, 0.5, false, 0.2], library: [0xd8c8a0, 0.2, false, 0.3], elfic: [0x9be07a, 0.4, true, 0.22], viking: [0xe6f0fa, 0.34, false, 0.3], egypt: [0xeed49a, 0.34, false, 0.3], mandala: [0xffd070, 0.4, true, 0.2], ink: [0x44e0ff, 0.3, true, 0.22], neon: [0xff2bd6, 0.3, true, 0.18], space: [0x39f2d0, 0.24, true, 0.16], stars: [0xffe08a, 0.3, true, 0.2], angel: [0xffffff, 0.5, false, 0.3], animal: [0x3a2a10, 0.4, false, 0.26], rock: [0xff2b8a, 0.3, true, 0.2] }[o.style] as [number, number, boolean, number];
     const l = pick(spec[3]);
     const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: puddleBlob(), color: spec[0], transparent: true, opacity: spec[1], depthWrite: false, blending: spec[2] ? THREE.AdditiveBlending : THREE.NormalBlending, polygonOffset: true, polygonOffsetFactor: -2, fog: !spec[2] }), l.length);
     place(l, (_i, x, z) => compose(x, 0.005, z, rng() * 6.28, 0.5 + rng() * 0.6, 1, 0.4 + rng() * 0.4), mesh);
@@ -79,7 +79,7 @@ export function buildDecor(o: DecorOpts): Decor {
     const mesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), l.length);
     const cc = new THREE.Color();
     place(l, (_i, x, z) => { const s = 0.02 + rng() * 0.05; return compose(x, s * 0.4, z, rng() * 6.28, s * (1 + rng() * 0.8), s * 0.7, s); }, mesh);
-    const RC: Record<string, [number, number]> = { garden: [0x4a463e, 0x7a746a], planet: [0x4a463e, 0x7a746a], ice: [0xaac8dc, 0xe8f4fa], hell: [0x2a2228, 0x4a3a40], clock: [0x8a6a2f, 0xb08a3c], library: [0xcfc4a8, 0xefe6cc], elfic: [0x5a6a48, 0x8a9a6a], viking: [0x4a5058, 0x8a929a], egypt: [0x8a6e3e, 0xc9a468] };
+    const RC: Record<string, [number, number]> = { garden: [0x4a463e, 0x7a746a], planet: [0x4a463e, 0x7a746a], ice: [0xaac8dc, 0xe8f4fa], hell: [0x2a2228, 0x4a3a40], clock: [0x8a6a2f, 0xb08a3c], library: [0xcfc4a8, 0xefe6cc], elfic: [0x5a6a48, 0x8a9a6a], viking: [0x4a5058, 0x8a929a], egypt: [0x8a6e3e, 0xc9a468], mandala: [0x8a4a14, 0xd8a040], ink: [0x1a3a6a, 0x3a6aa8], neon: [0x2a2040, 0x5a4a90], space: [0x4a5a6a, 0x9aaab8], stars: [0x2a3070, 0x6a78c0], angel: [0xe0dcd0, 0xffffff], animal: [0x6a5a30, 0xb09a58], rock: [0x2a2a32, 0x5a5a66] };
     l.forEach((_, k) => mesh.setColorAt(k, cc.setHex(RC[o.style][0]).lerp(new THREE.Color(RC[o.style][1]), rng())));
     mesh.castShadow = true; group.add(mesh);
   }
@@ -224,6 +224,74 @@ export function buildDecor(o: DecorOpts): Decor {
     const ln = pick(0.2), dn = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 6), new THREE.MeshStandardMaterial({ color: 0xdcc088, roughness: 1 }), ln.length);
     place(ln, (_i, x, z) => { const s = 0.08 + rng() * 0.13; return compose(x, 0, z, rng() * 6.28, s * 1.6, s * 0.34, s); }, dn); group.add(dn);
   }
+  const glowAt = (x: number, y: number, z: number, hex: number, sz: number, op: number) => { const gs = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: hex, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false })); gs.position.set(x, y, z); gs.scale.setScalar(sz); group.add(gs); glowSprites.push({ s: gs, ph: rng() * 6, base: op }); };
+  const hdrM = (hex: number, k = 2) => new THREE.MeshBasicMaterial({ color: hdr(hex, k), toneMapped: false });
+  if (o.style === 'mandala') {         // lótus-lâmpada e discos de anéis dourados de pé
+    const l = pick(0.1), pet: THREE.BufferGeometry[] = [];
+    for (let k = 0; k < 8; k++) { const p = new THREE.ConeGeometry(0.028, 0.12, 4); p.scale(1, 1, 0.35); p.translate(0, 0.06, 0); p.rotateZ(0.9); p.rotateY(k * 0.785); pet.push(col(p, k % 2 ? 0xffb0c8 : 0xffe0a0)); }
+    pet.push(col(new THREE.SphereGeometry(0.03, 8, 6).translate(0, 0.05, 0), 0xffc860));
+    const lm = new THREE.InstancedMesh(merge(pet), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, color: hdr(0xffffff, 1.4) }), l.length);
+    l.forEach((i, k) => { const c = corner(i); lm.setMatrixAt(k, compose(c.x, 0.02, c.z, rng() * 6.28, 1 + rng() * 0.6)); glowAt(c.x, 0.1, c.z, 0xffb030, 0.5, 0.5); }); group.add(lm);
+    const l2 = pick(0.08), disc = merge([col(new THREE.TorusGeometry(0.1, 0.012, 6, 24).translate(0, 0.14, 0), 0xe8b040), col(new THREE.TorusGeometry(0.065, 0.01, 6, 20).translate(0, 0.14, 0), 0xff9a30), col(new THREE.TorusGeometry(0.03, 0.01, 6, 16).translate(0, 0.14, 0), 0xffe080), col(new THREE.CylinderGeometry(0.012, 0.02, 0.14, 6).translate(0, 0.07, 0), 0x8a5a18)]);
+    const dm = new THREE.InstancedMesh(disc, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.8, emissive: 0x6a3a08, emissiveIntensity: 0.8 }), l2.length);
+    l2.forEach((i, k) => { const c = corner(i); dm.setMatrixAt(k, compose(c.x, 0, c.z, rng() * 6.28, 1 + rng() * 0.5)); }); group.add(dm);
+  }
+  if (o.style === 'ink') {             // alforrecas-lâmpada e bolhas de tinta
+    const l = pick(0.1), jf = merge([col(new THREE.SphereGeometry(0.07, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.16, 0), 0x80e8ff), ...[0, 1, 2, 3, 4].map((k) => col(new THREE.CylinderGeometry(0.004, 0.002, 0.16, 4).translate(Math.cos(k * 1.26) * 0.04, 0.08, Math.sin(k * 1.26) * 0.04), 0x44c0e0))]);
+    const jm = new THREE.InstancedMesh(jf, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, color: hdr(0xffffff, 1.3), transparent: true, opacity: 0.9 }), l.length);
+    l.forEach((i, k) => { const c = corner(i); jm.setMatrixAt(k, compose(c.x, 0.02 + rng() * 0.05, c.z, rng() * 6.28, 1 + rng() * 0.7)); glowAt(c.x, 0.16, c.z, 0x44e0ff, 0.6, 0.55); }); group.add(jm);
+    const lb = pick(0.2), bb = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshStandardMaterial({ color: 0x9ae8ff, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.2, emissive: 0x1a5a8a, emissiveIntensity: 0.4 }), lb.length);
+    place(lb, (_i, x, z) => { const s = 0.02 + rng() * 0.05; return compose(x, 0.04 + rng() * 0.2, z, 0, s); }, bb); group.add(bb);
+  }
+  if (o.style === 'neon') {            // cubos holográficos e barras de glitch
+    const l = pick(0.1), wire = merge([...[[0.1, 0.004, 0.004], [0.004, 0.1, 0.004], [0.004, 0.004, 0.1]].flatMap(([a, b, c2]) => [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sy]) => col(new THREE.BoxGeometry(a, b, c2).translate(a === 0.1 ? 0 : sx * 0.05, b === 0.1 ? 0 : (a === 0.1 ? sy * 0.05 : sy * 0.05), c2 === 0.1 ? 0 : sx * 0.05).translate(0, 0.14, 0), 0xffffff)))]);
+    const wm = new THREE.InstancedMesh(wire, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, color: hdr(0x27d3ff, 2.2) }), l.length);
+    l.forEach((i, k) => { const c = corner(i); wm.setMatrixAt(k, compose(c.x, 0.02, c.z, rng() * 6.28, 0.8 + rng() * 0.8)); glowAt(c.x, 0.16, c.z, 0x27d3ff, 0.5, 0.4); }); group.add(wm);
+    const lg = pick(0.12), gb = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.012, 0.03).translate(0, 0.02, 0), hdrM(0xff2bd6, 2.2), lg.length);
+    place(lg, (_i, x, z) => compose(x, 0, z, rng() * 6.28, 0.6 + rng() * 1.4), gb); group.add(gb);
+  }
+  if (o.style === 'space') {           // caixotes de carga e antenas com luz a piscar
+    const l = pick(0.1), cr = merge([col(new THREE.BoxGeometry(0.14, 0.12, 0.14).translate(0, 0.06, 0), 0x5a6a7a), col(new THREE.BoxGeometry(0.15, 0.02, 0.15).translate(0, 0.02, 0), 0xe8c020), col(new THREE.BoxGeometry(0.15, 0.02, 0.15).translate(0, 0.1, 0), 0xe8c020), col(new THREE.BoxGeometry(0.04, 0.03, 0.01).translate(0, 0.06, 0.075), 0x39f2d0)]);
+    const cm = new THREE.InstancedMesh(cr, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.6 }), l.length);
+    l.forEach((i, k) => { const c = corner(i); cm.setMatrixAt(k, compose(c.x, 0, c.z, rng() * 3, 1 + rng() * 0.5)); }); cm.castShadow = true; group.add(cm);
+    const la = pick(0.07), an = merge([col(new THREE.CylinderGeometry(0.008, 0.012, 0.3, 6).translate(0, 0.15, 0), 0x9aa8b8), col(new THREE.SphereGeometry(0.02, 8, 6).translate(0, 0.31, 0), 0xffffff)]);
+    const am = new THREE.InstancedMesh(an, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.7, emissive: 0x39f2d0, emissiveIntensity: 0.6 }), la.length);
+    la.forEach((i, k) => { const c = corner(i); am.setMatrixAt(k, compose(c.x, 0, c.z, 0, 1 + rng() * 0.6)); glowAt(c.x, 0.32, c.z, 0x39f2d0, 0.35, 0.5); }); group.add(am);
+  }
+  if (o.style === 'stars') {           // estrelas de ouro e anéis astrolábio a pairar
+    const l = pick(0.1), st = merge([col(new THREE.OctahedronGeometry(0.05, 0).scale(1, 1.5, 0.4).translate(0, 0.16, 0), 0xffffff), col(new THREE.OctahedronGeometry(0.05, 0).scale(1.5, 1, 0.4).translate(0, 0.16, 0), 0xffffff)]);
+    const sm = new THREE.InstancedMesh(st, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, color: hdr(0xffe08a, 2.2) }), l.length);
+    l.forEach((i, k) => { const c = corner(i); sm.setMatrixAt(k, compose(c.x, 0.02 + rng() * 0.1, c.z, rng() * 6.28, 0.8 + rng() * 0.9)); glowAt(c.x, 0.18, c.z, 0xffe08a, 0.55, 0.55); }); group.add(sm);
+    const l2 = pick(0.07), ast = merge([col(new THREE.TorusGeometry(0.1, 0.008, 6, 28).translate(0, 0.16, 0), 0xe6c060), col(new THREE.TorusGeometry(0.1, 0.008, 6, 28).rotateX(Math.PI / 2).translate(0, 0.16, 0), 0xc8a34a), col(new THREE.SphereGeometry(0.018, 8, 6).translate(0, 0.16, 0), 0xfff2b0), col(new THREE.CylinderGeometry(0.01, 0.02, 0.14, 6).translate(0, 0.07, 0), 0x6a5a28)]);
+    const am = new THREE.InstancedMesh(ast, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.85, emissive: 0x5a4208, emissiveIntensity: 0.6 }), l2.length);
+    l2.forEach((i, k) => { const c = corner(i); am.setMatrixAt(k, compose(c.x, 0, c.z, rng() * 6.28, 1 + rng() * 0.5)); }); group.add(am);
+  }
+  if (o.style === 'angel') {           // penas, harpas e halos a pairar
+    const l = pick(0.18), fe = new THREE.InstancedMesh(new THREE.ConeGeometry(0.03, 0.16, 5).scale(1, 1, 0.12).rotateZ(Math.PI / 2 + 0.3), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, emissive: 0x9aa0c0, emissiveIntensity: 0.35 }), l.length);
+    place(l, (_i, x, z) => compose(x, 0.01, z, rng() * 6.28, 0.8 + rng() * 0.9), fe); group.add(fe);
+    const lh = pick(0.07), hp = merge([col(new THREE.TorusGeometry(0.09, 0.008, 6, 22, Math.PI * 1.3).translate(0, 0.14, 0), 0xe6b84a), col(new THREE.CylinderGeometry(0.006, 0.006, 0.18, 4).translate(0.07, 0.14, 0), 0xe6b84a), ...[0, 1, 2, 3].map((k) => col(new THREE.CylinderGeometry(0.002, 0.002, 0.14 - k * 0.02, 3).translate(-0.04 + k * 0.035, 0.14, 0), 0xffffff))]);
+    const hm = new THREE.InstancedMesh(hp, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.8, emissive: 0x6a4a08, emissiveIntensity: 0.5 }), lh.length);
+    lh.forEach((i, k) => { const c = corner(i); hm.setMatrixAt(k, compose(c.x, 0, c.z, rng() * 6.28, 1 + rng() * 0.5)); }); group.add(hm);
+    const l3 = pick(0.07), ha = new THREE.InstancedMesh(new THREE.TorusGeometry(0.07, 0.008, 6, 24).rotateX(Math.PI / 2), hdrM(0xffd86b, 2), l3.length);
+    l3.forEach((i, k) => { const c = corner(i); ha.setMatrixAt(k, compose(c.x, 0.2 + rng() * 0.12, c.z, 0, 1 + rng() * 0.6)); glowAt(c.x, 0.22, c.z, 0xffd86b, 0.4, 0.5); }); group.add(ha);
+  }
+  if (o.style === 'animal') {          // flores da savana, montes de térmitas e pegadas
+    const l = pick(0.22), fl: THREE.BufferGeometry[] = [col(new THREE.CylinderGeometry(0.005, 0.006, 0.14, 4).translate(0, 0.07, 0), 0x4a7a20)];
+    for (let k = 0; k < 6; k++) { const p = new THREE.SphereGeometry(0.02, 6, 5).scale(1, 0.5, 1.5).translate(Math.cos(k * 1.05) * 0.03, 0.15, Math.sin(k * 1.05) * 0.03); fl.push(col(p, k % 2 ? 0xff7a2a : 0xffc040)); }
+    const fm = new THREE.InstancedMesh(merge(fl), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, emissive: 0x3a2008, emissiveIntensity: 0.4 }), l.length);
+    place(l, (_i, x, z) => compose(x, 0, z, rng() * 6.28, 0.8 + rng() * 0.7), fm); group.add(fm);
+    const lt = pick(0.07), tm = new THREE.InstancedMesh(new THREE.ConeGeometry(0.07, 0.24, 7).translate(0, 0.12, 0), new THREE.MeshStandardMaterial({ color: 0x8a5a2a, roughness: 1, flatShading: true }), lt.length);
+    lt.forEach((i, k) => { const c = corner(i); tm.setMatrixAt(k, compose(c.x, 0, c.z, rng() * 6.28, 0.8 + rng() * 0.8, 0.7 + rng() * 0.8, 0.8 + rng() * 0.8)); }); tm.castShadow = true; group.add(tm);
+  }
+  if (o.style === 'rock') {            // palhetas, pedestais de microfone e holofotes de chão
+    const l = pick(0.12), pk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.006, 3).translate(0, 0.004, 0), new THREE.MeshStandardMaterial({ color: 0xff2b8a, roughness: 0.4, emissive: 0x6a0a30, emissiveIntensity: 0.6 }), l.length);
+    place(l, (_i, x, z) => compose(x, 0, z, rng() * 6.28, 0.8 + rng() * 0.6), pk); group.add(pk);
+    const l2 = pick(0.07), mic = merge([col(new THREE.CylinderGeometry(0.006, 0.01, 0.36, 5).translate(0, 0.18, 0), 0x2a2a30), col(new THREE.CylinderGeometry(0.04, 0.05, 0.012, 8).translate(0, 0.006, 0), 0x2a2a30), col(new THREE.SphereGeometry(0.025, 8, 6).translate(0.03, 0.38, 0), 0x9a9aa8)]);
+    const mm = new THREE.InstancedMesh(mic, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.7 }), l2.length);
+    l2.forEach((i, k) => { const c = corner(i); mm.setMatrixAt(k, compose(c.x, 0, c.z, rng() * 6.28, 1 + rng() * 0.3)); }); mm.castShadow = true; group.add(mm);
+    const l3 = pick(0.06), sp = new THREE.InstancedMesh(new THREE.ConeGeometry(0.05, 0.1, 8).translate(0, 0.05, 0), new THREE.MeshStandardMaterial({ color: 0x18181e, roughness: 0.5, metalness: 0.7 }), l3.length);
+    l3.forEach((i, k) => { const c = corner(i); sp.setMatrixAt(k, compose(c.x, 0, c.z, rng() * 6.28, 1 + rng() * 0.4)); glowAt(c.x, 0.1, c.z, rng() < 0.5 ? 0xff2b8a : 0xffe14a, 0.7, 0.6); }); group.add(sp);
+  }
   if (o.style === 'library') {
     const l = pick(0.1);
     const BC = [0x6a1c1c, 0x1c3a5a, 0x2c4a2c, 0x7a4a1c, 0x4a2c5a];
@@ -237,7 +305,7 @@ export function buildDecor(o: DecorOpts): Decor {
   // ── velas com chama (os dois mundos) ──
   const flames: { g: THREE.Group; ph: number }[] = [];
   {
-    const l = pick(({ garden: 0.07, planet: 0.04, library: 0.16, ice: 0, hell: 0, clock: 0, elfic: 0, viking: 0, egypt: 0 } as Record<string, number>)[o.style]);
+    const l = pick(({ garden: 0.07, planet: 0.04, library: 0.16, ice: 0, hell: 0, clock: 0, elfic: 0, viking: 0, egypt: 0, mandala: 0, ink: 0, neon: 0, space: 0, stars: 0, angel: 0, animal: 0, rock: 0 } as Record<string, number>)[o.style]);
     const waxG = new THREE.CylinderGeometry(0.018, 0.02, 0.09, 8), waxM = new THREE.MeshStandardMaterial({ color: 0xe9e0c4, roughness: 0.8 });
     const flameG = new THREE.ConeGeometry(0.014, 0.05, 6), flameM = new THREE.MeshBasicMaterial({ color: hdr(0xffa040, 2), toneMapped: false });
     l.forEach((i) => {
@@ -256,7 +324,7 @@ export function buildDecor(o: DecorOpts): Decor {
   // ── archotes nas paredes ──
   const torches: { flame: THREE.Mesh; glow: THREE.Sprite; pool: THREE.Mesh; ph: number }[] = [];
   {
-    const TC: Record<string, [number, number]> = { garden: [0xff8a2a, 0xff9a40], planet: [0xff8a2a, 0xff9a40], ice: [0x7fd8ff, 0x9fe0ff], hell: [0xff4a1a, 0xff5a20], clock: [0xffc060, 0xffd080], library: [0xffa040, 0xffb860], elfic: [0x9be07a, 0xb8f090], viking: [0xff7a2a, 0xff9a50], egypt: [0xffb43a, 0xffc860] };
+    const TC: Record<string, [number, number]> = { garden: [0xff8a2a, 0xff9a40], planet: [0xff8a2a, 0xff9a40], ice: [0x7fd8ff, 0x9fe0ff], hell: [0xff4a1a, 0xff5a20], clock: [0xffc060, 0xffd080], library: [0xffa040, 0xffb860], elfic: [0x9be07a, 0xb8f090], viking: [0xff7a2a, 0xff9a50], egypt: [0xffb43a, 0xffc860], mandala: [0xffb030, 0xffd070], ink: [0x44e0ff, 0x80f0ff], neon: [0xff2bd6, 0xff80e8], space: [0x39f2d0, 0x80ffe8], stars: [0xffe08a, 0xfff0b0], angel: [0xffe9a0, 0xfff4cc], animal: [0xff9a2a, 0xffb860], rock: [0xff2b8a, 0xff80b8] };
     const tc = TC[o.style];
     const n = Math.max(2, Math.min(7, Math.round(o.segs.length / 13)));
     const bracket = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.2, 6), new THREE.MeshStandardMaterial({ color: 0x1b1713, roughness: 0.6, metalness: 0.5 }));

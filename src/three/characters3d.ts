@@ -1,4 +1,5 @@
 ﻿import * as THREE from 'three';
+import { mestra as mestraD, polvo as polvoD, glitch as glitchD, comandante as comandanteD, cartografa as cartografaD, serafim as serafimD, leao as leaoD, lenda as lendaD } from './chars_world2';
 import { CharKind } from '../art/characters';
 import { glowSprite, hdr, makeClockTexture } from './common';
 import { makeUli } from './nightmare';
@@ -253,6 +254,14 @@ function buildPortraitRaw(kind: CharKind): { group: THREE.Group; center: THREE.V
     case 'dama': return { group: damaD(), center: new THREE.Vector3(0.15, 3.0, 0), dist: 8.4 };
     case 'jarl': return { group: jarlD(), center: new THREE.Vector3(0.1, 2.75, 0.3), dist: 9.0 };
     case 'esfinge': return { group: esfingeD(), center: new THREE.Vector3(0, 3.5, 0.3), dist: 8.8 };
+    case 'mestra': return { group: mestraD(), center: new THREE.Vector3(0, 3.0, 0), dist: 9.6 };
+    case 'polvo': return { group: polvoD(), center: new THREE.Vector3(0, 2.6, 0.3), dist: 10.6 };
+    case 'glitch': return { group: glitchD(), center: new THREE.Vector3(0, 2.7, 0), dist: 9.8 };
+    case 'comandante': return { group: comandanteD(), center: new THREE.Vector3(0, 2.9, 0), dist: 9.4 };
+    case 'cartografa': return { group: cartografaD(), center: new THREE.Vector3(0, 3.0, 0.3), dist: 9.4 };
+    case 'serafim': return { group: serafimD(), center: new THREE.Vector3(0, 3.0, 0), dist: 10.2 };
+    case 'leao': return { group: leaoD(), center: new THREE.Vector3(0, 2.5, 0.5), dist: 9.4 };
+    case 'lenda': return { group: lendaD(), center: new THREE.Vector3(0, 2.9, 0.3), dist: 9.0 };
     case 'rainha': return { group: rainhaD(), center: new THREE.Vector3(0.5, 2.35, 0), dist: 10.5 };
   }
 }

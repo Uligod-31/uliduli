@@ -130,7 +130,9 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
     const cone = new THREE.ConeGeometry(0.72, 1, 4, 1, false).rotateY(Math.PI / 4).rotateX(Math.PI);
     const rocks = new THREE.InstancedMesh(cone, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), open.length);
     const mat = new THREE.Matrix4();
-    const cA = new THREE.Color(0x3a2a30), cB = new THREE.Color(0x6a4a3c), cc = new THREE.Color();
+    const bellyP: Record<string, [number, number]> = { angel: [0xb8b4d4, 0xf0ecff], ink: [0x0a1a3a, 0x1a4a8a], neon: [0x1a1030, 0x3a2060], space: [0x2a3040, 0x5a6878], stars: [0x10163a, 0x2a3470], egypt: [0x6a4a22, 0xa88040], mandala: [0x5a2a0a, 0xa86a20], animal: [0x4a3418, 0x8a6a30], rock: [0x14141a, 0x34343e] };
+    const bp = bellyP[L.decor] ?? [0x3a2a30, 0x6a4a3c];
+    const cA = new THREE.Color(bp[0]), cB = new THREE.Color(bp[1]), cc = new THREE.Color();
     open.forEach((i, k) => {
       const dn = Math.hypot(px(i), pz(i)) / Math.max(R, 1);
       const depth = (1.5 + 6.5 * Math.pow(1 - dn, 1.4)) * (0.75 + 0.5 * rng());

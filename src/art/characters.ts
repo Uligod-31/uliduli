@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-export type CharKind = 'uli' | 'pimpa' | 'lagarta' | 'sorriso' | 'rainha' | 'raposa' | 'rei' | 'acendedor' | 'carcereiro' | 'geada' | 'relojoeiro' | 'bibliotecario' | 'dama' | 'jarl' | 'esfinge';
+export type CharKind = 'uli' | 'pimpa' | 'lagarta' | 'sorriso' | 'rainha' | 'raposa' | 'rei' | 'acendedor' | 'carcereiro' | 'geada' | 'relojoeiro' | 'bibliotecario' | 'dama' | 'jarl' | 'esfinge' | 'mestra' | 'polvo' | 'glitch' | 'comandante' | 'cartografa' | 'serafim' | 'leao' | 'lenda';
 
 export const CHAR_NAMES: Record<CharKind, string> = {
   uli: 'Uli',
@@ -18,6 +18,14 @@ export const CHAR_NAMES: Record<CharKind, string> = {
   dama: 'A Dama das Raízes',
   jarl: 'O Jarl dos Corvos',
   esfinge: 'A Esfinge das Areias',
+  mestra: 'A Guardiã dos Anéis',
+  polvo: 'O Polvo Escritor',
+  glitch: 'A IA Glitch',
+  comandante: 'Comandante Zyx',
+  cartografa: 'A Cartógrafa das Estrelas',
+  serafim: 'O Serafim',
+  leao: 'O Velho Leão',
+  lenda: 'A Lenda do Rock',
 };
 export const CHAR_COLORS: Record<CharKind, number> = {
   uli: 0x5b92ff,
@@ -35,6 +43,14 @@ export const CHAR_COLORS: Record<CharKind, number> = {
   dama: 0x9be07a,
   jarl: 0xe0703a,
   esfinge: 0xffc65a,
+  mestra: 0xffb030,
+  polvo: 0x44e0ff,
+  glitch: 0xff2bd6,
+  comandante: 0x39f2d0,
+  cartografa: 0xffe08a,
+  serafim: 0xffd86b,
+  leao: 0xffb050,
+  lenda: 0xff2b8a,
 };
 
 type G = Phaser.GameObjects.Graphics;
