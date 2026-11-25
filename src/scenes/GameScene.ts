@@ -96,11 +96,11 @@ export class GameScene extends Phaser.Scene {
   private buildHud() {
     const { wd, def } = this;
     const top = this.add.graphics().setDepth(29);
-    top.fillGradientStyle(0x0a0b10, 0x0a0b10, 0x0a0b10, 0x0a0b10, 0.78, 0.78, 0, 0);
+    top.fillGradientStyle(0x0a0b10, 0x0a0b10, 0x0a0b10, 0x0a0b10, 0.62, 0.62, 0, 0);
     top.fillRect(0, 0, W, 230);
     const bot = this.add.graphics().setDepth(29);
-    bot.fillGradientStyle(0x0a0b10, 0x0a0b10, 0x0a0b10, 0x0a0b10, 0, 0, 0.7, 0.7);
-    bot.fillRect(0, H - 520, W, 520);
+    bot.fillGradientStyle(0x0a0b10, 0x0a0b10, 0x0a0b10, 0x0a0b10, 0, 0, 0.5, 0.5);
+    bot.fillRect(0, H - 420, W, 420);
 
     this.add.text(W / 2, 54, wd.name.toUpperCase(), { fontFamily: FONT, fontSize: '22px', color: toHex(lighten(wd.pal.accent, 0.35)), fontStyle: 'bold' }).setOrigin(0.5).setDepth(30).setStyle({ letterSpacing: 5 } as any);
     this.add.text(W / 2, 96, `${def.bonus ? '★ Bónus' : 'Nível ' + (this.li + 1)} · ${def.title}`, { fontFamily: FONT, fontSize: '30px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(30);

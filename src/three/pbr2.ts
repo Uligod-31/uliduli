@@ -13,7 +13,7 @@ function mkc(n: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   return [c, c.getContext('2d', { willReadFrequently: true })!];
 }
 function tex(c: HTMLCanvasElement, srgb: boolean): THREE.CanvasTexture {
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16; return t;
 }
 function blob(g: CanvasRenderingContext2D, x: number, y: number, r: number, rgba: string) {
   const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, rgba); gr.addColorStop(1, 'rgba(0,0,0,0)');

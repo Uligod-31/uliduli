@@ -32,7 +32,7 @@ function tex(c: HTMLCanvasElement, srgb: boolean, repeat = true): THREE.CanvasTe
   const t = new THREE.CanvasTexture(c);
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 16;
   return t;
 }
 

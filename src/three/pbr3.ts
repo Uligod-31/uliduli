@@ -8,7 +8,7 @@ import type { Tex } from './pbr2';
 const rndf = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const N = 512, TAU = Math.PI * 2;
 function mk(): [HTMLCanvasElement, CanvasRenderingContext2D] { const c = document.createElement('canvas'); c.width = c.height = N; return [c, c.getContext('2d', { willReadFrequently: true })!]; }
-function tex(c: HTMLCanvasElement, srgb: boolean): THREE.CanvasTexture { const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+function tex(c: HTMLCanvasElement, srgb: boolean): THREE.CanvasTexture { const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16; return t; }
 function blob(g: CanvasRenderingContext2D, x: number, y: number, r: number, rgba: string) { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, rgba); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
 function out(cc: HTMLCanvasElement, hc: HTMLCanvasElement, ec: HTMLCanvasElement | null, k = 2.6): Tex {
   const t: Tex = { map: tex(cc, true), normal: tex(heightToNormal(hc, k), false) };

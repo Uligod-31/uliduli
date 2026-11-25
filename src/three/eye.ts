@@ -24,7 +24,7 @@ function pn(x: number, y: number, fx: number, fy: number, o = 0): number {
   return (h(ix, iy) * (1 - su) + h(ix + 1, iy) * su) * (1 - sv) + (h(ix, iy + 1) * (1 - su) + h(ix + 1, iy + 1) * su) * sv;
 }
 function mkTex(c: HTMLCanvasElement, srgb: boolean, wrapX = false) {
-  const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 16;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   if (wrapX) t.wrapS = THREE.RepeatWrapping;
   return t;

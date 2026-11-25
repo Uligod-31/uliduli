@@ -5,12 +5,12 @@ import type { Weather as WeatherMode } from '../worlds';
 
 interface Preset { col: [number, number, number]; size: number; fall: number; dir: 1 | -1; drift: number; alpha: number; add: boolean; page: boolean }
 const PRESETS: Record<string, Preset> = {
-  snow: { col: [0.93, 0.97, 1], size: 6, fall: 0.07, dir: 1, drift: 1.6, alpha: 0.85, add: false, page: false },
-  embers: { col: [1, 0.48, 0.14], size: 7, fall: 0.09, dir: -1, drift: 0.9, alpha: 1, add: true, page: false },
-  ash: { col: [0.62, 0.62, 0.66], size: 6, fall: 0.045, dir: 1, drift: 1.2, alpha: 0.5, add: false, page: false },
-  dust: { col: [1, 0.82, 0.5], size: 3.6, fall: 0.012, dir: 1, drift: 2.2, alpha: 0.5, add: true, page: false },
-  fireflies: { col: [0.78, 1, 0.42], size: 3.2, fall: 0.012, dir: -1, drift: 3.2, alpha: 0.85, add: true, page: false },
-  pages: { col: [0.96, 0.9, 0.72], size: 9, fall: 0.03, dir: 1, drift: 2.6, alpha: 0.6, add: false, page: true },
+  snow: { col: [0.93, 0.97, 1], size: 4.2, fall: 0.07, dir: 1, drift: 1.6, alpha: 0.85, add: false, page: false },
+  embers: { col: [1, 0.48, 0.14], size: 5, fall: 0.09, dir: -1, drift: 0.9, alpha: 1, add: true, page: false },
+  ash: { col: [0.62, 0.62, 0.66], size: 4.2, fall: 0.045, dir: 1, drift: 1.2, alpha: 0.5, add: false, page: false },
+  dust: { col: [1, 0.82, 0.5], size: 2.2, fall: 0.012, dir: 1, drift: 2.2, alpha: 0.5, add: true, page: false },
+  fireflies: { col: [0.78, 1, 0.42], size: 2.6, fall: 0.012, dir: -1, drift: 3.2, alpha: 0.85, add: true, page: false },
+  pages: { col: [0.96, 0.9, 0.72], size: 7, fall: 0.03, dir: 1, drift: 2.6, alpha: 0.6, add: false, page: true },
 };
 
 /** Clima: chuva em riscos, ou partículas (neve, brasas, cinza, pó, páginas) que acompanham a câmara. */

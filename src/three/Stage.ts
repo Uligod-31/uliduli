@@ -20,6 +20,8 @@ import { glowSprite, hdr, disposeTree } from './common';
 
 export type ViewMode = 'follow' | 'overview';
 
+const DPR_MAX = 2.25;
+
 export class Stage {
   renderer: THREE.WebGLRenderer;
   composer: EffectComposer;
@@ -93,7 +95,7 @@ export class Stage {
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_MAX));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -102,10 +104,12 @@ export class Stage {
     Object.assign(this.el.style, { position: 'fixed', left: '0', top: '0', zIndex: '0', display: 'none' });
     document.body.insertBefore(this.el, document.body.firstChild);
 
-    const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 0 });
+    const ext = this.renderer.extensions;
+    const msaa = this.renderer.capabilities.isWebGL2 && (ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float'));
+    const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: msaa ? 4 : 0 });
     this.composer = new EffectComposer(this.renderer, rt);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.62, 0.75, 0.9);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.5, 1.5);
     // buffers de 8 bits no bloom: compatíveis com todas as GPUs/browsers móveis
     const b = this.bloom;
     for (const t of [b.renderTargetBright, ...b.renderTargetsHorizontal, ...b.renderTargetsVertical]) { t.texture.type = THREE.UnsignedByteType; t.dispose(); }
@@ -119,17 +123,19 @@ export class Stage {
         float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
         void main(){
           vec2 c = vUv - 0.5; float d = dot(c,c);
-          vec2 off = c * (d * 0.016 + pulse * 0.012 + danger * 0.02);
+          vec2 off = c * (d * 0.005 + pulse * 0.01 + danger * 0.02);
           float bl = smoothstep(0.28, 0.52, abs(vUv.y - 0.5)) * tilt; vec2 bp = res * bl * 4.5;
           vec3 col = bl > 0.02 ? vec3(smp(vUv + off, bp).r, smp(vUv, bp).g, smp(vUv - off, bp).b) : vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
-          col *= 1.0 - smoothstep(0.12, 0.62, d) * (0.6 + 0.3 * grade);
+          vec3 nb = (texture2D(tDiffuse, vUv + vec2(res.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(res.x, 0.0)).rgb + texture2D(tDiffuse, vUv + vec2(0.0, res.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, res.y)).rgb) * 0.25;
+          col = max(col + clamp(col - nb, -0.3, 0.3) * 0.7, 0.0);
+          col = max((col - 0.32) * 1.14 + 0.32, 0.0);
+          col *= 1.0 - smoothstep(0.2, 0.7, d) * (0.38 + 0.2 * grade);
           float lu = dot(col, vec3(0.299, 0.587, 0.114));
           col = mix(col, vec3(lu), 0.4 * grade);
           col *= mix(vec3(1.0), vec3(0.93, 1.03, 1.02), grade);
           col = mix(col, col * col * 1.6, 0.25 * grade);
           col += vec3(0.55, 0.0, 0.06) * danger * smoothstep(0.08, 0.5, d) * (0.65 + 0.35 * sin(time * 0.6));
-          col += (h(vUv * 900.0 + time) - 0.5) * 0.045;
-          col *= 0.97 + 0.03 * sin(vUv.y * 900.0);
+          col += (h(vUv * 900.0 + time) - 0.5) * 0.012;
           gl_FragColor = vec4(col, 1.0);
         }`,
     });
@@ -156,7 +162,7 @@ export class Stage {
     this.scene.add(this.island.group, this.scenery.group);
     this.fogBase.set(theme.horizon);
     this.mist.setColor(new THREE.Color(theme.horizon).lerp(new THREE.Color(0xffffff), 0.3).multiplyScalar(0.8));
-    this.fogNear = theme.fogNear ?? 90; this.fogFar = theme.fogFar ?? 900;
+    this.fogNear = Math.max(36, (theme.fogNear ?? 90) * 2.4); this.fogFar = Math.max(180, (theme.fogFar ?? 900) * 1.5);
     this.scene.fog = new THREE.Fog(theme.horizon, this.fogNear, this.fogFar);
     this.th = theme;
     this.fx.uniforms.grade.value = theme.grade ?? 0;
@@ -241,7 +247,7 @@ export class Stage {
   }
   private applyDpr() {
     const dpr = window.devicePixelRatio || 1;
-    this.renderer.setPixelRatio(this.quality === 0 ? Math.min(dpr, 1.75) : this.quality === 1 ? Math.min(dpr, 1.25) : 1);
+    this.renderer.setPixelRatio(this.quality === 0 ? Math.min(dpr, DPR_MAX) : this.quality === 1 ? Math.min(dpr, 1.5) : this.quality === 2 ? Math.min(dpr, 1.25) : 1);
     this.composer.setPixelRatio(this.renderer.getPixelRatio()); this.sync(true);
   }
 
@@ -387,7 +393,7 @@ export class Stage {
     this.sync(true);
     if (mode === 'title') this.placeCamera(0, true);
     this.sun.castShadow = mode !== 'title' && this.quality < 2;
-    this.fx.uniforms.tilt.value = mode === 'title' || this.quality >= 2 ? 0 : 0.5;
+    this.fx.uniforms.tilt.value = mode === 'title' || this.quality >= 2 ? 0 : 0.12;
     this.weather.visible = mode !== 'title' && this.quality < 3;
     this.mist.group.visible = mode !== 'title';
     if (!this.raf) { this.last = performance.now(); this.loop(); }
@@ -427,8 +433,8 @@ export class Stage {
     if (this.slow < 100) return;
     this.slow = 0; this.quality++;
     const dpr = window.devicePixelRatio || 1;
-    if (this.quality === 1) this.renderer.setPixelRatio(Math.min(dpr, 1.25));
-    else if (this.quality === 2) { this.bloom.enabled = false; this.sun.castShadow = false; this.fx.uniforms.tilt.value = 0; }
+    if (this.quality === 1) this.renderer.setPixelRatio(Math.min(dpr, 1.5));
+    else if (this.quality === 2) { this.renderer.setPixelRatio(Math.min(dpr, 1.25)); this.bloom.enabled = false; this.sun.castShadow = false; this.fx.uniforms.tilt.value = 0; }
     else { this.renderer.setPixelRatio(1); this.weather.visible = false; }
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.sync(true);
@@ -508,7 +514,7 @@ export class Stage {
     const pulse = sfx.pulse();
     this.pulseCur += (pulse - this.pulseCur) * 0.6;
     this.fx.uniforms.pulse.value = this.pulseCur;
-    this.bloom.strength = 0.55 + 0.4 * this.pulseCur;
+    this.bloom.strength = 0.36 + 0.4 * this.pulseCur;
     this.eye!.update(dt, this.camera, this.pulseCur);
   }
 
@@ -583,7 +589,7 @@ export class Stage {
     // ritmo: o bumbo faz a imagem, o neon e a câmara pulsarem
     const pulse = sfx.pulse();
     this.pulseCur += (pulse - this.pulseCur) * 0.6;
-    this.bloom.strength = 0.62 + 0.5 * this.pulseCur + this.dangerCur * 0.3;
+    this.bloom.strength = 0.4 + 0.5 * this.pulseCur + this.dangerCur * 0.3;
     this.fx.uniforms.pulse.value = this.pulseCur;
     const fov = 58 - 1.6 * this.pulseCur;
     if (Math.abs(this.camera.fov - fov) > 0.01) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }

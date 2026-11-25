@@ -29,14 +29,14 @@ export function makeTitleGiant(Rd: number): TitleGiant {
   };
 
   // ───────── céu pintado, muito ao fundo ─────────
-  if (!skyTex) { skyTex = new THREE.CanvasTexture(drawSky(1080)); skyTex.colorSpace = THREE.SRGBColorSpace; skyTex.anisotropy = 4; }
+  if (!skyTex) { skyTex = new THREE.CanvasTexture(drawSky(1080)); skyTex.colorSpace = THREE.SRGBColorSpace; skyTex.anisotropy = 16; }
   const skyP = new THREE.Mesh(new THREE.PlaneGeometry(76, 135), new THREE.MeshBasicMaterial({ map: skyTex, depthWrite: false, fog: false, toneMapped: false }));
   skyP.position.set(0, 14, -62); skyP.renderOrder = -5; group.add(skyP);
 
   // ───────── a ilustração ─────────
   if (!mummyTex) {
     mummyTex = new THREE.CanvasTexture(drawMummy(1536));
-    mummyTex.colorSpace = THREE.SRGBColorSpace; mummyTex.anisotropy = 8; mummyTex.generateMipmaps = true; mummyTex.minFilter = THREE.LinearMipmapLinearFilter;
+    mummyTex.colorSpace = THREE.SRGBColorSpace; mummyTex.anisotropy = 16; mummyTex.generateMipmaps = true; mummyTex.minFilter = THREE.LinearMipmapLinearFilter;
   }
   const PW = 21, PH = (PW * MUMMY_H) / MUMMY_W, YC = 5.6, PZ = -13.6;
   const art = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshBasicMaterial({ map: mummyTex, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
@@ -62,7 +62,7 @@ export function makeTitleGiant(Rd: number): TitleGiant {
 
   // ───────── mãos gigantes a agarrar o mundo PELOS LADOS ─────────
   // O mundo tem um ventre rochoso: a palma encosta-se ao flanco e os dedos contornam-no, por baixo do labirinto.
-  const bandTex = new THREE.CanvasTexture(drawBandageTex(512)); bandTex.wrapS = bandTex.wrapT = THREE.RepeatWrapping; bandTex.colorSpace = THREE.SRGBColorSpace; bandTex.anisotropy = 4;
+  const bandTex = new THREE.CanvasTexture(drawBandageTex(512)); bandTex.wrapS = bandTex.wrapT = THREE.RepeatWrapping; bandTex.colorSpace = THREE.SRGBColorSpace; bandTex.anisotropy = 16;
   const hskin = new THREE.MeshStandardMaterial({ map: bandTex, color: 0xffffff, roughness: 0.95 });
   const hskinD = new THREE.MeshStandardMaterial({ map: bandTex, color: 0x8a8578, roughness: 0.95 });
   handMats.push(hskin, hskinD);

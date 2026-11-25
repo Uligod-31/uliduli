@@ -107,7 +107,7 @@ export function makeCheckerTexture(a: string, b: string, n = 8): THREE.CanvasTex
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
+  t.anisotropy = 16;
   return t;
 }
 
