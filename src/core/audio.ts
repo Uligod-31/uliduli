@@ -95,6 +95,11 @@ class Sfx {
   hint() { [0, 5, 9, 14].forEach((n, i) => this.tone(midi(84 + n), 0.22, 'triangle', 0.05, undefined, i * 0.05)); }
   win() { [0, 3, 7, 12, 15, 19].forEach((n, i) => this.tone(midi(62 + n), 0.45, 'sawtooth', 0.07, undefined, i * 0.08)); }
 
+  // Chama Viva
+  blow() { this.tone(520, 0.34, 'sawtooth', 0.05, 70); this.tone(1500, 0.28, 'triangle', 0.035, 180, 0.02); this.tone(90, 0.3, 'sine', 0.12, 45, 0.18); }
+  heartbeat() { this.tone(72, 0.13, 'sine', 0.22, 46); this.tone(62, 0.16, 'sine', 0.16, 40, 0.17); }
+  snuff() { this.tone(340, 0.8, 'triangle', 0.12, 40); this.tone(900, 0.35, 'sawtooth', 0.03, 120, 0.05); }
+
   // ───────────── banda ─────────────
   private chug(f: number, t: number, len: number, power = true) {
     const c = this.ctx!;

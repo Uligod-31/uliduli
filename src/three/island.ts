@@ -5,6 +5,7 @@ import { buildIceFx, buildLavaFx, buildWarpFx, buildHoleFx, buildHazardFx, build
 import { Pal } from '../core/theme';
 import { mulberry32 } from '../core/rng';
 import { collectWalls } from '../art/render';
+import { buildBarrierFx, BarrierFx } from './barriers';
 import { hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
 import { buildPlanetBody } from './planet';
 import { wallPBR, floorPBR } from './pbr2';
@@ -20,6 +21,7 @@ export interface Island {
   group: THREE.Group;
   dyn: DynWall[];
   radius: number;
+  barriers?: BarrierFx;
   cellPos(i: number, out?: THREE.Vector3): THREE.Vector3;
   gridPos(gx: number, gy: number, out?: THREE.Vector3): THREE.Vector3;
   update(dt: number, t?: number): void;
@@ -287,7 +289,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
   });
 
   // detalhe de cenário: musgo, poças, ossos, lápides, velas, archotes
-  const reserved = new Set<number>([m.start, m.exit, ...m.rosas]);
+  const reserved = new Set<number>([m.start, m.exit, ...m.rosas, ...(m.barriers ?? []).flatMap((b) => [b.a, b.b])]);
   // com mecânica, o chão fica limpo: nada se pode confundir com neve, lava ou anéis (nos anéis só o exterior tem adereços)
   const decorOpen = R2 ? open.filter((i) => R2.layer[i] === 0) : m.mech ? [] : open;
   const decor = buildDecor({ cols, rows, open: decorOpen, reserved, segs, rng: mulberry32(seed * 71 + 5), style: L.decor as DecorOpts['style'], accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
@@ -301,9 +303,11 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
   const hideFloor = (c: number) => { const zero = new THREE.Matrix4().makeScale(0, 0, 0); for (const [mesh, k] of floorAt.get(c) ?? []) { mesh.setMatrixAt(k, zero); mesh.instanceMatrix.needsUpdate = true; } };
   const fx = m.warp ? buildWarpFx(m, cellPos) : m.holes ? buildHoleFx(m, cellPos) : m.haz ? buildHazardFx(m, cellPos) : m.clouds ? buildCloudFx(m, cellPos, hideFloor) : undefined;
   if (fx) group.add(fx.group);
+  const barriers = m.barriers?.length ? buildBarrierFx(m, cellPos) : undefined;
+  if (barriers) group.add(barriers.group);
 
   return {
-    group, dyn, radius: R, ice, lava, fx,
+    group, dyn, radius: R, ice, lava, fx, barriers,
     layers: R2 ? layers : undefined,
     setRingTarget: R2 ? (l: number) => { ringTargetL = l; } : undefined,
     pulse(p: number) { stripMat.color.copy(stripBase).multiplyScalar(1 + 1.1 * p); },
@@ -315,6 +319,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
       ice?.update(t);
       lava?.update(dt, t);
       fx?.update(dt, t);
+      barriers?.update(dt, t);
       for (const g of marks) (g.material as THREE.MeshBasicMaterial).opacity = g.userData.layer === ringTargetL ? 0.35 + 0.3 * Math.sin(t * 4.5) : 0;
       for (const d of dyn) {
         d.vel += (d.target - d.cur) * 190 * dt;

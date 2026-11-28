@@ -5,6 +5,7 @@ import { Maze, DIRS, OPP, canPass, neighbor, pathTo, distFrom } from '../core/ma
 import { mulberry32, shuffle } from '../core/rng';
 import { levelMaze } from '../art/thumb';
 import { travel, solve, rotCell, setRot, ringTarget, hazardAt, hazardIn, cloudBit, BRASAS } from '../core/mech';
+import { ELEMENTS, PUDDLE, REVIVE, LURE_R, LURE_TICKS, GAS_R, LOW, barrierNear, openBarrier } from '../core/viva';
 import { LevelDef, WorldDef, getWorld, isUnlocked, GUARD_HUNT, GUARD_STUN, GUARD_STUN_R, HINTS, guardEvery } from '../worlds';
 import { sfx } from '../core/audio';
 import { save } from '../core/save';
@@ -43,6 +44,22 @@ export class GameScene extends Phaser.Scene {
   private actionBtn?: Btn;
   private mechTxt?: Phaser.GameObjects.Text;
   private mechPips!: Phaser.GameObjects.Graphics;
+  // Chama Viva
+  private light = 0;
+  private lightMax = 1;
+  private lightShown = 1;
+  private relit = false;          // apanhou uma chama neste passo
+  private soak = 0;               // luz extra perdida em poças neste passo
+  private puddles = new Set<number>();
+  private lure = 0;               // vezes que os guardas ainda vão atrás do clarão
+  private facing = 2;
+  private warned = false;
+  private bumpTip = false;
+  private lightG!: Phaser.GameObjects.Graphics;
+  private lightTxt!: Phaser.GameObjects.Text;
+  private blowBtn?: Btn;
+  private blowRing?: Phaser.GameObjects.Graphics;
+  private blowTip?: Phaser.GameObjects.Text;
 
   private pips!: Phaser.GameObjects.Graphics;
   private guardPips!: Phaser.GameObjects.Graphics;
@@ -61,6 +78,8 @@ export class GameScene extends Phaser.Scene {
     this.moves = 0; this.phase = 0; this.moving = false; this.done = false; this.blocked = true;
     this.run = false; this.lastDir = -1; this.queued = null; this.collected = 0; this.hints = HINTS; this.overview = false;
     this.brasas = BRASAS; this.armed = false; this.gone = 0; this.actionBtn = undefined; this.mechTxt = undefined;
+    this.relit = false; this.soak = 0; this.puddles = new Set(); this.lure = 0; this.facing = 2; this.warned = false; this.bumpTip = false;
+    this.blowBtn = undefined; this.blowRing = undefined; this.blowTip = undefined; this.lightShown = 1;
     this.pad.id = -1; this.pad.dir = -1; this.pad.kx = 0; this.pad.ky = 0; this.padArrows = [];
   }
 
@@ -69,6 +88,7 @@ export class GameScene extends Phaser.Scene {
     const { def } = this;
     const m = (this.m = levelMaze(def));
     this.idx = m.start;
+    this.light = this.lightMax = m.light ?? 99;
     this.trail = [m.start];
     this.rosas = new Set(m.rosas);
 
@@ -101,38 +121,49 @@ export class GameScene extends Phaser.Scene {
     this.setupInput();
     this.updateHud();
 
-    const go = () => this.mechCard(() => { this.blocked = false; });
+    const go = () => this.introCards(() => { this.blocked = false; this.updateHud(); });
     if (this.skipIntro || !def.intro.length) go();
     else this.time.delayedCall(1300, () => playDialogue(this, def.intro, go));
   }
 
-  /** Na primeira vez de cada mecânica, um cartão curto explica a regra antes de começar. */
-  private mechCard(done: () => void) {
+  /** Na primeira vez de cada regra (a Chama Viva, o sopro do mundo, a mecânica), um cartão curto explica-a. */
+  private introCards(done: () => void) {
+    const cards: [string, string, string][] = [['viva', 'CHAMA VIVA', 'A tua luz é a tua vida: cada passo gasta 1, e cada chama que apanhas reacende-te por inteiro.\n\nSe a luz acabar, um Vagalume que te sobre reacende-te. Sem nenhum, apagas-te.']];
+    const kind = this.m.barriers?.[0]?.kind;
+    if (kind) cards.push(['sopro_' + kind, ELEMENTS[kind].name, ELEMENTS[kind].text + '\n\nÉ um atalho: encosta-te e carrega em Soprar.']);
     const mech = this.m.mech;
-    const key = 'uliduli_mech_' + mech;
+    if (mech) {
+      const info = ({
+        ice: ['GELO', 'Aqui não se caminha: desliza-se até à parede ou até à neve. Os aros no chão mostram onde vais parar.\n\nO botão Brasa (3 cargas) faz o próximo passo ter só uma casa e derrete o chão numa poça onde podes travar.'],
+        lava: ['A LAVA', 'Ao fim de uns passos, a lava nasce onde começaste e avança sempre.\n\nO chão que vai arder racha primeiro. Escolhe bem a ordem das chamas: só andas tu, só anda ela.'],
+        rings: ['OS ANÉIS', 'O labirinto é feito de anéis. O botão Rodar gira o anel assinalado (leva-te se estiveres em cima dele) e conta como um passo.\n\nAlinha as portas e chega ao centro.'],
+        planet: ['PLANETA REDONDO', 'Os arcos de luz da mesma cor ligam os dois lados do mundo: sais por um e entras pelo outro.\n\nOs guardas também os usam.'],
+        holes: ['BURACOS DE VERME', 'Ao pisares um redemoinho, sais no redemoinho da mesma cor.\n\nSão atalhos: escondem o caminho mais curto até às chamas.'],
+        tide: ['A MARÉ', 'A cada 12 passos o mar enche durante 4. As poças azuis são zonas baixas: se lá estiveres quando a água subir, és levado.\n\nO botão Esperar deixa passar um passo.'],
+        beat: ['A BATIDA', 'As colunas rebentam à vez, por cores: rosa, azul e amarelo, dois passos cada. A que pisca é a seguinte.\n\nO botão Esperar deixa passar um passo.'],
+        page: ['VIRAR A PÁGINA', 'O botão Virar troca de página: umas passagens abrem-se e outras fecham-se. Conta como um passo.\n\nAs estantes fúcsia são as que se movem; a marca azul no chão mostra onde podem voltar.'],
+        clouds: ['NUVENS', 'Os tufos desfazem-se quando sais de cima deles, e fica um buraco.\n\nPensa no caminho de volta antes de ires às chamas.'],
+      } as Record<string, string[]>)[mech];
+      cards.push(['mech_' + mech, info[0], info[1]]);
+    }
+    const next = () => { const c = cards.shift(); if (!c) { done(); return; } this.card(c[0], c[1], c[2], next); };
+    next();
+  }
+
+  private card(id: string, head: string, text: string, done: () => void) {
+    const key = 'uliduli_' + id;
     let seen = false; try { seen = !!localStorage.getItem(key); } catch { /* ok */ }
-    if (!mech || seen) { done(); return; }
-    const info = ({
-      ice: ['GELO', 'Aqui não se caminha: desliza-se até à parede ou até à neve. Os aros no chão mostram onde vais parar.\n\nO botão Brasa (3 cargas) faz o próximo passo ter só uma casa e derrete o chão numa poça onde podes travar.'],
-      lava: ['A LAVA', 'Ao fim de uns passos, a lava nasce onde começaste e avança sempre.\n\nO chão que vai arder racha primeiro. Escolhe bem a ordem das chamas: só andas tu, só anda ela.'],
-      rings: ['OS ANÉIS', 'O labirinto é feito de anéis. O botão Rodar gira o anel assinalado (leva-te se estiveres em cima dele) e conta como um passo.\n\nAlinha as portas e chega ao centro.'],
-      planet: ['PLANETA REDONDO', 'Os arcos de luz da mesma cor ligam os dois lados do mundo: sais por um e entras pelo outro.\n\nOs guardas também os usam.'],
-      holes: ['BURACOS DE VERME', 'Ao pisares um redemoinho, sais no redemoinho da mesma cor.\n\nSão atalhos: escondem o caminho mais curto até às chamas.'],
-      tide: ['A MARÉ', 'A cada 12 passos o mar enche durante 4. As poças azuis são zonas baixas: se lá estiveres quando a água subir, és levado.\n\nO botão Esperar deixa passar um passo.'],
-      beat: ['A BATIDA', 'As colunas rebentam à vez, por cores: rosa, azul e amarelo, dois passos cada. A que pisca é a seguinte.\n\nO botão Esperar deixa passar um passo.'],
-      page: ['VIRAR A PÁGINA', 'O botão Virar troca de página: umas passagens abrem-se e outras fecham-se. Conta como um passo.\n\nAs estantes com flores são as que se movem.'],
-      clouds: ['NUVENS', 'Os tufos desfazem-se quando sais de cima deles, e fica um buraco.\n\nPensa no caminho de volta antes de ires às chamas.'],
-    } as Record<string, string[]>)[mech];
+    if (seen) { done(); return; }
     const root = this.add.container(0, 0).setDepth(170);
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x05060b, 0.72).setInteractive();
     const g = this.add.graphics();
-    g.fillStyle(0x1e2025, 0.97); g.fillRoundedRect(60, 360, W - 120, 560, 34);
-    g.lineStyle(3, UI.line, 1); g.strokeRoundedRect(60, 360, W - 120, 560, 34);
+    g.fillStyle(0x1e2025, 0.97); g.fillRoundedRect(60, 340, W - 120, 660, 34);
+    g.lineStyle(3, UI.line, 1); g.strokeRoundedRect(60, 340, W - 120, 660, 34);
     g.fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1); g.fillRect(100, 466, W - 200, 5);
-    const title = gradText(this, W / 2, 420, info[0], 56);
-    const body = this.add.text(W / 2, 500, info[1], { fontFamily: FONT, fontSize: '30px', color: '#eceef3', align: 'center', wordWrap: { width: W - 200 }, lineSpacing: 8 }).setOrigin(0.5, 0);
+    const title = gradText(this, W / 2, 410, head, 56);
+    const body = this.add.text(W / 2, 500, text, { fontFamily: FONT, fontSize: '30px', color: '#eceef3', align: 'center', wordWrap: { width: W - 200 }, lineSpacing: 8 }).setOrigin(0.5, 0);
     root.add([dim, g, title, body]);
-    root.add(button(this, W / 2, 852, 420, 100, 'Entendi', () => {
+    root.add(button(this, W / 2, 928, 420, 100, 'Entendi', () => {
       try { localStorage.setItem(key, '1'); } catch { /* ok */ }
       root.destroy(); this.time.delayedCall(60, done);
     }, 'primary', 36));
@@ -151,8 +182,8 @@ export class GameScene extends Phaser.Scene {
 
     this.add.text(W / 2, 54, wd.name.toUpperCase(), { fontFamily: FONT, fontSize: '22px', color: toHex(lighten(wd.pal.accent, 0.35)), fontStyle: 'bold' }).setOrigin(0.5).setDepth(30).setStyle({ letterSpacing: 5 } as any);
     this.add.text(W / 2, 96, `${def.bonus ? '★ Bónus' : 'Nível ' + (this.li + 1)} · ${def.title}`, { fontFamily: FONT, fontSize: '30px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(30);
-    const line = this.add.graphics().setDepth(30);
-    line.fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1); line.fillRect(0, 132, W, 4);
+    this.lightG = this.add.graphics().setDepth(30);
+    this.lightTxt = this.add.text(W / 2, 135, '', { fontFamily: FONT, fontSize: '18px', color: '#ffffff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 4 }).setOrigin(0.5).setDepth(30);
 
     button(this, 70, 70, 100, 70, '‹', () => this.scene.start('Levels', { world: wd.id }), 'ghost', 40).setDepth(31);
     const snd = button(this, W - 80, 70, 120, 70, save.mute ? '♪ off' : '♪ on', () => {
@@ -163,7 +194,7 @@ export class GameScene extends Phaser.Scene {
     this.movesTxt = this.add.text(W - 50, 176, '', { fontFamily: FONT, fontSize: '25px', color: '#fff', fontStyle: 'bold' }).setOrigin(1, 0.5).setDepth(30);
     this.pips = this.add.graphics().setDepth(30);
     this.guardPips = this.add.graphics().setDepth(30);
-    if (this.m.dyn.length && this.m.mech !== 'page') label(this, W / 2, 160, 'as sebes mudam em', 18, UI.textDim as string).setDepth(30);
+    if (this.m.dyn.length && this.m.mech !== 'page') label(this, W / 2, 168, 'sebes mudam', 17, UI.textDim as string).setDepth(30);
 
     // rodapé: três botões numa linha; o joystick fica por cima deles
     this.hintBtn = button(this, 175, H - 70, 300, 88, 'Vagalume ✦' + HINTS, () => this.useHint(), 'primary', 28).setDepth(31);
@@ -171,6 +202,78 @@ export class GameScene extends Phaser.Scene {
     button(this, 575, H - 70, 220, 88, 'Reiniciar', () => this.scene.restart({ world: wd.id, level: this.li, skipIntro: true }), 'ghost', 24).setDepth(31);
     this.buildPad();
     this.buildMech();
+    this.buildBlow();
+  }
+
+  /** A barra de luz (com o gradiente de assinatura; âmbar e vermelho quando está a acabar). */
+  private drawLight() {
+    const g = this.lightG, x = 24, y = 122, w = W - 48, h = 26;
+    this.lightShown += (this.light / this.lightMax - this.lightShown) * 0.18;
+    const f = Math.max(0, Math.min(1, this.lightShown)), end = x + 3 + (w - 6) * f;
+    const low = this.light <= this.lightMax * LOW, beat = low ? 0.5 + 0.5 * Math.sin(this.time.now / 130) : 0;
+    g.clear();
+    g.fillStyle(0x0a0b10, 0.74); g.fillRoundedRect(x, y, w, h, 13);
+    if (f > 0.004) {
+      if (low) { g.fillStyle(this.light <= this.lightMax * 0.12 ? 0xff3b30 : 0xff9f1a, 0.75 + 0.25 * beat); g.fillRect(x + 3, y + 4, end - x - 3, h - 8); }
+      else { g.fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1); g.fillRect(x + 3, y + 4, end - x - 3, h - 8); }
+      g.fillStyle(0xffb040, 0.28 + 0.2 * beat); g.fillCircle(end, y + h / 2, 17);
+      g.fillStyle(0xffe9a0, 0.95); g.fillCircle(end, y + h / 2, 7);
+    }
+    g.lineStyle(2, low ? 0xffb040 : UI.line, 1); g.strokeRoundedRect(x, y, w, h, 13);
+  }
+
+  /** Botão «Soprar»: só aparece quando o Uli está encostado a uma barreira. */
+  private buildBlow() {
+    const kind = this.m.barriers?.[0]?.kind;
+    if (!kind) return;
+    const x = 88, y = H - 495, E = ELEMENTS[kind];
+    this.blowRing = this.add.graphics().setDepth(30).setPosition(x, y).setVisible(false);
+    this.blowRing.lineStyle(6, E.hex, 0.95); this.blowRing.strokeCircle(0, 0, 72);
+    this.tweens.add({ targets: this.blowRing, scale: 1.09, alpha: 0.5, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    // no botão vê-se logo quanta luz custa
+    this.blowBtn = roundBtn(this, x, y, 64, `−${E.cost}`, 'Soprar', () => this.blow(), 40).setDepth(31).setVisible(false);
+    this.blowBtn.txt.setColor(E.color);
+    this.blowTip = this.add.text(W / 2, 268, E.tip, { fontFamily: FONT, fontSize: '22px', color: E.color, fontStyle: 'bold', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5).setDepth(30).setVisible(false);
+  }
+
+  private refreshBlow() {
+    const hit = this.done || this.moving ? null : barrierNear(this.m, this.idx, this.facing);
+    stage.nearBarrier(hit ? hit.k : -1);
+    const show = !!hit;
+    if (show && this.blowBtn && !this.blowBtn.visible) { this.blowBtn.setScale(0.4); this.tweens.add({ targets: this.blowBtn, scale: 1, duration: 240, ease: 'Back.Out' }); }
+    this.blowBtn?.setVisible(show); this.blowRing?.setVisible(show); this.blowTip?.setVisible(show);
+    if (hit && this.blowBtn) this.blowBtn.setAlpha(this.light > ELEMENTS[this.m.barriers![hit.k].kind].cost ? 1 : 0.45);
+  }
+
+  /** Soprar: gasta luz para abrir a barreira. Cada elemento reage à sua maneira. Conta como um passo. */
+  private blow() {
+    if (this.blocked || this.done || this.moving) return;
+    const hit = barrierNear(this.m, this.idx, this.facing);
+    if (!hit) return;
+    const m = this.m, kind = m.barriers![hit.k].kind, E = ELEMENTS[kind];
+    if (this.light <= E.cost) { sfx.bump(); this.say('Pouca luz para soprar', '#ffb0a0'); return; }
+    this.moving = true; this.run = false; this.queued = null; this.facing = hit.side;
+    const dx = DIRS[hit.side].dx, dz = DIRS[hit.side].dy;
+    stage.player.dir = Math.atan2(dx, dz);
+    this.refreshBlow();
+    sfx.blow(); stage.breath(dx, dz, E.hex); navigator.vibrate?.(20);
+    this.time.delayedCall(300, () => {
+      openBarrier(m, hit.k); stage.burnBarrier(hit.k, E.hex);
+      this.light -= E.cost - E.back - 1;           // o passo desconta o que falta
+      if (E.back) this.say(`+${E.back} de luz: era lenha`, E.color);
+      if (kind === 'gelo') { this.puddles.add(hit.other); stage.puddle(hit.other); }
+      if (kind === 'gas') {
+        const d = distFrom(m, this.idx, this.phase);
+        this.guards.forEach((g, i) => { if (d[g] >= 0 && d[g] <= GAS_R) { this.stun[i] = GUARD_STUN; stage.setGuardStun(i, true); } });
+        sfx.shift(); navigator.vibrate?.([30, 20, 60]);
+      } else if (this.guards.length) {
+        this.lure = LURE_TICKS;
+        const d = distFrom(m, this.idx, this.phase);
+        if (this.guards.some((g, i) => !this.stun[i] && d[g] >= 0 && d[g] <= LURE_R)) this.say('Os guardas viram o clarão!', '#ff9a8a');
+      }
+      this.flameStop = true;
+      this.endTurn();
+    });
   }
 
   /** Linha de estado da mecânica e, no gelo e nos anéis, o botão de ação (à direita do joystick). */
@@ -306,6 +409,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHud() {
+    this.lightTxt.setText(`LUZ ${Math.max(0, this.light)}`);
+    stage.setLife(this.light / this.lightMax);
+    this.refreshBlow();
     this.rosaTxt.setText(`🔥 ${this.collected}/${this.m.rosas.length}` + (this.guards.length ? `   ☠ ${this.guards.length}` : ''));
     this.movesTxt.setText(`Passos ${this.moves}  (par ${this.m.par})`);
     this.pips.clear();
@@ -314,7 +420,7 @@ export class GameScene extends Phaser.Scene {
       const gap = 22, x0 = W / 2 - ((n - 1) * gap) / 2;
       for (let i = 0; i < n; i++) {
         this.pips.fillStyle(i < done ? this.wd.pal.accent : UI.line, 1);
-        this.pips.fillCircle(x0 + i * gap, 188, 7);
+        this.pips.fillCircle(x0 + i * gap, 193, 7);
       }
     }
     // ritmo dos guardas: quando só falta um ponto, o teu próximo passo faz os guardas mexerem-se
@@ -371,7 +477,7 @@ export class GameScene extends Phaser.Scene {
 
   // ───────────────────────── Entrada ─────────────────────────
   private setupInput() {
-    this.keys = this.input.keyboard!.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D,SPACE') as any;
+    this.keys = this.input.keyboard!.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D,SPACE,E') as any;
     const P = this.pad;
     const read = (p: Phaser.Input.Pointer) => {
       const dx = p.x - P.cx, dy = p.y - P.cy, len = Math.hypot(dx, dy);
@@ -469,9 +575,11 @@ export class GameScene extends Phaser.Scene {
   update() {
     if (this.padKnob) this.drawKnob();
     if (this.compass) this.drawCompass();
+    if (this.lightG) this.drawLight();
     if (this.blocked || this.done || this.moving) return;
     const k = this.keys;
-    if (this.actionBtn && Phaser.Input.Keyboard.JustDown(k.SPACE)) { this.action(); return; }
+    if (Phaser.Input.Keyboard.JustDown(k.E)) { this.blow(); return; }
+    if (Phaser.Input.Keyboard.JustDown(k.SPACE)) { if (this.actionBtn) this.action(); else this.blow(); return; }
     let dir = -1;
     // joystick segurado: continua a andar (sem repetir o "toc" na parede). No gelo, cada deslize pede um toque.
     if (this.m.mech !== 'ice' && this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 150 && canPass(this.m, this.idx, this.mapDir(this.pad.dir), this.phase)) this.queued = { dir: this.mapDir(this.pad.dir), run: false };
@@ -492,12 +600,15 @@ export class GameScene extends Phaser.Scene {
   private step(dir: number) {
     if (this.moving || this.done || this.blocked) return;
     const m = this.m;
+    this.facing = dir;
     stage.player.dir = Math.atan2(DIRS[dir].dx, DIRS[dir].dy);
     let path = travel(m, this.idx, dir, (i, d) => canPass(m, i, d, this.phase));
     const wet = path.length > 0 && path.some((c) => hazardAt(m, c, this.moves + 1));
     const lost = path.length > 0 && path.some((c) => { const b = cloudBit(m, c); return b >= 0 && (this.gone & (1 << b)) !== 0; });
     if (wet) this.say(m.mech === 'tide' ? 'A água está lá!' : 'Fora de tempo!', '#ffb0a0');
     if (!path.length || wet || lost) {
+      this.refreshBlow();
+      if (!path.length && !this.bumpTip && barrierNear(m, this.idx, dir)?.side === dir) { this.bumpTip = true; this.say('Sopra para abrir!', '#ffe28a'); }
       sfx.bump(); this.run = false; navigator.vibrate?.(8);
       const a = { t: 0 };
       this.tweens.add({ targets: a, t: 1, duration: 120, onUpdate: () => { stage.player.h = Math.sin(a.t * Math.PI) * 0.25; } });
@@ -506,6 +617,7 @@ export class GameScene extends Phaser.Scene {
     const brasa = this.armed && m.mech === 'ice';
     if (brasa) path = path.slice(0, 1);
     this.moving = true; this.lastDir = dir; this.flameStop = false;
+    this.refreshBlow();
     sfx.step();
     if (m.mech === 'ice') { stage.setTargets([]); if (path.length > 1) { stage.sliding = 1; sfx.shift(); } }
     const pts = [this.idx, ...path], len = path.length, slide = len > 1;
@@ -581,7 +693,9 @@ export class GameScene extends Phaser.Scene {
     if (this.rosas.has(ni)) {
       this.rosas.delete(ni); this.collected++; this.flameStop = true;
       sfx.collect(); stage.removeRose(ni); navigator.vibrate?.(18);
+      this.relit = true; stage.relight();
     }
+    if (this.puddles.has(ni)) { this.soak += PUDDLE; this.say('A água apaga-te!', '#8fdcff'); sfx.bump(); }
     if (ni === m.exit) { this.moves++; this.moving = false; this.updateHud(); this.finish(); return; }
     if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.moves++; this.moving = false; this.caught(); }
   }
@@ -614,6 +728,18 @@ export class GameScene extends Phaser.Scene {
       stage.setLava(this.moves);
       if (m.lava.at[this.idx] <= this.moves) { this.updateHud(); this.caught('lava'); return; }
     }
+    // Chama Viva: cada passo gasta luz; uma chama apanhada neste passo reacende-a por inteiro
+    this.light = this.relit ? this.lightMax : this.light - 1 - this.soak;
+    this.relit = false; this.soak = 0;
+    if (this.light <= 0) {
+      this.light = 0;
+      if (this.hints <= 0) { this.updateHud(); this.caught('dark'); return; }
+      this.hints--; this.light = Math.ceil(this.lightMax * REVIVE); stop = true; this.warned = false;
+      stage.relight(); sfx.hint(); this.say('O Vagalume reacendeu-te!', '#ffe28a'); navigator.vibrate?.([30, 40, 30]);
+    } else if (this.light <= this.lightMax * LOW) {
+      if (!this.warned) { this.warned = true; stop = true; this.say('A tua chama está a morrer!', '#ffb040'); }
+      if (this.light % 2 === 0) sfx.heartbeat();
+    } else this.warned = false;
     this.updateHud();
     if (this.blocked) return;
 
@@ -648,7 +774,7 @@ export class GameScene extends Phaser.Scene {
       for (let d = 0; d < 4; d++) if (canPass(m, g, d, this.phase)) { const n = neighbor(m, g, d), cb = cloudBit(m, n); if (cb < 0 || !(this.gone & (1 << cb))) opts.push(n); }
       if (!opts.length) return;
       let pick: number;
-      const hunting = dist[g] >= 0 && dist[g] <= GUARD_HUNT;
+      const hunting = dist[g] >= 0 && (dist[g] <= GUARD_HUNT || (this.lure > 0 && dist[g] <= LURE_R));
       if (hunting) {
         const best = Math.min(...opts.map((o) => (dist[o] < 0 ? 99 : dist[o])));
         const cands = opts.filter((o) => (dist[o] < 0 ? 99 : dist[o]) === best && !this.guards.some((h, j) => j !== i && h === o));
@@ -662,38 +788,53 @@ export class GameScene extends Phaser.Scene {
       this.guards[i] = pick;
       stage.moveGuard(i, pick);
     });
+    if (this.lure > 0) this.lure--;
     if (this.guards.some((g, i) => g === this.idx && !this.stun[i])) { this.blocked = true; this.time.delayedCall(160, () => this.caught()); }
   }
 
-  private caught(by: 'guard' | 'lava' | 'tide' | 'beat' = 'guard') {
+  private caught(by: 'guard' | 'lava' | 'tide' | 'beat' | 'dark' = 'guard') {
     if (this.done) return;
-    const lava = by === 'lava';
     this.done = true;
-    sfx.bump(); sfx.shift(); navigator.vibrate?.([60, 40, 120]);
-    stage.shake(1.1);
-    const p = stage.worldPos(this.idx);
-    stage.burst(p.x, p.z, [0xff2030, 0xff7a3a, 0xffffff], 40, 0.5);
-    this.cameras.main.flash(260, 255, 30, 40);
+    this.refreshBlow();
+    const dark = by === 'dark';
+    if (dark) { sfx.snuff(); stage.snuff(); navigator.vibrate?.([40, 60, 40]); this.cameras.main.flash(300, 20, 12, 8); }
+    else {
+      sfx.bump(); sfx.shift(); navigator.vibrate?.([60, 40, 120]);
+      stage.shake(1.1);
+      const p = stage.worldPos(this.idx);
+      stage.burst(p.x, p.z, [0xff2030, 0xff7a3a, 0xffffff], 40, 0.5);
+      this.cameras.main.flash(260, 255, 30, 40);
+    }
     const root = this.add.container(0, 0).setDepth(160);
-    const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x200006, 0.62).setInteractive();
-    const title = gradText(this, W / 2, 470, { guard: 'APANHADO', lava: 'QUEIMADO', tide: 'LEVADO', beat: 'EXPLODIU' }[by], 120);
-    title.setFill({ guard: '#ff2a3d', lava: '#ff7a20', tide: '#3ac8ff', beat: '#ff4fd8' }[by]);
-    const quips = by === 'tide' ? ['O mar não avisa duas vezes.', 'Conta os passos até à maré.', 'Quase. Tenta outra vez.'] : by === 'beat' ? ['Fora de tempo!', 'Ouve a cor que pisca.', 'Quase. Tenta outra vez.'] : lava ? ['A lava não espera por ninguém.', 'Muda a ordem das chamas.', 'Os becos queimam primeiro.', 'Quase. Tenta outra vez.']
-      : ['Os Espadas não perdoam.', 'A Rainha manda cumprimentos.', 'Aprende o ritmo deles, rebelde.', 'Quase. Tenta outra vez.'];
+    const dim = this.add.rectangle(W / 2, H / 2, W, H, dark ? 0x040308 : 0x200006, dark ? 0.7 : 0.62).setInteractive();
+    const title = gradText(this, W / 2, 470, { guard: 'APANHADO', lava: 'QUEIMADO', tide: 'LEVADO', beat: 'EXPLODIU', dark: 'APAGASTE-TE' }[by], dark ? 92 : 120);
+    title.setFill({ guard: '#ff2a3d', lava: '#ff7a20', tide: '#3ac8ff', beat: '#ff4fd8', dark: '#ffb040' }[by]);
+    const QUIPS = {
+      guard: ['Os Espadas não perdoam.', 'A Rainha manda cumprimentos.', 'Aprende o ritmo deles, rebelde.'],
+      lava: ['A lava não espera por ninguém.', 'Muda a ordem das chamas.', 'Os becos queimam primeiro.'],
+      tide: ['O mar não avisa duas vezes.', 'Conta os passos até à maré.'],
+      beat: ['Fora de tempo!', 'Ouve a cor que pisca.'],
+      dark: ['As chamas reacendem-te.', 'Escolhe melhor a ordem das chamas.', 'Guarda um Vagalume para o fim.'],
+    };
+    const quips = [...QUIPS[by], 'Quase. Tenta outra vez.'];
     const q = this.add.text(W / 2, 580, quips[Math.floor(Math.random() * quips.length)], { fontFamily: FONT, fontSize: '30px', color: '#ffd0d4' }).setOrigin(0.5);
     root.add([dim, title, q]);
     root.add(button(this, W / 2, 740, 520, 110, 'Tentar outra vez', () => this.scene.restart({ world: this.wd.id, level: this.li, skipIntro: true }), 'primary', 38));
     root.add(button(this, W / 2, 880, 520, 90, 'Níveis', () => this.scene.start('Levels', { world: this.wd.id }), 'ghost', 30));
     root.setAlpha(0);
-    this.tweens.add({ targets: root, alpha: 1, duration: 260 });
-    this.tweens.add({ targets: title, scale: { from: 1.25, to: 1 }, duration: 320, ease: 'Back.Out' });
+    this.tweens.add({ targets: root, alpha: 1, duration: 260, delay: dark ? 700 : 0 });   // deixa ver a chama apagar-se
+    this.tweens.add({ targets: title, scale: { from: 1.25, to: 1 }, duration: 320, delay: dark ? 700 : 0, ease: 'Back.Out' });
   }
 
   private useHint() {
     if (this.hints <= 0 || this.blocked || this.done) return;
     this.hints--; sfx.hint(); this.updateHud();
     if (this.m.mech) this.mechHint();
-    else stage.hint(pathTo(this.m, this.idx, this.m.exit, this.phase).slice(1, 12));
+    else {
+      const d = distFrom(this.m, this.idx, this.phase);
+      const near = [...this.rosas].filter((r) => d[r] >= 0).sort((a, b) => d[a] - d[b])[0];
+      stage.hint(pathTo(this.m, this.idx, near ?? this.m.exit, this.phase).slice(1, 12));
+    }
     // a luz do Vagalume ofusca os guardas por perto: ficam parados e podes passar por eles
     if (this.guards.length) {
       const d = distFrom(this.m, this.idx, this.phase);
@@ -729,6 +870,7 @@ export class GameScene extends Phaser.Scene {
   // ───────────────────────── Fim de nível ─────────────────────────
   private finish() {
     this.done = true;
+    this.refreshBlow();
     sfx.win();
     const m = this.m;
     stage.win();

@@ -10,6 +10,7 @@ import { buildIsland, Island } from './island';
 import { Scenery, themeFor } from './scenery';
 import { makeFlame, makePortal, Trail } from './actors';
 import { rotCell } from '../core/mech';
+import { LOW } from '../core/viva';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
 import { makeTitleGiant, TitleGiant } from './titlegiant';
 import { OrbitTitle } from './orbit';
@@ -52,7 +53,12 @@ export class Stage {
   private spinLift = 0;
   roses = new Map<number, THREE.Group>();
   orbs: { m: THREE.Group; life: number; delay: number; base: THREE.Vector3 }[] = [];
-  parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
+  parts: { m: THREE.Mesh; v: THREE.Vector3; life: number; g?: number; fade?: number }[] = [];
+  // Chama Viva: o Uli encolhe e a escuridão fecha-se à medida que a luz se gasta
+  private life = 1;
+  private lifeCur = 1;
+  private flashT = 0;
+  private dying = 0;
 
   guards: { g: THREE.Group; x: number; y: number; tx: number; ty: number; dir: number; walk: number; stun?: boolean }[] = [];
   /** posição do jogador em unidades de grelha (células, fracionário), salto e direção */
@@ -125,9 +131,9 @@ export class Stage {
     this.composer.addPass(this.bloom);
     // grão, vinheta e aberração cromática: ar de filme sujo / punk
     this.fx = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 }, tilt: { value: 0 }, lift: { value: 0 }, res: { value: new THREE.Vector2(1 / 400, 1 / 700) } },
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 }, tilt: { value: 0 }, lift: { value: 0 }, res: { value: new THREE.Vector2(1 / 400, 1 / 700) }, candle: { value: new THREE.Vector2(0.5, 0.5) }, cr: { value: 1 }, dim: { value: 0 }, low: { value: 0 }, flash: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; uniform float tilt; uniform float lift; uniform vec2 res; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; uniform float tilt; uniform float lift; uniform vec2 res; uniform vec2 candle; uniform float cr; uniform float dim; uniform float low; uniform float flash; varying vec2 vUv;
         vec3 smp(vec2 uv, vec2 bp){ vec3 a = texture2D(tDiffuse, uv).rgb * 0.36; a += texture2D(tDiffuse, uv + vec2(bp.x, 0.0)).rgb * 0.16; a += texture2D(tDiffuse, uv - vec2(bp.x, 0.0)).rgb * 0.16; a += texture2D(tDiffuse, uv + vec2(0.0, bp.y)).rgb * 0.16; a += texture2D(tDiffuse, uv - vec2(0.0, bp.y)).rgb * 0.16; return a; }
         float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
         void main(){
@@ -145,6 +151,12 @@ export class Stage {
           col *= mix(vec3(1.0), vec3(0.93, 1.03, 1.02), grade);
           col = mix(col, col * col * 1.6, 0.25 * grade);
           col += vec3(0.55, 0.0, 0.06) * danger * smoothstep(0.08, 0.5, d) * (0.65 + 0.35 * sin(time * 0.6));
+          // Chama Viva: longe do Uli escurece; o que brilha por si (chamas, portal, arestas de néon) continua a ver-se
+          float away = length((vUv - candle) * vec2(res.y / res.x, 1.0));
+          float keep = smoothstep(0.7, 1.5, dot(col, vec3(0.299, 0.587, 0.114)));
+          col *= 1.0 - dim * smoothstep(cr, cr + 0.26, away) * (1.0 - 0.7 * keep);
+          col += vec3(0.42, 0.13, 0.0) * low * smoothstep(0.1, 0.5, d) * (0.6 + 0.4 * sin(time * 0.9));
+          col += vec3(1.0, 0.55, 0.22) * flash * (1.0 - smoothstep(0.0, 0.12 + 0.5 * (1.0 - flash), away)) * 0.5;
           col += (h(vUv * 900.0 + time) - 0.5) * 0.012;
           gl_FragColor = vec4(col, 1.0);
         }`,
@@ -207,6 +219,7 @@ export class Stage {
     this.island.lava?.set(0, true);
     this.island.fx?.set?.(0, true);
     this.uliScale = 1;
+    this.life = this.lifeCur = 1; this.flashT = 0; this.dying = 0;
     const portalPos = this.island.cellPos(m.exit);
     this.portal.position.copy(portalPos);
     this.tintPortal(this.planet);
@@ -245,7 +258,7 @@ export class Stage {
     this.scene.environment = null; this.scene.fog = null; this.scene.background = this.orbit.background;
     this.uli.visible = false; this.portal.visible = false; this.trail.mesh.visible = false; this.trail.dots.visible = false;
     this.hemi.intensity = 0; this.sun.intensity = 0; this.rim.intensity = 0; this.lamp.intensity = 0;
-    this.fx.uniforms.grade.value = 0; this.fx.uniforms.lift.value = 0; this.fx.uniforms.danger.value = 0; this.renderer.toneMappingExposure = 1.15;
+    this.fx.uniforms.grade.value = 0; this.fx.uniforms.lift.value = 0; this.fx.uniforms.danger.value = 0; this.fx.uniforms.dim.value = 0; this.fx.uniforms.low.value = 0; this.fx.uniforms.flash.value = 0; this.renderer.toneMappingExposure = 1.15;
     this.view = 'follow';
   }
   private dropOrbit() {
@@ -335,6 +348,46 @@ export class Stage {
   dropCloud(cell: number) { this.island?.fx?.drop?.(cell); const p = this.island!.cellPos(cell); this.burst(p.x, p.z, [0xffffff, 0xcfd8ff, 0x9ab8ff], 14, 0.1); }
   /** Salto entre arcos ou buracos: faíscas e a câmara vai direta ao destino. */
   warpBurst(cell: number, color: number) { const p = this.island!.cellPos(cell); this.burst(p.x, p.z, [color, 0xffffff, color], 18, 0.4); }
+  // ───────────────────────── Chama Viva ─────────────────────────
+  /** Fração de luz que resta (0..1). */
+  setLife(f: number) { this.life = Math.max(0, Math.min(1, f)); }
+  /** Uma chama (ou um Vagalume) reacende o Uli. */
+  relight() {
+    this.flashT = 1;
+    const p = this.uli.position;
+    this.burst(p.x, p.z, [0xffb040, 0xffe9a0, 0xff6a1a], 20, 0.55);
+  }
+  /** A chama apaga-se: encolhe até nada e deixa fumo. */
+  snuff() {
+    this.dying = 0.0001; this.life = 0;
+    const p = this.uli.position;
+    for (let i = 0; i < 26; i++) this.spark(p.x, 0.3 + Math.random() * 0.3, p.z, new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.5 + Math.random() * 0.9, (Math.random() - 0.5) * 0.5), [0x5a5c66, 0x8a8d99, 0x3a3c44][i % 3], 0.7, -0.4, 0.7);
+  }
+  /** O sopro: um jato de fogo da boca do Uli na direção da barreira. */
+  breath(dx: number, dz: number, color: number) {
+    const p = this.uli.position;
+    for (let i = 0; i < 34; i++) {
+      const sp = 1.2 + Math.random() * 1.6, side = (Math.random() - 0.5) * 0.8;
+      const v = new THREE.Vector3(dx * sp + dz * side, (Math.random() - 0.4) * 0.7, dz * sp - dx * side);
+      this.spark(p.x + dx * 0.18, 0.4, p.z + dz * 0.18, v, i % 4 === 0 ? color : [0xff7a1a, 0xffc457, 0xffe9a0][i % 3], 2, 0, 2.6);
+    }
+  }
+  private spark(x: number, y: number, z: number, v: THREE.Vector3, color: number, k: number, g: number, fade: number) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.03 + Math.random() * 0.045, 8, 6), new THREE.MeshBasicMaterial({ color: hdr(color, k), toneMapped: false, transparent: true }));
+    m.position.set(x, y, z);
+    this.parts.push({ m, v, life: 1, g, fade });
+    this.scene.add(m);
+  }
+  nearBarrier(k: number) { this.island?.barriers?.near(k); }
+  burnBarrier(k: number, color: number) {
+    this.island?.barriers?.burn(k);
+    const b = this.maze!.barriers![k], a = this.island!.cellPos(b.a), c = this.island!.cellPos(b.b);
+    const x = (a.x + c.x) / 2, z = (a.z + c.z) / 2;
+    this.burst(x, z, [color, 0xffffff, 0xff8a2a], b.kind === 'gas' ? 56 : 30, 0.35);
+    this.shake(b.kind === 'gas' ? 0.9 : 0.25);
+  }
+  puddle(cell: number) { this.island?.barriers?.puddle(cell); }
+
   /** Gelo: aros no chão que mostram onde vais parar em cada direção. */
   setTargets(cells: number[]) {
     while (this.targets.length < cells.length) {
@@ -627,7 +680,11 @@ export class Stage {
     // jogador
     const wp = this.worldPlayer(this.tmp);
     this.uli.position.set(wp.x, this.spinLift, wp.z);
-    this.uli.scale.setScalar(this.uliScale);
+    this.lifeCur += (this.life - this.lifeCur) * (1 - Math.exp(-dt * 5));
+    if (this.dying) this.dying += dt;
+    const alive = this.dying ? Math.max(0.001, 1 - this.dying * 1.6) : 1;
+    const vigor = this.celebrate > 0 ? 1 : 0.68 + 0.32 * this.lifeCur;
+    this.uli.scale.setScalar(this.uliScale * vigor * alive);
     const body = this.uli.userData.body as THREE.Group;
     // marcha: velocidade a partir do deslocamento
     const spd = dt > 0 ? Math.hypot(wp.x - this.prevP.x, wp.z - this.prevP.z) / dt : 0;
@@ -724,13 +781,26 @@ export class Stage {
     this.sun.intensity = (T.sunI ?? 2.4) * (1 - 0.55 * d); this.rim.intensity = (T.rimI ?? 1.4) * (1 - 0.45 * d); this.hemi.intensity = (T.hemiI ?? 1.05) * 1.3 * (1 - 0.35 * d) + 0.18 * d;
     this.scene.environmentIntensity = 0.9 * (1 - 0.5 * d) + 0.15 * d;
     this.scenery.setDark(d);
-    this.lamp.intensity = (T.lampI ?? 0.5) + d * 7.5;
+    this.lamp.intensity = ((T.lampI ?? 0.5) + d * 7.5) * (0.45 + 0.55 * this.lifeCur);
     this.lamp.decay = 1.25;
     this.lamp.distance = (T.lampD ?? 3) + (this.darkR * 2.6) * d + 2 * (1 - d);
     this.scenery.skyMat.uniforms.dark.value = 1 - 0.5 * d;
     (this.scene.fog as THREE.Fog).near = this.fogNear * (1 - d) + 12 * d;
     (this.scene.fog as THREE.Fog).far = this.fogFar * (1 - d) + 80 * d;
     (this.scene.fog as THREE.Fog).color.copy(this.fogBase).multiplyScalar(1 - 0.72 * d);
+
+    // Chama Viva: o halo segue o Uli no ecrã
+    this.camera.updateMatrixWorld();
+    const s = this.tmp.set(wp.x, 0.35, wp.z).project(this.camera);
+    const u = this.fx.uniforms;
+    u.candle.value.set(s.x * 0.5 + 0.5, s.y * 0.5 + 0.5);
+    const spent = Math.max(0, Math.min(1, (0.65 - this.lifeCur) / 0.65));
+    const on = this.celebrate > 0 ? 0 : this.introT;
+    u.dim.value = 0.8 * Math.pow(spent, 0.85) * on * (1 - 0.5 * this.dark);
+    u.cr.value = 0.1 + 0.4 * this.lifeCur;
+    u.low.value = on * Math.max(0, (LOW - this.lifeCur) / LOW);
+    this.flashT = Math.max(0, this.flashT - dt * 1.7);
+    u.flash.value = this.flashT;
 
     // orbes de pista
     for (let i = this.orbs.length - 1; i >= 0; i--) {
@@ -745,8 +815,8 @@ export class Stage {
     // partículas
     for (let i = this.parts.length - 1; i >= 0; i--) {
       const p = this.parts[i];
-      p.life -= dt * 1.1;
-      p.v.y -= 9 * dt;
+      p.life -= dt * (p.fade ?? 1.1);
+      p.v.y -= (p.g ?? 9) * dt;
       p.m.position.addScaledVector(p.v, dt);
       (p.m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, p.life);
       if (p.life <= 0) { this.scene.remove(p.m); disposeTree(p.m); this.parts.splice(i, 1); }

@@ -2,13 +2,14 @@ import Phaser from 'phaser';
 import { generate, Maze } from '../core/maze';
 import { LevelDef, WorldDef, levelOpts } from '../worlds';
 import { buildLevel, cloneMaze } from '../core/mech';
+import { living } from '../core/viva';
 import { CharKind } from './characters';
 import { snap } from '../three/snap';
 
 const levelCache = new Map<LevelDef, Maze>();
 export function levelMaze(def: LevelDef): Maze {
   let m = levelCache.get(def);
-  if (!m) { m = buildLevel(def, levelOpts(def)); levelCache.set(def, m); }
+  if (!m) { m = living(buildLevel(def, levelOpts(def)), def); levelCache.set(def, m); }
   return cloneMaze(m);
 }
 

@@ -1,4 +1,4 @@
-import { MaskKind, MazeOpts, MechKind } from '../core/maze';
+import { MaskKind, MazeOpts, MechKind, Element } from '../core/maze';
 import { Pal, mkPal } from '../core/theme';
 import { CharKind } from '../art/characters';
 
@@ -34,6 +34,9 @@ export interface LevelDef {
   lavaK?: number;  // lava: passos por cada casa que avança
   slack?: number;  // lava: passos de folga antes de ela acordar
   rev?: number;    // versão do desenho do nível (os trilhos guardados de outra versão não se mostram)
+  lightK?: number; // Chama Viva: folga da luz sobre o troço mais longo
+  element?: Element; // elemento das barreiras de sopro deste mundo
+  barriers?: number; // quantas barreiras
   intro: Line[];
   outro?: Line[];
 }
@@ -672,6 +675,21 @@ const tuned: [WorldDef, Record<number, number>][] = [
   [glaciar, { 5: 9387 }],
 ];
 for (const [w, seeds] of tuned) for (const [i, seed] of Object.entries(seeds)) w.levels[Number(i)].seed = seed;
+
+// ───────────────────────── Chama Viva ─────────────────────────
+// A luz é igual para todos (mais folgada nos primeiros níveis). O sopro tem um elemento por mundo; o Glaciar fica
+// com a sua Brasa (abrir paredes no gelo podia prender o jogador) e a Mandala com os anéis, que rodam.
+const SOPRO: Partial<Record<string, Element>> = {
+  b612: 'heras', jardim: 'heras', elfico: 'heras', animal: 'heras',
+  viking: 'gelo',
+  egipto: 'runa', biblioteca: 'runa', tinta: 'runa', estelar: 'runa', angelico: 'runa',
+  demoniaco: 'gas', relogio: 'gas', neon: 'gas', galactico: 'gas', rockstar: 'gas',
+};
+for (const w of WORLDS) w.levels.forEach((l, i) => {
+  l.lightK = [2.3, 2.1, 1.95, 1.9, 1.85, 1.85, 1.85, 1.85][i] ?? 1.85;
+  const e = SOPRO[w.id];
+  if (e) { l.element = e; l.barriers = [2, 3, 3, 3, 3, 4, 4, 4][i] ?? 3; }
+});
 
 export const getWorld = (id: string) => WORLDS.find((w) => w.id === id)!;
 

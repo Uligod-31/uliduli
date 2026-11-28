@@ -462,6 +462,7 @@ export function buildLevel(p: MechParams, opts: MazeOpts): Maze {
 export function cloneMaze(m: Maze): Maze {
   return {
     ...m, pass: m.pass.slice(), rosas: m.rosas.slice(), grip: m.grip?.slice(), clouds: m.clouds?.slice(),
+    barriers: m.barriers?.map((b) => ({ ...b })),
     lava: m.lava ? { ...m.lava } : undefined, rings: m.rings ? { ...m.rings, rot: m.rings.rot.slice() } : undefined,
   };
 }

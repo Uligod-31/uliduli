@@ -1,10 +1,14 @@
-// Robô que joga os níveis com mecânica. Correr: npx esbuild tools/bot-mecanicas.ts --bundle --platform=node --format=esm --outfile=%TEMP%/bot.mjs && node %TEMP%/bot.mjs (ONLY=mandala TRIALS=100)
+// Robô que joga todos os níveis (mecânicas, guardas e Chama Viva). Correr: npx esbuild tools/bot-mecanicas.ts --bundle --platform=node --format=esm --outfile=%TEMP%/bot.mjs && node %TEMP%/bot.mjs
+// Variáveis: ONLY=mandala  TRIALS=100  WANDER=0.2 (fração de passos ao acaso, sem guardas, para medir a luz)  TUNE=1 CAND=8 LV=4,5
 import { distFrom, canPass, neighbor, Maze } from '../src/core/maze';
 import { buildLevel, cloneMaze, solve, travel, rotCell, setRot, iceSound, hazardAt, cloudBit, Act } from '../src/core/mech';
 import { WORLDS, LevelDef, levelOpts, GUARD_HUNT, GUARD_STUN, GUARD_STUN_R, HINTS, guardEvery } from '../src/worlds/index';
 import { mulberry32, shuffle } from '../src/core/rng';
+import { living, routeLegs, openBarrier, REVIVE } from '../src/core/viva';
 
 const TRIALS = Number(process.env.TRIALS ?? 60);
+const WANDER = Number(process.env.WANDER ?? 0.2);
+const build = (def: LevelDef) => living(buildLevel(def, levelOpts(def)), def);
 
 function spawnGuards(m: Maze, n: number, seed: number): number[] {
   const g: number[] = [];
@@ -17,14 +21,16 @@ function spawnGuards(m: Maze, n: number, seed: number): number[] {
 }
 
 /** Joga com as mesmas regras do GameScene; evita guardas perto e usa o Vagalume quando fica encurralado. */
-function play(base: Maze, def: LevelDef, rnd: () => number) {
+function play(base: Maze, def: LevelDef, rnd: () => number, wander = 0) {
   const m = cloneMaze(base);
-  let guards = spawnGuards(m, def.guards ?? 0, def.seed);
+  let guards = wander ? [] : spawnGuards(m, def.guards ?? 0, def.seed);
   const spawned = guards.length;
   const prev = guards.map(() => -1), stun = guards.map(() => 0);
   let at = m.start, moves = 0, phase = 0, charges = HINTS, gone = 0;
   const left = new Set(m.rosas);
-  const res = (win: boolean, why = '') => ({ win, moves, got: 3 - left.size, why, spawned });
+  const max = Number(process.env.LIGHT ?? m.light); let light = max, revives = 0, low = 1;
+  const res = (win: boolean, why = '') => ({ win, moves, got: 3 - left.size, why, spawned, revives, low });
+  let stuck = 0; // passos sem apanhar nada: um jogador, farto de rondar, gasta o Vagalume e passa
   for (let it = 0; it < 600; it++) {
     const near = guards.map((g) => distFrom(m, g, phase));
     const mk = (r: number) => (c: number, t: number) => guards.some((_, i) => stun[i] < t - moves && near[i][c] >= 0 && near[i][c] <= r && t - moves <= 7);
@@ -39,9 +45,26 @@ function play(base: Maze, def: LevelDef, rnd: () => number) {
         plan = solve(m, st, { block: mk(0) }) ?? tryPlan();
       }
     }
+    if (++stuck > 24 && charges > 0 && guards.length) {
+      const d = distFrom(m, at, phase);
+      if (guards.some((g, i) => !stun[i] && d[g] >= 0 && d[g] <= GUARD_STUN_R)) {
+        charges--; stuck = 0; guards.forEach((g, i) => { if (d[g] >= 0 && d[g] <= GUARD_STUN_R) stun[i] = GUARD_STUN; });
+        plan = solve(m, st, { block: mk(0) }) ?? tryPlan();
+      }
+    }
     plan ??= solve(m, st) ?? solve(m, st, { needAll: false });
     if (!plan) return res(false, 'sem caminho');
-    const a = plan[0];
+    let a = plan[0];
+    if (wander && rnd() < wander) {
+      // um passo ao acaso (como quem se engana no caminho), sem se atirar à água, à lava ou a um buraco
+      const open = [0, 1, 2, 3].map((dir) => ({ dir, path: travel(m, at, dir, (i, d) => canPass(m, i, d, phase)) })).filter((o) => {
+        if (!o.path.length || o.path.includes(m.exit)) return false;
+        if (o.path.some((c) => hazardAt(m, c, moves + 1) || (cloudBit(m, c) >= 0))) return false;
+        return !(m.lava && m.lava.at[o.path[o.path.length - 1]] <= moves + 2);
+      });
+      if (open.length) { const o = open[Math.floor(rnd() * open.length)]; a = { type: 'move', dir: o.dir, path: o.path }; }
+    }
+    const before = left.size;
     if (a.type === 'flip') phase ^= 1;
     else if (a.type === 'wait') { /* espera */ }
     else if (a.type === 'rot') {
@@ -80,6 +103,10 @@ function play(base: Maze, def: LevelDef, rnd: () => number) {
     for (let i = 0; i < stun.length; i++) if (stun[i] > 0) stun[i]--;
     if (guards.some((g, i) => g === at && !stun[i])) return res(false, 'guarda');
     if (m.lava && m.lava.at[at] <= moves) return res(false, 'lava');
+    if (left.size < before) stuck = 0;
+    light = left.size < before ? max : light - 1;
+    low = Math.min(low, light / max);
+    if (light <= 0) { if (charges <= 0) return res(false, 'luz'); charges--; revives++; light = Math.ceil(max * REVIVE); }
   }
   return res(false, 'tempo');
 }
@@ -87,13 +114,13 @@ function play(base: Maze, def: LevelDef, rnd: () => number) {
 if (process.env.TUNE) {
   // para cada nível com guardas, procura uma semente em que se ganhe e se consigam as 3 estrelas
   for (const wd of WORLDS) {
-    if (!wd.ready || !wd.levels[0]?.mech || (process.env.ONLY && process.env.ONLY !== wd.id)) continue;
+    if (!wd.ready || (process.env.ONLY && process.env.ONLY !== wd.id)) continue;
     wd.levels.forEach((base, li) => {
       if (!base.guards || (process.env.LV && !process.env.LV.split(",").includes(String(li)))) return;
       let best = { seed: base.seed, sc: -1e9, v: 0, s3: 0 };
       for (let k = 0; k < Number(process.env.CAND ?? 6); k++) {
         const def = { ...base, seed: base.seed + k * 1009 };
-        const m = buildLevel(def, levelOpts(def)); const rnd = mulberry32(99 + li + def.seed);
+        const m = build(def); const rnd = mulberry32(99 + li + def.seed);
         let win = 0, s3 = 0, sp = 0;
         for (let t = 0; t < TRIALS; t++) { const r = play(m, def, rnd); sp = r.spawned; if (r.win) { win++; if (r.got === 3 && r.moves <= m.par) s3++; } }
         const v = (100 * win) / TRIALS, q = (100 * s3) / TRIALS;
@@ -107,21 +134,28 @@ if (process.env.TUNE) {
   process.exit(0);
 }
 for (const wd of WORLDS) {
-  if (!wd.ready || !wd.levels[0]?.mech) continue;
+  if (!wd.ready) continue;
   if (process.env.ONLY && process.env.ONLY !== wd.id) continue;
   wd.levels.forEach((def, li) => {
     const t0 = Date.now();
-    const m = buildLevel(def, levelOpts(def));
+    const m = build(def);
     const ms = Date.now() - t0;
-    const s = solve(m, { cell: m.start, flames: m.rosas, t: 0 });
+    const st = { cell: m.start, flames: m.rosas, t: 0 };
+    const s = solve(m, st);
     if (!s) { console.log(wd.id, li + 1, 'SEM SOLUCAO'); return; }
+    // quanto poupa cada barreira aberta sozinha (passos na melhor rota)
+    const gains = (m.barriers ?? []).map((_, k) => { const c = cloneMaze(m); openBarrier(c, k); return s.length - (solve(c, st)?.length ?? 999); });
+    const legs = routeLegs(m);
     const open = m.solid.filter((x) => !x).length;
     const extra = m.mech === 'ice' ? `gelo ${Math.round(100 - (100 * m.grip!.reduce((a, b) => a + b, 0)) / open)}% desl.max ${Math.max(...s.map((a) => (a.type === 'move' ? a.path.length : 0)))} sound ${iceSound(m)}`
-      : m.mech === 'lava' ? `atraso ${m.lava!.delay} k ${m.lava!.k}` : m.mech === 'rings' ? `rodar ${s.filter((a) => a.type === 'rot').length}`
+      : !m.mech ? '' : m.mech === 'lava' ? `atraso ${m.lava!.delay} k ${m.lava!.k}` : m.mech === 'rings' ? `rodar ${s.filter((a) => a.type === 'rot').length}`
         : `${m.mech} q${def.amount} viradas ${s.filter((a) => a.type === 'flip').length} esperas ${s.filter((a) => a.type === 'wait').length} nuvens ${m.clouds?.length ?? 0} arcos ${(m.warp?.size ?? 0) / 2} pares ${(m.holes?.size ?? 0) / 2} (sem regra ${solve({ ...m, warp: undefined, holes: undefined, haz: undefined, clouds: undefined } as any, { cell: m.start, flames: m.rosas, t: 0 })?.length})`;
     const rnd = mulberry32(99 + li + def.seed);
-    let win = 0, s3 = 0, spawned = 0; const why: Record<string, number> = {};
-    for (let t = 0; t < TRIALS; t++) { const r = play(m, def, rnd); spawned = r.spawned; if (r.win) { win++; if (r.got === 3 && r.moves <= m.par) s3++; } else why[r.why] = (why[r.why] ?? 0) + 1; }
-    console.log(`${wd.id.slice(0, 4)}${li + 1} otimo ${s.length} par ${m.par} flames ${m.rosas.length} ${extra} g${spawned}/${def.guards ?? 0} | vence ${Math.round((100 * win) / TRIALS)}% 3* ${Math.round((100 * s3) / TRIALS)}% ${JSON.stringify(why)} ${ms}ms`);
+    let win = 0, s3 = 0, spawned = 0, rev = 0; const why: Record<string, number> = {};
+    for (let t = 0; t < TRIALS; t++) { const r = play(m, def, rnd); spawned = r.spawned; rev += r.revives; if (r.win) { win++; if (r.got === 3 && r.moves <= m.par) s3++; } else why[r.why] = (why[r.why] ?? 0) + 1; }
+    // quem se engana no caminho: quantas vezes é a luz que o trava
+    let dark = 0, wrev = 0;
+    for (let t = 0; t < TRIALS; t++) { const r = play(m, def, rnd, WANDER); wrev += r.revives ? 1 : 0; if (r.why === 'luz') dark++; }
+    console.log(`${wd.id.slice(0, 4)}${li + 1} otimo ${s.length} par ${m.par} luz ${m.light} trocos ${legs.join('/')} barr ${gains.join(',') || '-'} ${extra} g${spawned}/${def.guards ?? 0} | vence ${Math.round((100 * win) / TRIALS)}% 3* ${Math.round((100 * s3) / TRIALS)}% reac ${(rev / TRIALS).toFixed(1)} ${JSON.stringify(why)} | errante: reacende ${Math.round((100 * wrev) / TRIALS)}% apaga ${Math.round((100 * dark) / TRIALS)}% ${ms}ms`);
   });
 }

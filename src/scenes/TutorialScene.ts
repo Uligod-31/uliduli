@@ -321,6 +321,75 @@ export class TutorialScene extends Phaser.Scene {
         },
       },
       {
+        title: 'Chama Viva',
+        body: 'A tua luz é a tua vida: cada passo gasta 1 e a escuridão aperta.\nCada chama 🔥 reacende-te por inteiro. Escolhe bem a ordem.',
+        draw: (root) => {
+          const mp = this.map(root, ox, oy, CS, MAP_A);
+          this.portal(root, mp.cx(7), mp.cy(5), CS);
+          const spots: { i: number; p: Pt }[] = [{ i: 5, p: [4, 3] }, { i: 10, p: [7, 1] }];
+          const flames = spots.map((s) => this.rose(root, mp.cx(s.p[0]), mp.cy(s.p[1]), CS));
+          const dark = this.add.graphics(), bar = this.add.graphics(); root.add(dark);
+          const txt = this.add.text(W / 2, PY + 36, '', { fontFamily: FONT, fontSize: '19px', color: '#ffffff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 4 }).setOrigin(0.5);
+          const tok: Phaser.GameObjects.Container = this.walk(root, mp, ROUTE, 7600, false, (t) => {
+            const since = t - spots.reduce((a, s) => (t >= s.i ? s.i : a), 0);
+            const left = Math.max(1, Math.round(8 - since)), f = left / 8;
+            spots.forEach((s, k) => flames[k].setVisible(t < s.i));
+            tok.setScale(0.65 + 0.35 * f);
+            // escuridão em anéis à volta do Uli
+            dark.clear();
+            const R = 40 + 230 * f;
+            for (let y = 0; y < mp.rows.length; y++) for (let x = 0; x < mp.rows[0].length; x++) {
+              const k = Phaser.Math.Clamp((Math.hypot(mp.cx(x) - tok.x, mp.cy(y) - tok.y) - R * 0.6) / R, 0, 1);
+              if (k > 0.02) { dark.fillStyle(0x040308, 0.94 * k * (1 - f * 0.5)); dark.fillRect(mp.cx(x) - CS / 2, mp.cy(y) - CS / 2, CS, CS); }
+            }
+            bar.clear(); bar.fillStyle(0x0a0b10, 0.9); bar.fillRoundedRect(PX + 40, PY + 22, PW - 80, 28, 14);
+            if (f <= 0.25) { bar.fillStyle(0xff9f1a, 1); bar.fillRect(PX + 43, PY + 26, (PW - 86) * f, 20); }
+            else { bar.fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1); bar.fillRect(PX + 43, PY + 26, (PW - 86) * f, 20); }
+            txt.setText(`LUZ ${left}`);
+          });
+          root.add([bar, txt]);
+        },
+      },
+      {
+        title: 'Soprar',
+        body: 'Encosta-te a uma barreira e carrega em Soprar: gasta luz, mas abre um atalho.\nNem todos compensam, e o clarão chama os guardas (o gás atordoa-os).',
+        draw: (root) => {
+          const rows: [string, string, string, number][] = [['Heras', '−8 de luz, devolvem 3', '❦', 0x6ee87a], ['Gelo', '−7, deixa uma poça que apaga', '❄', 0x8fdcff], ['Runa', '−6 de luz', '✧', 0xa98bff], ['Gás', '−8, explode e atordoa', '✹', 0xc8ff3a]];
+          rows.forEach(([name, what, icon, color], i) => {
+            const y = PY + 230 + i * 72;
+            const g = this.add.graphics(); root.add(g);
+            g.fillStyle(0x1e2025, 1); g.fillRoundedRect(PX + 26, y - 30, PW - 52, 60, 16);
+            g.fillStyle(color, 0.95); g.fillCircle(PX + 62, y, 21);
+            const a = this.add.text(PX + 62, y - 1, icon, { fontFamily: FONT, fontSize: '28px', color: '#0a0b10', fontStyle: 'bold' }).setOrigin(0.5);
+            const b = this.add.text(PX + 104, y, name, { fontFamily: FONT, fontSize: '27px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0, 0.5);
+            const c = this.add.text(PX + PW - 48, y, what, { fontFamily: FONT, fontSize: '22px', color: '#c9cdd8' }).setOrigin(1, 0.5);
+            root.add([a, b, c]);
+            for (const o of [g, a, b, c]) { o.setAlpha(0); this.anim.push(this.tweens.add({ targets: o, alpha: 1, duration: 260, delay: 120 + i * 120 })); }
+          });
+          // em cima: o Uli sopra e a barreira desaparece
+          const cy = PY + 96;
+          const tok = this.token(root, W / 2 - 150, cy, CS);
+          const wall = this.add.graphics({ x: W / 2 + 40, y: cy }), fire = this.add.graphics();
+          root.add([wall, fire]);
+          wall.fillStyle(0x2d5a22, 1); wall.fillRoundedRect(-18, -62, 36, 124, 12);
+          for (let k = 0; k < 14; k++) { wall.fillStyle(k % 4 ? 0x5ad04a : 0xff4fd8, 1); wall.fillCircle(Math.sin(k * 2.3) * 16, -54 + k * 8, k % 4 ? 9 : 6); }
+          const o = { t: 0 };
+          this.anim.push(this.tweens.add({
+            targets: o, t: 4, duration: 3800, repeat: -1, ease: 'Linear',
+            onUpdate: () => {
+              fire.clear();
+              if (o.t > 0.8 && o.t < 2.1) for (let k = 0; k < 18; k++) {
+                const u = (o.t * 1.8 + k / 18) % 1;
+                fire.fillStyle([0xff7a1a, 0xffc457, 0xffe9a0][k % 3], 1 - u); fire.fillCircle(tok.x + 30 + u * 140, cy + Math.sin(k * 5.1) * 30 * u, 8 * (1 - u) + 3);
+              }
+              const burn = Phaser.Math.Clamp((o.t - 1.4) / 0.8, 0, 1), back = o.t > 3.5 ? 0 : burn;
+              wall.setAlpha(1 - back); wall.setScale(1 - back * 0.4, Math.max(0.05, 1 - back));
+              tok.setPosition(W / 2 - 150 + (o.t > 2.4 && o.t < 3.5 ? (o.t - 2.4) * 250 : 0), cy);
+            },
+          }));
+        },
+      },
+      {
         title: 'As estrelas',
         body: 'Cada nível dá até 3 estrelas. O «par» aparece no topo, ao lado dos teus passos.\nÉ sempre possível fazer as 3 estrelas: o par já conta com as chamas.',
         draw: (root) => {
@@ -371,7 +440,7 @@ export class TutorialScene extends Phaser.Scene {
       },
       {
         title: 'Vagalume ✦',
-        body: 'Tens 3 vagalumes por nível. Cada um mostra o caminho até à saída e ofusca os guardas a até 6 casas durante 8 passos: ficam parados e podes passar por eles.',
+        body: 'Tens 3 vagalumes por nível. Cada um mostra o caminho à chama mais próxima (ou à saída) e ofusca os guardas a até 6 casas durante 8 passos.\nOs que sobrarem reacendem-te se a luz acabar.',
         draw: (root) => {
           const mp = this.map(root, ox, oy, CS, MAP_A);
           this.portal(root, mp.cx(7), mp.cy(5), CS);
@@ -600,7 +669,7 @@ export class TutorialScene extends Phaser.Scene {
       },
       {
         title: 'Dicas',
-        body: '• Usa ◎ para ver o mapa todo antes de arriscares.\n• Chamas primeiro, saída depois: o par já conta com elas.\n• Com guardas por perto, gasta um vagalume e passa.\n• Preso? «Reiniciar» não custa nada.',
+        body: '• Usa ◎ para ver o mapa todo antes de arriscares.\n• A luz está a acabar? Vai à chama mais próxima.\n• Com guardas por perto, gasta um vagalume e passa.\n• Preso? «Reiniciar» não custa nada.',
         draw: (root) => {
           const cx = W / 2, cy = PY + PH / 2;
           const g = this.add.graphics({ x: cx, y: cy }); root.add(g);

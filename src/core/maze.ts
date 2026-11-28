@@ -21,6 +21,10 @@ export interface DynEdge {
 
 export type MechKind = 'ice' | 'lava' | 'rings' | 'planet' | 'holes' | 'tide' | 'beat' | 'page' | 'clouds';
 
+/** Elementos das barreiras de sopro (Chama Viva, ver core/viva.ts). */
+export type Element = 'heras' | 'gelo' | 'runa' | 'gas';
+export interface Barrier { a: number; b: number; dir: number; kind: Element; open?: boolean }
+
 export interface Maze {
   cols: number;
   rows: number;
@@ -42,6 +46,8 @@ export interface Maze {
   grip?: Uint8Array;                                   // gelo: 1 = neve ou poça (trava o deslize)
   lava?: { delay: number; k: number; at: Int32Array }; // lava: passo em que cada célula se incendeia
   rings?: { n: number; layer: Uint8Array; intra: Set<number>[]; door: Set<number>[]; rot: number[] };
+  light?: number;                                      // Chama Viva: luz máxima (passos entre chamas)
+  barriers?: Barrier[];                                // paredes que o sopro abre (de a para b, dir 1 = E, 2 = S)
 }
 
 export interface MazeOpts {
