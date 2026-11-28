@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { W, toHex } from './theme';
 import { WORLDS, WorldDef } from '../worlds';
 import { drawPlate, drawSky, drawFrame, drawChrome } from '../three/menuArt';
+import { levelMaze } from '../art/thumb';
 
 export const CARD_H = 210;
 
@@ -25,6 +26,8 @@ export function warmMenus(scene: Phaser.Scene, ok: () => boolean) {
     () => { if (!tm.exists('chrome_Mundos')) tm.addCanvas('chrome_Mundos', drawChrome('MUNDOS', 1100, 260, 200, false)); },
     () => { if (!tm.exists('plate_160_80_0')) tm.addCanvas('plate_160_80_0', drawPlate(160, 80, false, 2)); },
     ...WORLDS.map((wd) => () => { ensureWorldCard(tm, wd); }),
+    // os níveis com mecânica são calculados (e provados) por um solver: faz-se com antecedência, um de cada vez
+    ...WORLDS.flatMap((wd) => wd.levels.filter((l) => l.mech).map((l) => () => { levelMaze(l); })),
   ];
   let i = 0;
   const step = () => {

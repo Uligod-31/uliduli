@@ -1,6 +1,7 @@
 ﻿import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Maze } from '../core/maze';
+import { Maze, neighbor, DIRS } from '../core/maze';
+import { buildIceFx, buildLavaFx, IceFx, LavaFx } from './mechfx';
 import { Pal } from '../core/theme';
 import { mulberry32 } from '../core/rng';
 import { collectWalls } from '../art/render';
@@ -24,6 +25,10 @@ export interface Island {
   update(dt: number, t?: number): void;
   pulse(p: number): void;
   dispose(): void;
+  layers?: THREE.Group[];                 // anéis: um grupo por camada (roda inteiro)
+  setRingTarget?(layer: number): void;    // assinala o anel que o botão vai rodar
+  ice?: IceFx;
+  lava?: LavaFx;
 }
 
 function paint(g: THREE.BufferGeometry, v: number) {
@@ -112,14 +117,29 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
       color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), fk === 'flag' ? 0.32 : 0.86), map: flag.map, normalMap: flag.normal, normalScale: new THREE.Vector2(1.1, 1.1),
       roughness: fk === 'ice' ? 0.12 : fk === 'obsidian' ? 0.3 : fk === 'wood' ? 0.8 : fk === 'metal' ? 0.5 : planet ? 0.92 : 0.62,
       metalness: fk === 'metal' ? 0.55 : 0.03, envMapIntensity: fk === 'ice' ? 1.8 : 0.7,
-      emissiveMap: flag.emissive, emissive: flag.emissive ? new THREE.Color(0xffffff) : new THREE.Color(0x000000), emissiveIntensity: flag.emissive ? 1.4 : 0,
+      emissiveMap: flag.emissive, emissive: flag.emissive ? new THREE.Color(0xffffff) : new THREE.Color(0x000000), emissiveIntensity: flag.emissive ? (m.mech === 'lava' ? 0.22 : 1.4) : 0,
     }), list.length);
     const mat = new THREE.Matrix4();
     list.forEach((i, k) => mesh.setMatrixAt(k, mat.makeTranslation(px(i), -FLOOR_T / 2, pz(i))));
     mesh.receiveShadow = true;
     return mesh;
   };
-  group.add(mk(nA, pal.floorA), mk(nB, pal.floorB));
+  const R2 = m.rings;
+  const layers: THREE.Group[] = [];
+  if (R2) {
+    // cada anel tem o seu chão (mais quente para o centro) e roda como uma peça só
+    for (let l = 0; l <= R2.n; l++) {
+      const g = new THREE.Group(); g.rotation.y = -R2.rot[l] * Math.PI / 2; layers.push(g); group.add(g);
+      // cores bem distintas, para se ver de relance o que roda: bronze escuro (fixo), ouro, fúcsia
+      const [ca, cb] = ([[0x4a3828, 0x3e2e20], [0xe8a018, 0xc98608], [0xd83a98, 0xb82a80]] as const)[l];
+      for (const [list, color] of [[nA, ca], [nB, cb]] as const) {
+        const mesh = mk(list.filter((i) => R2.layer[i] === l), color);
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        mat.map = null; mat.color.setHex(color); mat.roughness = 0.5; mat.metalness = 0.25;
+        g.add(mesh);
+      }
+    }
+  } else group.add(mk(nA, pal.floorA), mk(nB, pal.floorB));
 
   let planetAnim: ((t: number) => void) | undefined;
   if (planet) {
@@ -145,18 +165,41 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
 
   }
 
-  // paredes fixas
-  const segs = collectWalls(m);
-  const solids: THREE.BufferGeometry[] = [], strips: THREE.BufferGeometry[] = [];
-  segs.forEach((s, k) => {
-    const { solid, strip } = wallParts(1 + WALL_T, mulberry32(seed * 31 + k * 7 + 1));
-    const cx = (s.x1 + s.x2) / 2 - cols / 2, cz = (s.y1 + s.y2) / 2 - rows / 2;
-    const m4 = new THREE.Matrix4().compose(
-      new THREE.Vector3(cx, 0, cz),
-      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.y1 === s.y2 ? 0 : Math.PI / 2),
-      new THREE.Vector3(1, 1, 1));
-    for (const g of solid) { g.applyMatrix4(m4); solids.push(g); }
-    strip.applyMatrix4(m4); strips.push(strip);
+  // paredes fixas (nos anéis, cada camada tem as suas; as de fronteira são meias paredes recuadas, com as portas abertas)
+  interface WSeg { x1: number; y1: number; x2: number; y2: number; ix?: number; iy?: number }
+  const wallSets: WSeg[][] = [];
+  if (R2) {
+    for (let l = 0; l <= R2.n; l++) {
+      const list: WSeg[] = [];
+      for (let u = 0; u < cols * rows; u++) {
+        if (R2.layer[u] !== l) continue;
+        const c = u % cols, r = (u / cols) | 0;
+        const edge = [[c, r, c + 1, r], [c + 1, r, c + 1, r + 1], [c, r + 1, c + 1, r + 1], [c, r, c, r + 1]];
+        for (let d = 0; d < 4; d++) {
+          const v = neighbor(m, u, d), [x1, y1, x2, y2] = edge[d];
+          if (v < 0) list.push({ x1, y1, x2, y2 });
+          else if (R2.layer[v] === l) { if (u < v && !R2.intra[l].has(u * 10000 + v)) list.push({ x1, y1, x2, y2 }); }
+          else if (!R2.door[l].has(u * 10000 + v)) list.push({ x1, y1, x2, y2, ix: -DIRS[d].dx, iy: -DIRS[d].dy });
+        }
+      }
+      wallSets.push(list);
+    }
+  } else wallSets.push(collectWalls(m));
+  const segs: WSeg[] = R2 ? wallSets[0].filter((w) => w.ix === undefined) : wallSets[0];
+  const built = wallSets.map((set, l) => {
+    const solids: THREE.BufferGeometry[] = [], strips: THREE.BufferGeometry[] = [];
+    set.forEach((w, k) => {
+      const { solid, strip } = wallParts(1 + WALL_T, mulberry32(seed * 31 + (k + l * 500) * 7 + 1));
+      const half = w.ix !== undefined;
+      const cx = (w.x1 + w.x2) / 2 - cols / 2 + (half ? w.ix! * 0.076 : 0), cz = (w.y1 + w.y2) / 2 - rows / 2 + (half ? w.iy! * 0.076 : 0);
+      const m4 = new THREE.Matrix4().compose(
+        new THREE.Vector3(cx, 0, cz),
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), w.y1 === w.y2 ? 0 : Math.PI / 2),
+        new THREE.Vector3(1, 1, half ? 0.52 : 1));
+      for (const g of solid) { g.applyMatrix4(m4); solids.push(g); }
+      strip.applyMatrix4(m4); strips.push(strip);
+    });
+    return { solids, strips };
   });
   const stone = wallPBR(L.wall);
   const wk = L.wall;
@@ -166,13 +209,42 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
     metalness: wk === 'brass' ? 0.6 : wk === 'ice' ? 0.1 : 0, vertexColors: true, envMapIntensity: wk === 'ice' ? 1.7 : 0.6,
     emissiveMap: stone.emissive, emissive: stone.emissive ? new THREE.Color(0xffffff) : new THREE.Color(0x000000), emissiveIntensity: stone.emissive ? 1.6 : 0,
   });
-  const walls = new THREE.Mesh(mergeGeometries(solids, false)!, hedgeMat);
-  walls.castShadow = true; walls.receiveShadow = true;
-  group.add(walls);
   const stripMat = new THREE.MeshBasicMaterial({ color: hdr(pal.accent, planet ? 0.8 : 1.05), toneMapped: false });
-  group.add(new THREE.Mesh(mergeGeometries(strips, false)!, stripMat));
+  built.forEach(({ solids, strips }, l) => {
+    const target = layers[l] ?? group;
+    let wm = hedgeMat, sm = stripMat;
+    if (R2) {
+      wm = hedgeMat.clone(); wm.color.setHex([0x8a7462, 0xffd878, 0xff9ad8][l]);
+      sm = stripMat.clone(); sm.color.copy(hdr([0x8a6a40, 0xffd24a, 0xff4fd8][l], l ? 1.5 : 0.8));
+    }
+    const walls = new THREE.Mesh(mergeGeometries(solids, false)!, wm);
+    walls.castShadow = true; walls.receiveShadow = true;
+    target.add(walls, new THREE.Mesh(mergeGeometries(strips, false)!, sm));
+    solids.forEach((g) => g.dispose()); strips.forEach((g) => g.dispose());
+  });
   const stripBase = stripMat.color.clone();
-  solids.forEach((g) => g.dispose()); strips.forEach((g) => g.dispose());
+
+  // anéis: moldura de luz em cada fronteira (com quatro losangos que mostram a rotação) e destaque do anel-alvo
+  const marks: THREE.Mesh[] = [];
+  if (R2) {
+    const half = (cols - 1) / 2;
+    for (let l = 1; l <= R2.n; l++) {
+      let rad = 0;
+      for (let i = 0; i < cols * rows; i++) if (R2.layer[i] === l) rad = Math.max(rad, Math.abs((i % cols) - half), Math.abs(((i / cols) | 0) - half));
+      const side = 2 * rad + 1, tone = hdr(l === 1 ? 0xffd24a : 0xff5ad0, 1.8);
+      const frame = new THREE.MeshBasicMaterial({ color: tone, toneMapped: false });
+      const mark = new THREE.MeshBasicMaterial({ color: tone, toneMapped: false, transparent: true, opacity: 0, depthWrite: false });
+      for (let k = 0; k < 4; k++) {
+        const rot = new THREE.Matrix4().makeRotationY((k * Math.PI) / 2);
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(side - 0.02, 0.022, 0.09).translate(0, 0.018, side / 2 - 0.03).applyMatrix4(rot), frame);
+        const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.13).scale(1, 0.7, 1).translate(0, WALL_H + 0.2, side / 2).applyMatrix4(rot), frame);
+        const glowBar = new THREE.Mesh(new THREE.BoxGeometry(side + 0.04, 0.02, 0.17).translate(0, WALL_H + 0.09, side / 2).applyMatrix4(rot), mark);
+        glowBar.userData.layer = l; marks.push(glowBar);
+        layers[l].add(bar, gem, glowBar);
+      }
+    }
+  }
+  let ringTargetL = 0;
 
   // sebes dinâmicas (flores brancas): sobem e descem com mola
   const dyn: DynWall[] = [];
@@ -202,17 +274,30 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
 
   // detalhe de cenário: musgo, poças, ossos, lápides, velas, archotes
   const reserved = new Set<number>([m.start, m.exit, ...m.rosas]);
-  const decor = buildDecor({ cols, rows, open, reserved, segs, rng: mulberry32(seed * 71 + 5), style: L.decor as DecorOpts['style'], accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
+  // com mecânica, o chão fica limpo: nada se pode confundir com neve, lava ou anéis (nos anéis só o exterior tem adereços)
+  const decorOpen = R2 ? open.filter((i) => R2.layer[i] === 0) : m.mech ? [] : open;
+  const decor = buildDecor({ cols, rows, open: decorOpen, reserved, segs, rng: mulberry32(seed * 71 + 5), style: L.decor as DecorOpts['style'], accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
   group.add(decor.group);
 
+  const cellPos = (i: number, out = new THREE.Vector3()) => out.set(px(i), 0, pz(i));
+  const ice = m.mech === 'ice' ? buildIceFx(m, cellPos) : undefined;
+  const lava = m.mech === 'lava' ? buildLavaFx(m, cellPos) : undefined;
+  if (ice) group.add(ice.group);
+  if (lava) group.add(lava.mesh);
+
   return {
-    group, dyn, radius: R,
+    group, dyn, radius: R, ice, lava,
+    layers: R2 ? layers : undefined,
+    setRingTarget: R2 ? (l: number) => { ringTargetL = l; } : undefined,
     pulse(p: number) { stripMat.color.copy(stripBase).multiplyScalar(1 + 1.1 * p); },
-    cellPos: (i, out = new THREE.Vector3()) => out.set(px(i), 0, pz(i)),
+    cellPos,
     gridPos: (gx, gy, out = new THREE.Vector3()) => out.set(gx - cols / 2, 0, gy - rows / 2),
     update(dt: number, t = 0) {
       planetAnim?.(t);
       decor.update(t);
+      ice?.update(t);
+      lava?.update(dt, t);
+      for (const g of marks) (g.material as THREE.MeshBasicMaterial).opacity = g.userData.layer === ringTargetL ? 0.35 + 0.3 * Math.sin(t * 4.5) : 0;
       for (const d of dyn) {
         d.vel += (d.target - d.cur) * 190 * dt;
         d.vel *= Math.exp(-9 * dt);

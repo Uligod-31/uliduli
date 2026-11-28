@@ -26,7 +26,7 @@ export class GalleryScene extends Phaser.Scene {
       const ck = `gal_${wd.id}`;
       if (!this.textures.exists(ck)) this.textures.addCanvas(ck, drawPlate(CW, CH, false, 1.5, '#' + wd.pal.accent.toString(16).padStart(6, '0')));
       const card = this.add.image(x, y - 44, ck).setOrigin(0, 0).setScale(1 / 1.5);
-      const art = artFor(this, levelMaze(def), wd, def.seed, CW - 30, 300, s.trail).setPosition(x + 15, y + 15);
+      const art = artFor(this, levelMaze(def), wd, def.seed, CW - 30, 300, s.rev === def.rev ? s.trail : undefined).setPosition(x + 15, y + 15);
       const t = this.add.text(x + CW / 2, y + 340, def.title, { fontFamily: FONT, fontSize: '23px', fontStyle: 'bold', color: '#fff', wordWrap: { width: CW - 30 }, align: 'center' }).setOrigin(0.5);
       const st = this.add.text(x + CW / 2, y + 384, '★'.repeat(s.stars) + '☆'.repeat(3 - s.stars), { fontFamily: FONT, fontSize: '34px', color: '#ffd45a' }).setOrigin(0.5);
       const z = this.add.rectangle(x + CW / 2, y + CH / 2, CW, CH, 0xffffff, 0.001).setInteractive();
@@ -59,7 +59,7 @@ export class GalleryScene extends Phaser.Scene {
     const root = this.add.container(0, 0).setDepth(100);
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.88).setInteractive();
     const aw = 640, ah = 820;
-    const art = artFor(this, levelMaze(def), wd, def.seed, aw, ah, s.trail).setPosition((W - aw) / 2, 130);
+    const art = artFor(this, levelMaze(def), wd, def.seed, aw, ah, s.rev === def.rev ? s.trail : undefined).setPosition((W - aw) / 2, 130);
     root.add([dim, art]);
     root.add(label(this, W / 2, 80, `${wd.name} · ${def.title}`, 32, '#ffffff', true));
     root.add(button(this, W / 2 - 150, 1130, 280, 90, 'Guardar', () => {

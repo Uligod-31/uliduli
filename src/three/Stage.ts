@@ -9,6 +9,7 @@ import { WorldDef } from '../worlds';
 import { buildIsland, Island } from './island';
 import { Scenery, themeFor } from './scenery';
 import { makeFlame, makePortal, Trail } from './actors';
+import { rotCell } from '../core/mech';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
 import { makeTitleGiant, TitleGiant } from './titlegiant';
 import { EyeTitle } from './eye';
@@ -41,6 +42,9 @@ export class Stage {
   uli = makeUli();
   portal = makePortal();
   trail = new Trail();
+  private ringTrails: Trail[] = [];
+  private spin?: { l: number; from: number; player?: { x: number; y: number; dir: number }; guards: { G: Stage['guards'][number]; x: number; y: number }[]; roses: { c: number; g: THREE.Group }[] };
+  private spinLift = 0;
   roses = new Map<number, THREE.Group>();
   orbs: { m: THREE.Group; life: number; delay: number; base: THREE.Vector3 }[] = [];
   parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
@@ -190,6 +194,10 @@ export class Stage {
 
     // atores
     this.trail.reset();
+    this.ringTrails = [];
+    this.spin = undefined; this.spinLift = 0;
+    if (m.rings) for (let l = 1; l <= m.rings.n; l++) { const tr = new Trail(); this.ringTrails[l] = tr; this.island.layers![l].add(tr.mesh, tr.dots); }
+    this.island.lava?.set(0, true);
     const portalPos = this.island.cellPos(m.exit);
     this.portal.position.copy(portalPos);
     this.tintPortal(this.planet);
@@ -287,8 +295,62 @@ export class Stage {
 
   addTrail(a: number, b: number, k: number) {
     const m = this.maze!, I = this.island!;
+    // nos anéis, o trilho pinta-se em coordenadas do anel de chegada, para rodar com ele
+    const l = m.rings ? m.rings.layer[b] : 0;
+    if (m.rings && l) { a = rotCell(m, a, -m.rings.rot[l]); b = rotCell(m, b, -m.rings.rot[l]); }
     const pa = I.cellPos(a), pb = I.cellPos(b);
-    this.trail.add(pa.x, pa.z, pb.x, pb.z, k);
+    (this.ringTrails[l] ?? this.trail).add(pa.x, pa.z, pb.x, pb.z, k);
+  }
+
+  // ───────────────────────── mecânicas ─────────────────────────
+  /** Lava: acende o que chegou ao seu passo e solta faíscas (poucas, para não pesar). */
+  setLava(moves: number) {
+    const fresh = this.island?.lava?.set(moves) ?? [];
+    fresh.slice(0, 6).forEach((c) => { const p = this.island!.cellPos(c); this.burst(p.x, p.z, [0xff5a14, 0xffb040, 0xffe9a0], 7, 0.15); });
+    if (fresh.length) this.shake(0.12);
+  }
+  /** Gelo: a Brasa derrete a célula numa poça que trava. */
+  melt(cell: number) {
+    this.island?.ice?.melt(cell);
+    const p = this.island!.cellPos(cell);
+    this.burst(p.x, p.z, [0xffffff, 0xcfeaff, 0xffa040], 26, 0.2);
+  }
+  frost(cell: number) { const p = this.island!.cellPos(cell); this.burst(p.x, p.z, [0xdff4ff, 0x9bd8ff], 3, 0.08); }
+  setRingTarget(l: number) { this.island?.setRingTarget?.(l); }
+
+  /** Anéis: começa a rodar a camada l; tudo o que está em cima dela viaja junto. */
+  beginSpin(l: number) {
+    const m = this.maze!, R = m.rings!;
+    const inL = (gx: number, gy: number) => R.layer[Math.floor(gy) * m.cols + Math.floor(gx)] === l;
+    this.spin = {
+      l, from: R.rot[l],
+      player: inL(this.player.x, this.player.y) ? { x: this.player.x, y: this.player.y, dir: this.player.dir } : undefined,
+      guards: this.guards.filter((G) => inL(G.tx, G.ty)).map((G) => ({ G, x: G.tx, y: G.ty })),
+      roses: [...this.roses].filter(([c]) => R.layer[c] === l).map(([c, g]) => ({ c, g })),
+    };
+  }
+  /** a: 0..1 de um quarto de volta (sentido dos ponteiros). */
+  spinStep(a: number) {
+    const S = this.spin; if (!S) return;
+    const m = this.maze!, half = m.cols / 2, th = (a * Math.PI) / 2, c = Math.cos(th), s = Math.sin(th);
+    const rot = (x: number, y: number) => ({ x: half + (x - half) * c - (y - half) * s, y: half + (x - half) * s + (y - half) * c });
+    const lift = Math.max(0, Math.sin(a * Math.PI)) * 0.16;
+    const layer = this.island!.layers![S.l];
+    layer.rotation.y = -(S.from + a) * (Math.PI / 2); layer.position.y = lift;
+    if (S.player) { const p = rot(S.player.x, S.player.y); this.player.x = p.x; this.player.y = p.y; this.player.dir = S.player.dir - th; }
+    this.spinLift = S.player ? lift : 0;
+    for (const g of S.guards) { const p = rot(g.x, g.y); g.G.x = g.G.tx = p.x; g.G.y = g.G.ty = p.y; }
+    for (const r of S.roses) { const p = rot((r.c % m.cols) + 0.5, ((r.c / m.cols) | 0) + 0.5); this.island!.gridPos(p.x, p.y, r.g.position); r.g.position.y = lift; }
+  }
+  endSpin(map: (c: number) => number) {
+    const S = this.spin; if (!S) return;
+    this.spinStep(1);
+    for (const r of S.roses) this.roses.delete(r.c);
+    for (const r of S.roses) { const to = map(r.c); this.roses.set(to, r.g); this.island!.cellPos(to, r.g.position); }
+    const snapC = (v: number) => Math.floor(v) + 0.5;
+    this.player.x = snapC(this.player.x); this.player.y = snapC(this.player.y);
+    for (const g of S.guards) { g.G.x = g.G.tx = snapC(g.G.x); g.G.y = g.G.ty = snapC(g.G.y); }
+    this.island!.layers![S.l].position.y = 0; this.spinLift = 0; this.spin = undefined;
   }
 
   setGuards(cells: number[], style = 0) {
@@ -533,7 +595,7 @@ export class Stage {
 
     // jogador
     const wp = this.worldPlayer(this.tmp);
-    this.uli.position.set(wp.x, 0, wp.z);
+    this.uli.position.set(wp.x, this.spinLift, wp.z);
     const body = this.uli.userData.body as THREE.Group;
     // marcha: velocidade a partir do deslocamento
     const spd = dt > 0 ? Math.hypot(wp.x - this.prevP.x, wp.z - this.prevP.z) / dt : 0;
@@ -599,7 +661,17 @@ export class Stage {
     // roses e portal
     for (const [i, r] of this.roses) {
       const b = r.userData.body as THREE.Group;
-      b.rotation.y += dt * 1.3; b.position.y = 0.45 + Math.sin(this.t * 2 + i) * 0.07;
+      // viradas para quem as vê, com os olhos postos no Uli; pulam de alegria quando ele se aproxima
+      const near = Math.max(0, 1 - Math.hypot(wp.x - r.position.x, wp.z - r.position.z) / 2.4);
+      b.rotation.y = Math.atan2(this.camera.position.x - r.position.x, this.camera.position.z - r.position.z);
+      b.position.y = 0.45 + Math.sin(this.t * 2 + i) * 0.07 + Math.abs(Math.sin(this.t * 7 + i)) * 0.12 * near;
+      const eyes = r.userData.eyes as THREE.Group | undefined;
+      if (eyes) {
+        const c = Math.cos(b.rotation.y), s = Math.sin(b.rotation.y), dx = wp.x - r.position.x, dz = wp.z - r.position.z, dl = Math.max(0.6, Math.hypot(dx, dz));
+        eyes.position.x = ((dx * c - dz * s) / dl) * 0.024; eyes.position.y = -((dx * s + dz * c) / dl) * 0.012;
+        const blink = ((this.t + i * 1.37) % 3.1) > 2.95 ? 0.12 : 1;
+        for (const l of r.userData.lids as THREE.Group[]) l.scale.y = blink * (1 + 0.18 * near);
+      }
       const fl = r.userData.flame as THREE.Group | undefined;
       if (fl) fl.scale.set(1 + 0.07 * Math.sin(this.t * 11 + i * 2), 1 + 0.12 * Math.sin(this.t * 8.3 + i) + 0.05 * Math.sin(this.t * 17 + i), 1 + 0.07 * Math.cos(this.t * 9 + i));
     }

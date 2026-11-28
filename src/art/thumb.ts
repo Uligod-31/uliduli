@@ -1,11 +1,15 @@
 import Phaser from 'phaser';
 import { generate, Maze } from '../core/maze';
 import { LevelDef, WorldDef, levelOpts } from '../worlds';
+import { buildLevel, cloneMaze } from '../core/mech';
 import { CharKind } from './characters';
 import { snap } from '../three/snap';
 
+const levelCache = new Map<LevelDef, Maze>();
 export function levelMaze(def: LevelDef): Maze {
-  return generate(levelOpts(def));
+  let m = levelCache.get(def);
+  if (!m) { m = buildLevel(def, levelOpts(def)); levelCache.set(def, m); }
+  return cloneMaze(m);
 }
 
 const S = 1.5; // supersampling das miniaturas

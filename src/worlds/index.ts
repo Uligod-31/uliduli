@@ -27,6 +27,12 @@ export interface LevelDef {
   gp?: number;     // os guardas mexem-se de gp em gp passos teus (por defeito 3)
   weather?: Weather; // clima deste nível (por cima do do mundo)
   bonus?: boolean; // nível bónus: só abre com todas as estrelas dos outros
+  mech?: 'ice' | 'lava' | 'rings'; // mecânica do mundo
+  rings?: number;  // anéis: quantos rodam (1 ou 2)
+  grip?: number;   // gelo: fração extra de neve (mais fácil)
+  lavaK?: number;  // lava: passos por cada casa que avança
+  slack?: number;  // lava: passos de folga antes de ela acordar
+  rev?: number;    // versão do desenho do nível (os trilhos guardados de outra versão não se mostram)
   intro: Line[];
   outro?: Line[];
 }
@@ -602,6 +608,35 @@ export const WORLDS: WorldDef[] = [
   soon('elementais', 'Reino dos Elementos', 'Fogo, água, terra e ar: quatro povos, quatro regras.', 'Mudas de elemento para atravessar.', mkPal(0x0d1c24, 0xe6f2e0, 0x2c8f8f, 0xff8a3b), 'cross', 17),
 ];
 
+// ───────────────────── Mecânicas dos mundos (Vaga 1) ─────────────────────
+// Cada nível redesenhado leva rev: 2, para os trilhos antigos não aparecerem sobre o labirinto novo.
+function mechanics(wd: WorldDef, rule: string, per: Partial<LevelDef>[], intros: Record<number, Line[]> = {}) {
+  wd.rule = rule;
+  wd.levels.forEach((l, i) => { Object.assign(l, { rev: 2 }, per[i] ?? {}); if (intros[i]) l.intro = intros[i]; });
+}
+
+// Gelo: escorrega-se até à parede ou à neve. As sebes dinâmicas dão lugar ao gelo.
+mechanics(glaciar, 'Escorregas até à parede ou à neve. A Brasa derrete o chão e dá-te onde travar.',
+  [0.4, 0.28, 0.2, 0.2, 0.14, 0.1, 0.07, 0.04].map((grip, i) => ({ mech: 'ice' as const, dyn: 0, grip, guards: [0, 0, 1, 1, 1, 2, 2, 2][i] })),
+  {
+    1: [{ who: 'geada', text: 'Aqui não se caminha: desliza-se. Só a neve te segura.' }, { who: 'uli', text: 'Então derreto onde quiser parar.' }, { who: 'geada', text: 'Três vezes. Depois és meu.' }],
+  });
+
+// Lava: nasce no ponto de partida e avança sem parar.
+mechanics(demoniaco, 'A lava nasce atrás de ti e nunca pára. Escolhe bem a ordem das chamas.',
+  [[3, 18], [3, 12], [2, 10], [2, 9], [2, 8], [2, 8], [2, 7], [2, 6]].map(([lavaK, slack], i) => ({ mech: 'lava' as const, lavaK, slack, guards: [0, 0, 1, 1, 1, 2, 2, 3][i] })),
+  {
+    1: [{ who: 'carcereiro', text: 'Ouves? O rio acordou. Não olhes para trás: ele não pára.' }],
+  });
+
+// Anéis: a mandala roda quando tu mandas.
+mechanics(mandala, 'Roda os anéis da mandala para alinhar as portas e chegar ao centro.',
+  ([[9, 1, 0], [9, 1, 0], [11, 1, 1], [11, 2, 0], [11, 2, 1], [13, 2, 1], [13, 2, 2], [13, 2, 2]] as const).map(([n, rings, guards]) => ({ mech: 'rings' as const, cols: n, rows: n, rings, guards, dyn: 0, mask: 'rect' as const })),
+  {
+    1: [{ who: 'mestra', text: 'Os anéis não giram sozinhos. Giram quando tu mandas. Pensa antes de mandar.' }],
+    3: [{ who: 'mestra', text: 'Agora são dois anéis. O de dentro só obedece a quem está sobre ele.' }, { who: 'mestra', text: 'O incenso esconde o caminho. Confia na tua própria luz.' }],
+  });
+
 export const getWorld = (id: string) => WORLDS.find((w) => w.id === id)!;
 
 /** Um nível está aberto se o anterior foi concluído; o bónus só abre com todas as estrelas dos restantes. */
@@ -614,5 +649,7 @@ export function isUnlocked(wd: WorldDef, i: number, st: { level(w: string, i: nu
 /** Parâmetros de geração de um nível: com guardas há sempre voltas (para os poderes contornar) e mais folga no par. */
 export function levelOpts(def: LevelDef): MazeOpts {
   const g = def.guards ?? 0;
-  return { cols: def.cols, rows: def.rows, mask: def.mask, seed: def.seed, dyn: def.dyn, loops: g ? Math.max(def.loops, 0.15) : def.loops, parExtra: g * 6 };
+  let loops = g ? Math.max(def.loops, 0.15) : def.loops;
+  if (def.mech === 'ice') loops = Math.max(loops, 0.34); // no gelo, corredores abertos = deslizes longos
+  return { cols: def.cols, rows: def.rows, mask: def.mask, seed: def.seed, dyn: def.dyn, loops, parExtra: g * 6 };
 }

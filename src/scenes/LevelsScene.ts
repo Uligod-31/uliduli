@@ -37,7 +37,7 @@ export class LevelsScene extends Phaser.Scene {
       const card = this.add.image(x, y - 44, ck).setOrigin(0, 0).setScale(1 / 1.5);
 
       const m = levelMaze(def);
-      const art = artFor(this, m, wd, def.seed, cw - 40, 200, s?.trail);
+      const art = artFor(this, m, wd, def.seed, cw - 40, 200, s && s.rev === def.rev ? s.trail : undefined);
       art.setPosition(x + 20, y + 18);
       if (!unlocked) art.setAlpha(0.22);
 

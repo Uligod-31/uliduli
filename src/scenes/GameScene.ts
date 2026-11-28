@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
-import { W, H, UI, FONT, toHex, lighten, brandAt } from '../core/theme';
+import { W, H, UI, FONT, FONT_HEAD, toHex, lighten, brandAt } from '../core/theme';
 import { button, gradText, label, roundBtn, Btn } from '../core/ui';
 import { Maze, DIRS, OPP, canPass, neighbor, pathTo, distFrom } from '../core/maze';
 import { mulberry32, shuffle } from '../core/rng';
 import { levelMaze } from '../art/thumb';
+import { travel, solve, rotCell, setRot, ringTarget, BRASAS } from '../core/mech';
 import { LevelDef, WorldDef, getWorld, isUnlocked, GUARD_HUNT, GUARD_STUN, GUARD_STUN_R, HINTS, guardEvery } from '../worlds';
 import { sfx } from '../core/audio';
 import { save } from '../core/save';
@@ -34,6 +35,13 @@ export class GameScene extends Phaser.Scene {
   private guards: number[] = [];
   private guardPrev: number[] = [];
   private stun: number[] = []; // passos que cada guarda ainda fica ofuscado
+  // mecânicas do mundo
+  private brasas = BRASAS;
+  private armed = false;          // Brasa pronta (gelo)
+  private flameStop = false;      // apanhou uma chama neste passo
+  private actionBtn?: Btn;
+  private mechTxt?: Phaser.GameObjects.Text;
+  private mechPips!: Phaser.GameObjects.Graphics;
 
   private pips!: Phaser.GameObjects.Graphics;
   private guardPips!: Phaser.GameObjects.Graphics;
@@ -51,6 +59,7 @@ export class GameScene extends Phaser.Scene {
     this.skipIntro = !!d.skipIntro;
     this.moves = 0; this.phase = 0; this.moving = false; this.done = false; this.blocked = true;
     this.run = false; this.lastDir = -1; this.queued = null; this.collected = 0; this.hints = HINTS; this.overview = false;
+    this.brasas = BRASAS; this.armed = false; this.actionBtn = undefined; this.mechTxt = undefined;
     this.pad.id = -1; this.pad.dir = -1; this.pad.kx = 0; this.pad.ky = 0; this.padArrows = [];
   }
 
@@ -81,6 +90,8 @@ export class GameScene extends Phaser.Scene {
     stage.setGuards(this.guards, this.wd.guardStyle ?? 0);
     stage.setWeather(def.weather ?? this.wd.weather ?? 'none');
     stage.start('game');
+    // nos anéis é preciso ver a mandala toda: começa na vista geral (◎ volta a seguir a personagem)
+    if (m.mech === 'rings') { this.overview = true; stage.setView('overview'); }
     if (def.fog) stage.setDark(def.fog * 1.0);
     this.events.once('shutdown', () => stage.stop());
 
@@ -88,8 +99,36 @@ export class GameScene extends Phaser.Scene {
     this.setupInput();
     this.updateHud();
 
-    if (this.skipIntro || !def.intro.length) this.blocked = false;
-    else this.time.delayedCall(1300, () => playDialogue(this, def.intro, () => { this.blocked = false; }));
+    const go = () => this.mechCard(() => { this.blocked = false; });
+    if (this.skipIntro || !def.intro.length) go();
+    else this.time.delayedCall(1300, () => playDialogue(this, def.intro, go));
+  }
+
+  /** Na primeira vez de cada mecânica, um cartão curto explica a regra antes de começar. */
+  private mechCard(done: () => void) {
+    const mech = this.m.mech;
+    const key = 'uliduli_mech_' + mech;
+    let seen = false; try { seen = !!localStorage.getItem(key); } catch { /* ok */ }
+    if (!mech || seen) { done(); return; }
+    const info = {
+      ice: ['GELO', 'Aqui não se caminha: desliza-se até à parede ou até à neve.\n\nO botão Brasa (3 cargas) faz o próximo passo ter só uma casa e derrete o chão numa poça onde podes travar.'],
+      lava: ['A LAVA', 'Ao fim de uns passos, a lava nasce onde começaste e avança sempre.\n\nO chão que vai arder racha primeiro. Escolhe bem a ordem das chamas: só andas tu, só anda ela.'],
+      rings: ['OS ANÉIS', 'O labirinto é feito de anéis. O botão Rodar gira o anel assinalado (leva-te se estiveres em cima dele) e conta como um passo.\n\nAlinha as portas e chega ao centro.'],
+    }[mech];
+    const root = this.add.container(0, 0).setDepth(170);
+    const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x05060b, 0.72).setInteractive();
+    const g = this.add.graphics();
+    g.fillStyle(0x1e2025, 0.97); g.fillRoundedRect(60, 360, W - 120, 560, 34);
+    g.lineStyle(3, UI.line, 1); g.strokeRoundedRect(60, 360, W - 120, 560, 34);
+    g.fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1); g.fillRect(100, 466, W - 200, 5);
+    const title = gradText(this, W / 2, 420, info[0], 56);
+    const body = this.add.text(W / 2, 500, info[1], { fontFamily: FONT, fontSize: '30px', color: '#eceef3', align: 'center', wordWrap: { width: W - 200 }, lineSpacing: 8 }).setOrigin(0.5, 0);
+    root.add([dim, g, title, body]);
+    root.add(button(this, W / 2, 852, 420, 100, 'Entendi', () => {
+      try { localStorage.setItem(key, '1'); } catch { /* ok */ }
+      root.destroy(); this.time.delayedCall(60, done);
+    }, 'primary', 36));
+    root.setAlpha(0); this.tweens.add({ targets: root, alpha: 1, duration: 220 });
   }
 
   // ───────────────────────── HUD (vidro sobre o 3D) ─────────────────────────
@@ -123,6 +162,52 @@ export class GameScene extends Phaser.Scene {
     button(this, 385, H - 70, 100, 88, '◎', () => this.toggleView(), 'ghost', 38).setDepth(31);
     button(this, 575, H - 70, 220, 88, 'Reiniciar', () => this.scene.restart({ world: wd.id, level: this.li, skipIntro: true }), 'ghost', 24).setDepth(31);
     this.buildPad();
+    this.buildMech();
+  }
+
+  /** Linha de estado da mecânica e, no gelo e nos anéis, o botão de ação (à direita do joystick). */
+  private buildMech() {
+    this.mechPips = this.add.graphics().setDepth(30);
+    const mech = this.m.mech;
+    if (!mech) return;
+    this.mechTxt = this.add.text(W / 2, 232, '', { fontFamily: FONT, fontSize: '22px', color: '#ffffff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5).setDepth(30);
+    if (mech === 'lava') return;
+    const ice = mech === 'ice';
+    this.actionBtn = roundBtn(this, W - 88, H - 345, 66, ice ? '🔥' + BRASAS : '⟳', ice ? 'Brasa' : 'Rodar', () => this.action(), ice ? 34 : 50).setDepth(31);
+    const ring = this.add.graphics().setDepth(30).setPosition(W - 88, H - 345);
+    for (let i = 0; i < 40; i++) { const a0 = (i / 40) * Math.PI * 2; ring.lineStyle(5, brandAt(0.5 - 0.5 * Math.cos(a0)), 0.9); ring.beginPath(); ring.arc(0, 0, 74, a0, a0 + 0.18); ring.strokePath(); }
+    this.tweens.add({ targets: ring, scale: 1.07, alpha: 0.55, duration: 850, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+  }
+
+  private action() {
+    if (this.blocked || this.done) return;
+    if (this.m.mech === 'rings') { this.rotate(); return; }
+    if (this.brasas <= 0) { sfx.bump(); return; }
+    this.armed = !this.armed; sfx.hint(); this.updateHud();
+  }
+
+  /** Anéis: roda o anel assinalado um quarto de volta. Conta como um passo. */
+  private rotate() {
+    if (this.moving || this.done || this.blocked) return;
+    const m = this.m, R = m.rings!, L = ringTarget(m, this.idx);
+    this.moving = true; this.run = false; this.queued = null;
+    sfx.shift(); stage.beginSpin(L); stage.shake(0.18); navigator.vibrate?.(30);
+    const a = { t: 0 };
+    this.tweens.add({
+      targets: a, t: 1, duration: 620, ease: 'Cubic.InOut',
+      onUpdate: () => stage.spinStep(a.t),
+      onComplete: () => {
+        const map = (c: number) => (c >= 0 && R.layer[c] === L ? rotCell(m, c, 1) : c);
+        this.idx = map(this.idx);
+        this.rosas = new Set([...this.rosas].map(map));
+        this.guards = this.guards.map(map); this.guardPrev = this.guardPrev.map(map);
+        const rot = R.rot.slice(); rot[L] = (rot[L] + 1) % 4; setRot(m, rot);
+        stage.endSpin(map);
+        sfx.bump(); stage.shake(0.3);
+        this.flameStop = true;
+        this.endTurn();
+      },
+    });
   }
 
   // ───────────────────────── Joystick de vidro ─────────────────────────
@@ -223,11 +308,33 @@ export class GameScene extends Phaser.Scene {
     }
     this.hintBtn.txt.setText(`Vagalume ✦${this.hints}`);
     this.hintBtn.setAlpha(this.hints > 0 ? 1 : 0.45);
+    this.updateMech();
+  }
+
+  private updateMech() {
+    const m = this.m, g = this.mechPips;
+    g.clear();
+    if (!this.mechTxt) return;
+    if (m.mech === 'ice') {
+      this.actionBtn!.txt.setText('🔥' + this.brasas);
+      this.actionBtn!.setAlpha(this.brasas > 0 ? 1 : 0.45);
+      this.mechTxt.setText(this.armed ? 'Brasa pronta: o próximo passo derrete o chão' : 'No gelo deslizas até à parede ou à neve').setColor(this.armed ? '#ffc457' : '#cfeaff');
+      if (this.armed) { g.lineStyle(6, 0xffc457, 0.95); g.strokeCircle(W - 88, H - 345, 84); }
+    } else if (m.mech === 'rings') {
+      stage.setRingTarget(ringTarget(m, this.idx));
+      const inner = ringTarget(m, this.idx) === 2;
+      this.mechTxt.setText(m.rings!.n === 2 ? `Rodar gira o anel ${inner ? 'rosa (centro)' : 'dourado'}` : 'Rodar gira o anel dourado').setColor(inner ? '#ff9ae6' : '#ffe28a');
+    } else if (m.mech === 'lava') {
+      const L = m.lava!, wait = L.delay - this.moves;
+      const left = L.at[this.idx] - this.moves;
+      this.mechTxt.setText(wait > 0 ? `🌋 A lava acorda em ${wait} ${wait === 1 ? 'passo' : 'passos'}` : left <= 4 ? `CORRE! O chão arde em ${Math.max(0, left)}` : `🌋 A lava avança de ${L.k} em ${L.k} passos`)
+        .setColor(wait > 6 ? '#ffd0a0' : left <= 4 ? '#ff4a30' : '#ff9a40');
+    }
   }
 
   // ───────────────────────── Entrada ─────────────────────────
   private setupInput() {
-    this.keys = this.input.keyboard!.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D') as any;
+    this.keys = this.input.keyboard!.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D,SPACE') as any;
     const P = this.pad;
     const read = (p: Phaser.Input.Pointer) => {
       const dx = p.x - P.cx, dy = p.y - P.cy, len = Math.hypot(dx, dy);
@@ -327,13 +434,15 @@ export class GameScene extends Phaser.Scene {
     if (this.compass) this.drawCompass();
     if (this.blocked || this.done || this.moving) return;
     const k = this.keys;
+    if (this.actionBtn && Phaser.Input.Keyboard.JustDown(k.SPACE)) { this.action(); return; }
     let dir = -1;
-    // joystick segurado: continua a andar (sem repetir o "toc" na parede)
-    if (this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 150 && canPass(this.m, this.idx, this.mapDir(this.pad.dir), this.phase)) this.queued = { dir: this.mapDir(this.pad.dir), run: false };
+    // joystick segurado: continua a andar (sem repetir o "toc" na parede). No gelo, cada deslize pede um toque.
+    if (this.m.mech !== 'ice' && this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 150 && canPass(this.m, this.idx, this.mapDir(this.pad.dir), this.phase)) this.queued = { dir: this.mapDir(this.pad.dir), run: false };
     if (k.UP.isDown || k.W.isDown) dir = 0;
     else if (k.RIGHT.isDown || k.D.isDown) dir = 1;
     else if (k.DOWN.isDown || k.S.isDown) dir = 2;
     else if (k.LEFT.isDown || k.A.isDown) dir = 3;
+    if (this.m.mech === 'ice' && !['UP', 'DOWN', 'LEFT', 'RIGHT', 'W', 'A', 'S', 'D'].some((n) => Phaser.Input.Keyboard.JustDown(k[n]))) dir = -1;
     if (dir >= 0) this.queued = { dir: this.mapDir(dir), run: false };
     if (this.queued) {
       const q = this.queued; this.queued = null;
@@ -347,41 +456,72 @@ export class GameScene extends Phaser.Scene {
     if (this.moving || this.done || this.blocked) return;
     const m = this.m;
     stage.player.dir = Math.atan2(DIRS[dir].dx, DIRS[dir].dy);
-    if (!canPass(m, this.idx, dir, this.phase)) {
+    let path = travel(m, this.idx, dir, (i, d) => canPass(m, i, d, this.phase));
+    if (!path.length) {
       sfx.bump(); this.run = false; navigator.vibrate?.(8);
       const a = { t: 0 };
       this.tweens.add({ targets: a, t: 1, duration: 120, onUpdate: () => { stage.player.h = Math.sin(a.t * Math.PI) * 0.25; } });
       return;
     }
-    const ni = neighbor(m, this.idx, dir);
-    this.moving = true; this.lastDir = dir;
+    const brasa = this.armed && m.mech === 'ice';
+    if (brasa) path = path.slice(0, 1);
+    this.moving = true; this.lastDir = dir; this.flameStop = false;
     sfx.step();
-    const fromX = (this.idx % m.cols) + 0.5, fromY = ((this.idx / m.cols) | 0) + 0.5;
-    const toX = (ni % m.cols) + 0.5, toY = ((ni / m.cols) | 0) + 0.5;
+    const pts = [this.idx, ...path], len = path.length, slide = len > 1;
+    const xy = (c: number) => ({ x: (c % m.cols) + 0.5, y: ((c / m.cols) | 0) + 0.5 });
     const a = { t: 0 };
-    this.tweens.add({
-      targets: a, t: 1, duration: 112, ease: (this.pad.dir >= 0 || this.queued || this.run) ? 'Linear' : 'Sine.InOut',
+    let reached = 0;
+    const advance = (upTo: number) => {
+      while (reached < upTo && !this.done) {
+        reached++;
+        this.enter(pts[reached], pts[reached - 1]);
+        if (slide && !this.done) stage.frost(pts[reached]);
+      }
+    };
+    const tw = this.tweens.add({
+      targets: a, t: len, duration: slide ? 70 * len + 90 : 112,
+      ease: slide ? 'Sine.Out' : (this.pad.dir >= 0 || this.queued || this.run) ? 'Linear' : 'Sine.InOut',
       onUpdate: () => {
-        stage.player.x = fromX + (toX - fromX) * a.t; stage.player.y = fromY + (toY - fromY) * a.t; stage.player.h = a.t;
+        if (this.done) return;
+        const i = Math.min(len - 1, Math.floor(a.t)), f = a.t - i, p = xy(pts[i]), q = xy(pts[i + 1]);
+        stage.player.x = p.x + (q.x - p.x) * f; stage.player.y = p.y + (q.y - p.y) * f; stage.player.h = slide ? 0 : f;
+        advance(Math.floor(a.t + 1e-6));
+        if (this.done) { tw.stop(); const e = xy(this.idx); stage.player.x = e.x; stage.player.y = e.y; stage.player.h = 0; }
       },
-      onComplete: () => { stage.player.h = 0; this.arrive(ni); },
+      onComplete: () => {
+        stage.player.h = 0;
+        advance(len);
+        if (this.done) return;
+        if (brasa) {
+          this.armed = false;
+          if (!m.grip![this.idx]) { m.grip![this.idx] = 1; this.brasas--; stage.melt(this.idx); sfx.shift(); navigator.vibrate?.(24); }
+        }
+        if (slide) { stage.shake(0.14); this.run = false; }
+        this.endTurn();
+      },
     });
   }
 
-  private arrive(ni: number) {
+  /** A personagem entra numa casa (num deslize há várias por passo). */
+  private enter(ni: number, prev: number) {
     const m = this.m;
-    const prev = this.idx;
-    this.idx = ni; this.moving = false; this.moves++;
-    this.trail.push(ni);
+    this.idx = ni;
+    // nos anéis, o trilho guardado fica em coordenadas de origem (a obra da Galeria não roda)
+    this.trail.push(m.rings ? rotCell(m, ni, -m.rings.rot[m.rings.layer[ni]]) : ni);
     stage.addTrail(prev, ni, this.trail.length - 1);
-
-    let stop = false;
     if (this.rosas.has(ni)) {
-      this.rosas.delete(ni); this.collected++; stop = true;
+      this.rosas.delete(ni); this.collected++; this.flameStop = true;
       sfx.collect(); stage.removeRose(ni); navigator.vibrate?.(18);
     }
-    if (ni === m.exit) { this.updateHud(); this.finish(); return; }
-    if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.caught(); return; }
+    if (ni === m.exit) { this.moves++; this.moving = false; this.updateHud(); this.finish(); return; }
+    if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.moves++; this.moving = false; this.caught(); }
+  }
+
+  /** Fim de um passo: o mundo reage (sebes, guardas, lava). */
+  private endTurn() {
+    const m = this.m, ni = this.idx;
+    this.moving = false; this.moves++;
+    let stop = this.flameStop;
     if (m.dyn.length && this.moves % this.def.shift === 0) {
       this.phase ^= 1; stage.setPhase(this.phase, true); stop = true;
       sfx.shift(); stage.shake(0.35); navigator.vibrate?.(26);
@@ -391,15 +531,23 @@ export class GameScene extends Phaser.Scene {
       this.stun = this.stun.map((v, i) => { const n = Math.max(0, v - 1); if (v > 0 && n === 0) stage.setGuardStun(i, false); return n; });
       if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.caught(); return; }
     }
+    if (m.lava) {
+      if (this.moves === m.lava.delay) { sfx.shift(); stage.shake(0.6); navigator.vibrate?.([40, 30, 80]); }
+      stage.setLava(this.moves);
+      if (m.lava.at[this.idx] <= this.moves) { this.updateHud(); this.caught('lava'); return; }
+    }
     this.updateHud();
+    if (this.blocked) return;
 
     if (this.queued) {
       const q = this.queued; this.queued = null;
       if (canPass(m, ni, q.dir, this.phase)) { this.run = q.run; this.step(q.dir); return; }
     }
+    if (m.mech === 'ice') { this.run = false; return; }
     // joystick segurado: fluxo contínuo, sem pausas, e dobra sozinho nas esquinas de um corredor
     if (!stop && this.pad.dir >= 0 && this.time.now - this.padSince > 150) {
-      if (canPass(m, ni, this.pad.dir, this.phase)) { this.step(this.pad.dir); return; }
+      const held = this.mapDir(this.pad.dir);
+      if (canPass(m, ni, held, this.phase)) { this.step(held); return; }
       const opts: number[] = [];
       for (let d = 0; d < 4; d++) if (d !== OPP[this.lastDir] && canPass(m, ni, d, this.phase)) opts.push(d);
       if (opts.length === 1) { this.step(opts[0]); return; }
@@ -439,8 +587,9 @@ export class GameScene extends Phaser.Scene {
     if (this.guards.some((g, i) => g === this.idx && !this.stun[i])) { this.blocked = true; this.time.delayedCall(160, () => this.caught()); }
   }
 
-  private caught() {
+  private caught(by: 'guard' | 'lava' = 'guard') {
     if (this.done) return;
+    const lava = by === 'lava';
     this.done = true;
     sfx.bump(); sfx.shift(); navigator.vibrate?.([60, 40, 120]);
     stage.shake(1.1);
@@ -449,9 +598,10 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.flash(260, 255, 30, 40);
     const root = this.add.container(0, 0).setDepth(160);
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x200006, 0.62).setInteractive();
-    const title = gradText(this, W / 2, 470, 'APANHADO', 120);
-    title.setFill('#ff2a3d');
-    const quips = ['Os Espadas não perdoam.', 'A Rainha manda cumprimentos.', 'Aprende o ritmo deles, rebelde.', 'Quase. Tenta outra vez.'];
+    const title = gradText(this, W / 2, 470, lava ? 'QUEIMADO' : 'APANHADO', 120);
+    title.setFill(lava ? '#ff7a20' : '#ff2a3d');
+    const quips = lava ? ['A lava não espera por ninguém.', 'Muda a ordem das chamas.', 'Os becos queimam primeiro.', 'Quase. Tenta outra vez.']
+      : ['Os Espadas não perdoam.', 'A Rainha manda cumprimentos.', 'Aprende o ritmo deles, rebelde.', 'Quase. Tenta outra vez.'];
     const q = this.add.text(W / 2, 580, quips[Math.floor(Math.random() * quips.length)], { fontFamily: FONT, fontSize: '30px', color: '#ffd0d4' }).setOrigin(0.5);
     root.add([dim, title, q]);
     root.add(button(this, W / 2, 740, 520, 110, 'Tentar outra vez', () => this.scene.restart({ world: this.wd.id, level: this.li, skipIntro: true }), 'primary', 38));
@@ -464,7 +614,8 @@ export class GameScene extends Phaser.Scene {
   private useHint() {
     if (this.hints <= 0 || this.blocked || this.done) return;
     this.hints--; sfx.hint(); this.updateHud();
-    stage.hint(pathTo(this.m, this.idx, this.m.exit, this.phase).slice(1, 12));
+    if (this.m.mech) this.mechHint();
+    else stage.hint(pathTo(this.m, this.idx, this.m.exit, this.phase).slice(1, 12));
     // a luz do Vagalume ofusca os guardas por perto: ficam parados e podes passar por eles
     if (this.guards.length) {
       const d = distFrom(this.m, this.idx, this.phase);
@@ -479,6 +630,26 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Vagalume nos mundos com mecânica: o mesmo solver mostra os próximos passos da melhor rota (ou diz quando rodar). */
+  private mechHint() {
+    const st = { cell: this.idx, flames: [...this.rosas], t: this.moves };
+    const sol = solve(this.m, st) ?? solve(this.m, st, { needAll: false });
+    const say = (msg: string, color: string) => {
+      const t = this.add.text(W / 2, 290, msg, { fontFamily: FONT_HEAD, fontSize: '40px', color, stroke: '#05060b', strokeThickness: 8, align: 'center' }).setOrigin(0.5).setDepth(40);
+      this.tweens.add({ targets: t, y: 270, alpha: 0, delay: 1500, duration: 600, onComplete: () => t.destroy() });
+    };
+    if (!sol) { say('Já não há caminho: reinicia', '#ff6a50'); return; }
+    if (sol[0].type === 'rot') {
+      say('Roda agora!', '#ffe28a');
+      if (this.actionBtn) this.tweens.add({ targets: this.actionBtn, scale: 1.3, duration: 220, yoyo: true, repeat: 3 });
+      return;
+    }
+    const cells: number[] = [];
+    for (const a of sol) { if (a.type !== 'move' || cells.length >= 14) break; cells.push(...a.path); }
+    stage.hint(cells.slice(0, 14));
+    if (this.m.mech === 'rings' && sol.some((a) => a.type === 'rot') && cells.length < 4) say('Depois, roda o anel', '#ffe28a');
+  }
+
   // ───────────────────────── Fim de nível ─────────────────────────
   private finish() {
     this.done = true;
@@ -490,7 +661,7 @@ export class GameScene extends Phaser.Scene {
     let stars = 1;
     if (this.collected === m.rosas.length) stars++;
     if (this.moves <= m.par) stars++;
-    save.setLevel(this.wd.id, this.li, { stars, moves: this.moves, trail: this.trail });
+    save.setLevel(this.wd.id, this.li, { stars, moves: this.moves, trail: this.trail, rev: this.def.rev });
 
     const after = () => this.showResult(stars);
     this.time.delayedCall(1400, () => (this.def.outro ? playDialogue(this, this.def.outro, after) : after()));

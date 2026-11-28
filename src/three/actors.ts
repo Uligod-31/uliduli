@@ -268,12 +268,23 @@ export function makeFlame(_accent: number): THREE.Group {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
   };
-  const outer = mk(1, [1.7, 0.38, 0.02], [2.0, 0.85, 0.12]);
-  const inner = mk(0.62, [2.1, 1.3, 0.35], [2.4, 1.9, 0.9]);
-  inner.position.y = 0.02;
-  const halo = glowSprite(0xff7a1a, 1.15, 0.5); halo.position.y = 0.22;
+  const outer = mk(1, [0.72, 0.06, 0.0], [1.0, 0.24, 0.0]);
+  (outer.material as THREE.MeshBasicMaterial).transparent = true; (outer.material as THREE.MeshBasicMaterial).opacity = 0.84;
+  const inner = mk(0.7, [1.4, 0.62, 0.06], [1.65, 1.0, 0.24]);
+  inner.position.set(0, 0.025, 0.035);
+  const halo = glowSprite(0xff5a0a, 0.95, 0.28); halo.position.y = 0.22;
+  // olhos enormes como os do Uli (com brilho): seguem-te e piscam
+  const eyes = new THREE.Group();
+  const lids: THREE.Group[] = [];
+  for (const s of [-1, 1]) {
+    const eg = new THREE.Group(); eg.position.set(s * 0.07, 0.27, 0.19);
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.043, 14, 12), new THREE.MeshBasicMaterial({ color: 0x1a0c05 }));
+    e.scale.set(0.82, 1.38, 0.55);
+    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff })); shine.position.set(0.011, 0.022, 0.028);
+    eg.add(e, shine); eyes.add(eg); lids.push(eg);
+  }
   const body = new THREE.Group();
-  body.add(outer, inner);
+  body.add(outer, inner, eyes);
   body.position.y = -0.2;
   g.add(body, halo);
   g.position.y = 0.5;
@@ -284,7 +295,7 @@ export function makeFlame(_accent: number): THREE.Group {
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.2, 1.5, 14, 1, true), new THREE.MeshBasicMaterial({ color: hdr(0xff8a2a, 1.0), transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
   beam.position.y = 0.78;
   root.add(g, ring, beam);
-  root.userData = { body: g, flame: body };
+  root.userData = { body: g, flame: body, eyes, lids };
   return root;
 }
 

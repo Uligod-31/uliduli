@@ -31,6 +31,11 @@ export interface Maze {
   dynMap: Map<number, number>; // idx*4+dir -> grupo
   shortest: number;
   par: number;
+  // mecânicas dos mundos (ver core/mech.ts)
+  mech?: 'ice' | 'lava' | 'rings';
+  grip?: Uint8Array;                                   // gelo: 1 = neve ou poça (trava o deslize)
+  lava?: { delay: number; k: number; at: Int32Array }; // lava: passo em que cada célula se incendeia
+  rings?: { n: number; layer: Uint8Array; intra: Set<number>[]; door: Set<number>[]; rot: number[] };
 }
 
 export interface MazeOpts {

@@ -1,5 +1,5 @@
 // Progresso local (offline-first). Mais tarde pode sincronizar com Supabase.
-export interface LevelSave { stars: number; moves: number; trail: number[] }
+export interface LevelSave { stars: number; moves: number; trail: number[]; rev?: number }
 interface SaveData { v: 1; worlds: Record<string, Record<number, LevelSave>>; mute: boolean }
 
 const KEY = 'uliduli.save.v1';
@@ -20,7 +20,8 @@ export const save = {
   setLevel(world: string, i: number, s: LevelSave) {
     const w = (data.worlds[world] ??= {});
     const old = w[i];
-    if (!old || s.stars >= old.stars) w[i] = { ...s, trail: s.trail.slice(0, 700) };
+    // se o nível foi redesenhado, o trilho novo substitui o antigo (as estrelas já ganhas ficam)
+    if (!old || s.stars >= old.stars || old.rev !== s.rev) w[i] = { ...s, stars: Math.max(s.stars, old?.stars ?? 0), trail: s.trail.slice(0, 700) };
     persist();
   },
   unlocked(world: string, i: number) { return i === 0 || !!data.worlds[world]?.[i - 1]; },

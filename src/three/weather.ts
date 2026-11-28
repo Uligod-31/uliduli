@@ -8,7 +8,7 @@ const PRESETS: Record<string, Preset> = {
   snow: { col: [0.93, 0.97, 1], size: 2.3, fall: 0.07, dir: 1, drift: 1.6, alpha: 0.95, add: false, page: false },
   embers: { col: [1, 0.48, 0.14], size: 2.8, fall: 0.09, dir: -1, drift: 0.9, alpha: 1, add: true, page: false },
   ash: { col: [0.7, 0.7, 0.74], size: 2.4, fall: 0.045, dir: 1, drift: 1.2, alpha: 0.7, add: false, page: false },
-  dust: { col: [1, 0.82, 0.5], size: 1.5, fall: 0.012, dir: 1, drift: 2.2, alpha: 0.6, add: true, page: false },
+  dust: { col: [1, 0.82, 0.5], size: 1.3, fall: 0.012, dir: 1, drift: 2.2, alpha: 0.4, add: true, page: false },
   fireflies: { col: [0.78, 1, 0.42], size: 2.0, fall: 0.012, dir: -1, drift: 3.2, alpha: 0.85, add: true, page: false },
   pages: { col: [0.96, 0.9, 0.72], size: 5, fall: 0.03, dir: 1, drift: 2.6, alpha: 0.6, add: false, page: true },
 };

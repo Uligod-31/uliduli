@@ -131,13 +131,17 @@ export class TutorialScene extends Phaser.Scene {
     return { cx: (x) => ox + x * cs + cs / 2, cy: (y) => oy + y * cs + cs / 2, cs, rows };
   }
 
+  /** O Uli nas ilustrações: uma chama que anda, com o aro azul do jogador. */
   private token(root: Root, x: number, y: number, cs: number) {
     const c = this.add.container(x, y);
     const g = this.add.graphics();
-    g.fillStyle(UI.blue, 0.25); g.fillCircle(0, 0, cs * 0.46);
-    g.fillStyle(UI.blue, 1); g.fillCircle(0, 0, cs * 0.3);
-    g.lineStyle(3, 0xffffff, 0.85); g.strokeCircle(0, 0, cs * 0.3);
-    g.fillStyle(0xffffff, 0.9); g.fillCircle(-cs * 0.08, -cs * 0.1, cs * 0.1);
+    const prof: Pt[] = [[0, 0], [0.12, 0.02], [0.2, 0.12], [0.19, 0.24], [0.12, 0.37], [0.05, 0.47], [0, 0.55]];
+    const poly = (k: number, dy: number) => [...prof.map(([r, h]) => new Phaser.Math.Vector2(r * k, dy - h * k)), ...prof.slice(0, -1).reverse().map(([r, h]) => new Phaser.Math.Vector2(-r * k, dy - h * k))];
+    g.lineStyle(4, UI.blue, 0.95); g.strokeEllipse(0, cs * 0.3, cs * 0.76, cs * 0.34);
+    g.fillStyle(0xe0400a, 1); g.fillPoints(poly(cs * 1.45, cs * 0.34), true);
+    g.fillStyle(0xff9a24, 1); g.fillPoints(poly(cs * 1.1, cs * 0.3), true);
+    g.fillStyle(0xfff1c4, 1); g.fillPoints(poly(cs * 0.74, cs * 0.24), true);
+    g.fillStyle(0x1a0c05, 1); g.fillEllipse(-cs * 0.065, cs * 0.04, cs * 0.065, cs * 0.12); g.fillEllipse(cs * 0.065, cs * 0.04, cs * 0.065, cs * 0.12);
     c.add(g); root.add(c);
     return c;
   }
@@ -165,6 +169,8 @@ export class TutorialScene extends Phaser.Scene {
     g.fillStyle(0xff7a1a, 1); g.fillPoints(poly(cs * 2.1), true);
     g.fillStyle(0xffc457, 1); g.fillPoints(poly(cs * 1.6), true);
     g.fillStyle(0xfff1c4, 1); g.fillPoints(poly(cs * 1.2), true);
+    g.fillStyle(0x1a0c05, 1); g.fillEllipse(-cs * 0.09, -cs * 0.24, cs * 0.09, cs * 0.15); g.fillEllipse(cs * 0.09, -cs * 0.24, cs * 0.09, cs * 0.15);
+    g.fillStyle(0xffffff, 1); g.fillCircle(-cs * 0.075, -cs * 0.27, cs * 0.022); g.fillCircle(cs * 0.105, -cs * 0.27, cs * 0.022);
     c.add(g); root.add(c);
     this.anim.push(this.tweens.add({ targets: c, scaleY: 1.14, scaleX: 0.94, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.InOut' }));
     return c;
@@ -418,6 +424,98 @@ export class TutorialScene extends Phaser.Scene {
                 pips.clear();
                 for (let i = 0; i < 3; i++) { pips.fillStyle(i < step % 3 + 1 ? UI.fuchsia : 0x4a4f5e, 1); pips.fillCircle(W / 2 - 22 + i * 22, PY + 34, 7); }
               }
+            },
+          }));
+        },
+      },
+      {
+        title: 'Gelo',
+        body: 'No Glaciar não se anda: desliza-se até à parede ou à neve (também as chamas se apanham pelo caminho).\nA Brasa, com 3 cargas, faz o próximo passo ter só uma casa e deixa uma poça onde travas.',
+        draw: (root) => {
+          const rows = ['#########', '#P.....S#', '#.#.###.#', '#.#.#...#', '#.#.#.#.#', '#...S.#E#', '#########'];
+          const mp = this.map(root, ox, oy, CS, rows);
+          const g = this.add.graphics(); root.add(g);
+          rows.forEach((r, y) => [...r].forEach((c, x) => {
+            if (c === '#') return;
+            const px = mp.cx(x), py = mp.cy(y);
+            if (c === 'S') { g.fillStyle(0xf4f8ff, 1); g.fillEllipse(px, py + 4, CS * 0.82, CS * 0.62); g.fillStyle(0x4a5868, 1); g.fillCircle(px - 12, py + 6, 4); g.fillCircle(px + 10, py - 2, 3); }
+            else { g.fillStyle(0x2f8fd0, 0.45); g.fillRoundedRect(px - CS / 2 + 3, py - CS / 2 + 3, CS - 6, CS - 6, 6); g.lineStyle(3, 0xcff0ff, 0.55); g.beginPath(); g.moveTo(px - 18, py + 12); g.lineTo(px + 4, py - 14); g.strokePath(); }
+          }));
+          this.portal(root, mp.cx(7), mp.cy(5), CS);
+          const tok = this.token(root, mp.cx(1), mp.cy(1), CS);
+          const o = { t: 0 };
+          this.anim.push(this.tweens.add({
+            targets: o, t: 5, duration: 5200, repeat: -1, ease: 'Linear',
+            onUpdate: () => {
+              const e = (a: number, b: number) => Phaser.Math.Easing.Sine.Out(Phaser.Math.Clamp((o.t - a) / (b - a), 0, 1));
+              const first = e(0.6, 2), second = e(2.8, 4.2);
+              tok.setPosition(mp.cx(1 + 6 * first), mp.cy(1 + 4 * second));
+            },
+          }));
+        },
+      },
+      {
+        title: 'Lava',
+        body: 'No Abismo a lava nasce onde começaste e avança sempre, ao ritmo dos teus passos.\nO chão racha antes de arder. Os becos junto ao início são os primeiros a desaparecer: escolhe bem a ordem das chamas.',
+        draw: (root) => {
+          const mp = this.map(root, ox, oy, CS, MAP_A);
+          this.portal(root, mp.cx(7), mp.cy(5), CS);
+          const dist = this.bfs(MAP_A, 1, 1, 99);
+          const g = this.add.graphics(); root.add(g);
+          const tok = this.token(root, mp.cx(1), mp.cy(1), CS);
+          const o = { t: 0 };
+          this.anim.push(this.tweens.add({
+            targets: o, t: 14, duration: 6800, repeat: -1, repeatDelay: 800, ease: 'Linear',
+            onUpdate: () => {
+              const lava = o.t - 3;
+              g.clear();
+              dist.forEach((d, k) => {
+                const [x, y] = k.split(',').map(Number), px = mp.cx(x) - CS / 2, py = mp.cy(y) - CS / 2;
+                if (d <= lava) {
+                  const f = 0.5 + 0.5 * Math.sin(this.time.now / 180 + d);
+                  g.fillStyle(0xd83a08, 1); g.fillRoundedRect(px + 2, py + 2, CS - 4, CS - 4, 8);
+                  g.fillStyle(0xffb030, 0.35 + 0.55 * f); g.fillCircle(mp.cx(x) - 8 + 12 * f, mp.cy(y) + 6 - 10 * f, 13);
+                } else if (d <= lava + 2) { g.lineStyle(4, 0xff6a20, 0.5 + 0.5 * Math.sin(this.time.now / 100)); g.strokeRoundedRect(px + 7, py + 7, CS - 14, CS - 14, 6); }
+              });
+              const t = Math.min(ROUTE.length - 1, o.t * 1.15), i = Math.min(ROUTE.length - 2, Math.floor(t)), f = t - i, a = ROUTE[i], b = ROUTE[i + 1];
+              tok.setPosition(mp.cx(a[0] + (b[0] - a[0]) * f), mp.cy(a[1] + (b[1] - a[1]) * f));
+            },
+          }));
+        },
+      },
+      {
+        title: 'Anéis',
+        body: 'A Mandala é feita de anéis. O botão Rodar gira o anel assinalado um quarto de volta (leva-te, se estiveres em cima dele) e conta como um passo.\nAlinha as portas e chega ao centro.',
+        draw: (root) => {
+          const cx = W / 2, cy = PY + PH / 2;
+          /** moldura quadrada de lado 2r com uma porta em cima */
+          const ringShape = (g: Phaser.GameObjects.Graphics, r: number, color: number) => {
+            g.lineStyle(22, color, 1);
+            const door = 34;
+            const seg = (x1: number, y1: number, x2: number, y2: number) => { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.strokePath(); };
+            seg(-r, -r, -door, -r); seg(door, -r, r, -r); seg(r, -r - 11, r, r + 11); seg(r, r, -r, r); seg(-r, r + 11, -r, -r - 11);
+          };
+          const outer = this.add.graphics({ x: cx, y: cy }); ringShape(outer, 200, 0x34508f); root.add(outer);
+          const inner = this.add.graphics({ x: cx, y: cy }); ringShape(inner, 110, 0xd9a22b);
+          inner.fillStyle(0xffd24a, 0.12); inner.fillRect(-99, -99, 198, 198); root.add(inner);
+          this.portal(root, cx, cy, CS);
+          const path = this.add.graphics(); root.add(path);
+          const tok = this.token(root, cx, cy - 230, CS * 0.8);
+          const btn = this.add.container(cx + 262, cy + 180);
+          const bg = this.add.graphics(); bg.fillStyle(0x0a0b10, 0.8); bg.fillCircle(0, 0, 44); bg.lineStyle(4, UI.fuchsia, 0.9); bg.strokeCircle(0, 0, 44);
+          btn.add([bg, this.add.text(0, -2, '⟳', { fontFamily: FONT, fontSize: '50px', color: '#ffffff' }).setOrigin(0.5)]); root.add(btn);
+          const o = { t: 0 };
+          this.anim.push(this.tweens.add({
+            targets: o, t: 6, duration: 6600, repeat: -1, ease: 'Linear',
+            onUpdate: () => {
+              // começa desalinhado (porta à esquerda); três toques no botão trazem-na para cima
+              const k = Math.min(3, Math.floor(Math.max(0, o.t - 0.4))), f = k >= 3 ? 0 : Phaser.Math.Easing.Cubic.InOut(Phaser.Math.Clamp((o.t - 0.4 - k) * 1.6, 0, 1));
+              inner.rotation = (1 + k + f) * (Math.PI / 2);
+              btn.setScale(k < 3 && f > 0 && f < 0.5 ? 1.2 : 1);
+              const go = Phaser.Math.Clamp((o.t - 3.8) / 1.5, 0, 1);
+              tok.setPosition(cx, cy - 230 + 230 * go);
+              path.clear();
+              if (k >= 3) { path.lineStyle(8, brandAt(0.7), 0.8); path.beginPath(); path.moveTo(cx, cy - 230); path.lineTo(cx, cy - 230 + 230 * go); path.strokePath(); }
             },
           }));
         },

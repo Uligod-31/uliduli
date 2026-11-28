@@ -76,8 +76,9 @@ class Snap {
     scene.add(trailObj.mesh, trailObj.dots);
     // percursos guardados de versões antigas (labirinto diferente) são ignorados
     const adj = (x: number, y: number) => { const dx = Math.abs((x % m.cols) - (y % m.cols)), dy = Math.abs(((x / m.cols) | 0) - ((y / m.cols) | 0)); return dx + dy === 1 && !m.solid[x] && !m.solid[y]; };
-    const tr = trail && !trail.some((c, k) => k > 0 && !adj(trail[k - 1], c)) ? trail : undefined;
-    if (tr && tr.length > 1) for (let k = 1; k < tr.length; k++) { const a = isl.cellPos(tr[k - 1]), b = isl.cellPos(tr[k]); trailObj.add(a.x, a.z, b.x, b.z, k); }
+    // nos anéis o trilho vem em coordenadas de origem: só os saltos entre anéis é que se ignoram
+    const tr = trail && (m.mech === 'rings' || !trail.some((c, k) => k > 0 && !adj(trail[k - 1], c))) ? trail : undefined;
+    if (tr && tr.length > 1) for (let k = 1; k < tr.length; k++) { if (!adj(tr[k - 1], tr[k])) continue; const a = isl.cellPos(tr[k - 1]), b = isl.cellPos(tr[k]); trailObj.add(a.x, a.z, b.x, b.z, k); }
     const cam = new THREE.PerspectiveCamera(34, w / h, 0.1, 500);
     const d = R * (w / h < 1 ? 2.9 : 2.4);
     cam.position.set(d * 0.18, d * 0.78, d * 0.72);
