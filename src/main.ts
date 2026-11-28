@@ -8,6 +8,8 @@ import { GalleryScene } from './scenes/GalleryScene';
 import { TutorialScene } from './scenes/TutorialScene';
 import { stage } from './three/Stage';
 import { snap } from './three/snap';
+import { sfx } from './core/audio';
+import { music } from './audio/player';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -25,3 +27,7 @@ const game = new Phaser.Game({
 (window as any).__game = game;
 (window as any).__stage = stage;
 (window as any).__snap = snap;
+(window as any).__music = music;
+
+// os telemóveis só deixam haver som depois de um toque: qualquer toque serve
+for (const t of ['pointerup', 'touchend', 'keydown']) window.addEventListener(t, () => sfx.unlock(), { capture: true, passive: true });

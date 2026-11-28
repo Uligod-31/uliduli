@@ -5,6 +5,9 @@ import { getWorld, isUnlocked } from '../worlds';
 import { artFor, levelMaze } from '../art/thumb';
 import { save } from '../core/save';
 import { drawPlate } from '../three/menuArt';
+import { music } from '../audio/player';
+import { BANDS } from '../audio/bands';
+import { openJukebox } from '../ui/jukebox';
 
 export class LevelsScene extends Phaser.Scene {
   private worldId = 'b612';
@@ -23,6 +26,9 @@ export class LevelsScene extends Phaser.Scene {
     this.leaving = false;
     const wd = getWorld(this.worldId);
     paintedBg(this, 0.45);
+    // entrar no mundo é ouvir a sua banda: o tema do próximo nível por fazer
+    const upNext = Math.max(0, wd.levels.findIndex((_, i) => !save.level(wd.id, i)));
+    music.play({ world: wd.id, level: upNext, title: wd.levels[upNext].title });
 
     const list = this.add.container(0, 0);
     const CW = 310, CH = 330, GX = 30, TOPY = 0, GY = 26;
@@ -78,9 +84,24 @@ export class LevelsScene extends Phaser.Scene {
     label(this, W / 2, 190, wd.rule, 22, toHex(lighten(wd.pal.accent, 0.3))).setDepth(11).setWordWrapWidth(W - 80);
     button(this, 110, 80, 160, 80, '‹', () => this.scene.start('Worlds'), 'ghost', 44).setDepth(11);
     const foot = this.add.graphics().setDepth(10);
-    foot.fillGradientStyle(0x05070d, 0x05070d, 0x05070d, 0x05070d, 0, 0, 0.95, 0.95); foot.fillRect(0, H - 60, W, 60);
+    foot.fillGradientStyle(0x05070d, 0x05070d, 0x05070d, 0x05070d, 0, 0, 0.98, 0.98); foot.fillRect(0, H - 96, W, 96);
+    // a banda do mundo, num letreiro opaco por cima da lista; um toque abre a Discoteca
+    const pill = this.add.graphics().setDepth(11);
+    const band = label(this, W / 2, H - 40, '', 25, '#eceef3').setDepth(11);
+    const playing = () => {
+      const n = music.now?.world === wd.id ? music.now : undefined;
+      band.setText(`♫  ${n?.mine ? n.title : BANDS[wd.id].band}  ›`).setScale(1).setScale(Math.min(1, (W - 100) / band.width));
+      const pw = band.displayWidth + 60;
+      pill.clear(); pill.fillStyle(0x15161a, 0.97); pill.fillRoundedRect(W / 2 - pw / 2, H - 70, pw, 60, 30);
+      pill.lineStyle(2, 0x373a43, 1); pill.strokeRoundedRect(W / 2 - pw / 2, H - 70, pw, 60, 30);
+      pill.fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1); pill.fillRect(W / 2 - pw / 2 + 30, H - 15, pw - 60, 3);
+    };
+    playing();
+    this.events.once('shutdown', music.onNow(playing));
+    const tap = this.add.rectangle(W / 2, H - 40, 480, 72, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
+    tap.on('pointerup', (p: Phaser.Input.Pointer) => { if (p.getDistance() <= 16) openJukebox(this, wd.id); });
 
     const rows = Math.ceil((wd.levels.length - 1) / 2) + 1;
-    enableScroll(this, list, 270, H - 270 - 40, rows * (CH + GY) + 44);
+    enableScroll(this, list, 270, H - 270 - 80, rows * (CH + GY) + 44);
   }
 }

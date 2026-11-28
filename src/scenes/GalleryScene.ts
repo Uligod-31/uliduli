@@ -1,3 +1,4 @@
+import { MENU, music } from '../audio/player';
 ﻿import Phaser from 'phaser';
 import { W, H, UI, FONT } from '../core/theme';
 import { paintedBg, chromeHeading, button, enableScroll, label, signatureLine } from '../core/ui';
@@ -12,6 +13,7 @@ export class GalleryScene extends Phaser.Scene {
   constructor() { super('Gallery'); }
 
   create() {
+    music.play(MENU);
     paintedBg(this, 0.5);
     const entries: Entry[] = [];
     for (const wd of WORLDS) wd.levels.forEach((_, li) => { if (save.level(wd.id, li)) entries.push({ wid: wd.id, li }); });

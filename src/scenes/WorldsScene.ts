@@ -1,3 +1,4 @@
+import { MENU, music } from '../audio/player';
 import Phaser from 'phaser';
 import { W, H, UI, FONT, toHex, lighten } from '../core/theme';
 import { paintedBg, chromeHeading, button, enableScroll, signatureLine } from '../core/ui';
@@ -12,6 +13,7 @@ export class WorldsScene extends Phaser.Scene {
   init(d?: { dive?: boolean }) { this.fromDive = !!d?.dive; }
 
   create() {
+    music.play(MENU);
     paintedBg(this, 0.5);
     if (this.fromDive) {
       // saímos da pupila: clarão rosa que se dissipa e o ecrã a recuar até ao tamanho normal

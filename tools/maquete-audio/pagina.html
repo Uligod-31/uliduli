@@ -1,0 +1,86 @@
+<title>Sala de Ensaios ÜLidÜLi</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;600&display=swap">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* palco: espetro e chama no topo; cartaz com as seis bandas; alinhamento dos 17 mundos no fim */
+  :root { color-scheme: dark; --bg: #15161a; --card: #1e2025; --surface: #2a2c33; --line: #373a43; --text: #eceef3; --dim: #a3a8b6; --blue: #5b92ff; --pink: #ff4fd8;
+    --grad: linear-gradient(135deg, #3b74f2, #8a4bea 55%, #e02bc0); --display: 'Oswald', 'Arial Narrow', sans-serif; --body: 'Inter', system-ui, sans-serif; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { color-scheme: light; --bg: #f3f4f7; --card: #ffffff; --surface: #e8eaf0; --line: #d3d6df; --text: #17181d; --dim: #555b6b; --blue: #2a5fe0; --pink: #c8179f; } }
+  :root[data-theme="light"] { color-scheme: light; --bg: #f3f4f7; --card: #ffffff; --surface: #e8eaf0; --line: #d3d6df; --text: #17181d; --dim: #555b6b; --blue: #2a5fe0; --pink: #c8179f; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--body); }
+  main { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 22px 48px; }
+  header { text-align: center; }
+  #chama { display: block; margin: 0 auto; width: 54px; height: 70px; transform-origin: 50% 100%; }
+  h1 { font: 700 clamp(30px, 9vw, 46px)/1.05 var(--display); text-transform: uppercase; letter-spacing: .01em; margin: 8px 0 4px; text-wrap: balance; }
+  header p { color: var(--dim); margin: 0 auto; max-width: 46ch; }
+  #espetro { display: block; width: 100%; height: 74px; margin-top: 16px; border-bottom: 3px solid transparent; border-image: var(--grad) 1; }
+  ol { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 12px; }
+  .faixa { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .faixa.a-tocar { border-color: var(--pink); }
+  .tocar { width: 54px; height: 54px; border-radius: 50%; border: 0; cursor: pointer; background: var(--grad); display: grid; place-items: center; }
+  .tocar:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+  .tocar span { width: 0; height: 0; border-left: 17px solid #fff; border-top: 11px solid transparent; border-bottom: 11px solid transparent; margin-left: 5px; }
+  .a-tocar .tocar span { width: 16px; height: 18px; border: 0; margin: 0; border-left: 5px solid #fff; border-right: 5px solid #fff; box-sizing: border-box; }
+  .a-carregar .tocar span { width: 22px; height: 22px; margin: 0; border-radius: 50%; border: 3px solid rgba(255,255,255,.35); border-top-color: #fff; animation: roda .8s linear infinite; }
+  @keyframes roda { to { transform: rotate(360deg); } }
+  .info { min-width: 0; }
+  .mundo { margin: 0; font: 600 11px/1.4 var(--body); text-transform: uppercase; letter-spacing: .09em; color: var(--blue); }
+  h2 { margin: 1px 0 2px; font: 700 23px/1.15 var(--display); }
+  .tema { margin: 0; font-weight: 600; font-size: 13px; }
+  .historia { margin: 4px 0 0; color: var(--dim); font-size: 13.5px; }
+  .estado { margin: 6px 0 0; color: var(--pink); font-size: 13px; }
+  .estado:empty { display: none; }
+  .barra { height: 4px; margin-top: 10px; background: var(--surface); border-radius: 2px; overflow: hidden; }
+  .barra i { display: block; height: 100%; width: 0; background: var(--grad); }
+  .nota { color: var(--dim); font-size: 13px; margin: 14px 2px 0; }
+  h3 { font: 700 22px/1.2 var(--display); text-transform: uppercase; margin: 34px 0 6px; }
+  .rolo { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 8px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); }
+  td strong { display: block; font-family: var(--display); font-weight: 500; font-size: 15.5px; }
+  td small { color: var(--dim); font-size: 12.5px; }
+  td:last-child { white-space: nowrap; color: var(--dim); }
+  td.pronta { color: var(--pink); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { .a-carregar .tocar span { animation: none; } }
+</style>
+
+<main>
+  <header>
+    <svg id="chama" viewBox="0 0 54 70" aria-hidden="true"><path d="M28 1C33 14 50 24 50 44c0 15-10 25-23 25S4 59 4 44c0-9 4-16 9-21 0 6 2 9 5 10C17 20 23 9 28 1Z" fill="#ff8a1f"/><path d="M27 25c4 9 13 15 13 26 0 9-6 15-13 15S14 60 14 51c0-10 9-16 13-26Z" fill="#ffe9c2"/><ellipse cx="22" cy="51" rx="2.6" ry="4" fill="#17100a"/><ellipse cx="32" cy="51" rx="2.6" ry="4" fill="#17100a"/></svg>
+    <h1>Sala de Ensaios</h1>
+    <p>Seis temas originais para ouvires antes de entrarem no jogo. Carrega num para a banda começar. Auscultadores ajudam.</p>
+    <canvas id="espetro" aria-hidden="true"></canvas>
+  </header>
+
+  <ol id="faixas"></ol>
+  <p class="nota">Cada tema é calculado no teu aparelho na primeira vez, o que leva uns segundos. Depois repete em loop. Num iPhone sem som, confirma que o modo silencioso está desligado.</p>
+
+  <h3>Alinhamento proposto</h3>
+  <div class="rolo">
+    <table>
+      <thead><tr><th>Mundo</th><th>Banda e género</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td>Menu inicial</td><td><strong>Faísca Solta</strong><small>Rock alternativo a abrir</small></td><td class="pronta">amostra</td></tr>
+        <tr><td>Reino das Areias</td><td><strong>Escaravelho de Ferro</strong><small>Heavy clássico a galope</small></td><td>por compor</td></tr>
+        <tr><td>Asteroide B-612</td><td><strong>Rosa de Aço</strong><small>Groove metal</small></td><td>por compor</td></tr>
+        <tr><td>Jardim Sebe</td><td><strong>Sebes Tortas</strong><small>Nu metal aos saltos</small></td><td>por compor</td></tr>
+        <tr><td>Abismo Demoníaco</td><td><strong>Grilhões</strong><small>Groove em afinação funda</small></td><td class="pronta">amostra</td></tr>
+        <tr><td>Glaciar Espelhado</td><td><strong>Sepulcro Branco</strong><small>Death metal lento</small></td><td>por compor</td></tr>
+        <tr><td>Cidade-Relógio</td><td><strong>Mola Mestra</strong><small>Industrial marcial</small></td><td class="pronta">amostra</td></tr>
+        <tr><td>Biblioteca Infinita</td><td><strong>Tomo Proibido</strong><small>Neoclássico progressivo</small></td><td>por compor</td></tr>
+        <tr><td>Floresta Élfica</td><td><strong>Orvalho Negro</strong><small>Doom gótico</small></td><td>por compor</td></tr>
+        <tr><td>Fiorde Viking</td><td><strong>Corvos do Jarl</strong><small>Death melódico de remadores</small></td><td class="pronta">amostra</td></tr>
+        <tr><td>Mandala Solar</td><td><strong>Sétimo Anel</strong><small>Progressivo em compassos ímpares</small></td><td>por compor</td></tr>
+        <tr><td>Oceano de Tinta</td><td><strong>Abissal</strong><small>Post-metal atmosférico</small></td><td>por compor</td></tr>
+        <tr><td>Neon Glitch</td><td><strong>Curto-Circuito</strong><small>Industrial eletrónico</small></td><td>por compor</td></tr>
+        <tr><td>Intergaláctico</td><td><strong>Legião Quasar</strong><small>Power metal épico</small></td><td>por compor</td></tr>
+        <tr><td>Estelar</td><td><strong>Pó de Cometa</strong><small>Metal espacial</small></td><td>por compor</td></tr>
+        <tr><td>Céu Angélico</td><td><strong>Véu de Cinza</strong><small>Gótico sinfónico</small></td><td class="pronta">amostra</td></tr>
+        <tr><td>Reino Animal</td><td><strong>Tambor da Savana</strong><small>Groove tribal</small></td><td>por compor</td></tr>
+        <tr><td>Palco Rockstar</td><td><strong>A Lenda e os Cacos</strong><small>Grunge</small></td><td class="pronta">amostra</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="nota">Os nomes das bandas são provisórios.</p>
+</main>

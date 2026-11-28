@@ -1,3 +1,4 @@
+import { MENU, music } from '../audio/player';
 import Phaser from 'phaser';
 import { W, H, UI, FONT, FONT_HEAD, brandAt } from '../core/theme';
 import { button, gradText, bgGradient, signatureLine } from '../core/ui';
@@ -36,6 +37,7 @@ export class TutorialScene extends Phaser.Scene {
   constructor() { super('Tutorial'); }
 
   create() {
+    music.play(MENU);
     this.page = 0; this.root = undefined; this.anim = []; this.busy = false;
     this.cameras.main.fadeIn(260, 5, 6, 11);
     bgGradient(this, 0x1a1c22, 0x0b0c10);

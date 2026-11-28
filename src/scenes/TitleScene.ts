@@ -4,6 +4,8 @@ import { neoButton } from '../core/ui';
 import { drawPlate } from '../three/menuArt';
 import { drawLogo } from '../three/menuArt';
 import { sfx } from '../core/audio';
+import { MENU, music } from '../audio/player';
+import { openJukebox } from '../ui/jukebox';
 import { save } from '../core/save';
 import { stage } from '../three/Stage';
 import { warmMenus } from '../core/prewarm';
@@ -19,6 +21,7 @@ export class TitleScene extends Phaser.Scene {
   create() {
     this.diving = false;
     this.cameras.main.fadeIn(220, 5, 6, 11);
+    music.play(MENU);
 
     // véus para legibilidade sobre o 3D
     const top = this.add.graphics();
@@ -79,8 +82,12 @@ export class TitleScene extends Phaser.Scene {
       this.tweens.add({ targets: [name, info], alpha: { from: 0, to: 1 }, duration: 260 });
     };
 
-    neoButton(this, 293, 1078, 486, 112, 'Jogar aqui', '01', () => this.dive(), true, 46);
-    this.infoButton(608, 1078, 112);
+    neoButton(this, 230, 1078, 360, 112, 'Jogar aqui', '01', () => this.dive(), true, 40);
+    this.squareButton(484, 1078, 112, '♫', '68px', () => openJukebox(this));
+    this.squareButton(608, 1078, 112, 'i', '88px', () => {
+      this.cameras.main.fadeOut(180, 5, 6, 11);
+      this.time.delayedCall(190, () => this.scene.start('Tutorial'));
+    });
     neoButton(this, W / 2 - 207, 1190, 206, 80, 'Mundos', '02', () => this.scene.start('Worlds'), false, 26);
     neoButton(this, W / 2 + 7, 1190, 206, 80, 'Galeria', '03', () => this.scene.start('Gallery'), false, 26);
     const snd = neoButton(this, W / 2 + 214, 1190, 192, 80, save.mute ? 'Som: off' : 'Som: on', '04', () => {
@@ -116,13 +123,13 @@ export class TitleScene extends Phaser.Scene {
     this.events.once('shutdown', () => { stage.onOrbitFlash = undefined; window.removeEventListener('deviceorientation', tilt); stage.stop(); });
   }
 
-  /** Botão quadrado «i»: abre o tutorial. */
-  private infoButton(x: number, y: number, s: number) {
+  /** Botões quadrados: «♫» abre a Discoteca, «i» abre o tutorial. */
+  private squareButton(x: number, y: number, s: number, sign: string, size: string, action: () => void) {
     const key = `plate_${s}_${s}_0`;
     if (!this.textures.exists(key)) this.textures.addCanvas(key, drawPlate(s, s, false, 2));
     const img = this.add.image(0, -22, key).setScale(0.5);
     // «i» minúsculo, em letra serifada (as outras letras da app só têm maiúsculas)
-    const t = this.add.text(0, -2, 'i', { fontFamily: "Georgia,'Times New Roman',serif", fontSize: '88px', color: '#f4f7ff', fontStyle: 'bold italic', stroke: '#05060b', strokeThickness: 7 }).setOrigin(0.5);
+    const t = this.add.text(0, -2, sign, { fontFamily: "Georgia,'Times New Roman',serif", fontSize: size, color: '#f4f7ff', fontStyle: 'bold italic', stroke: '#05060b', strokeThickness: 7 }).setOrigin(0.5);
     try { (t as any).postFX?.addGlow(0xff4fd8, 2.5, 0, false, 0.1, 8); } catch { /* sem FX */ }
     const c = this.add.container(x, y, [img, t]);
     c.setSize(s, s).setInteractive({ useHandCursor: true });
@@ -130,8 +137,7 @@ export class TitleScene extends Phaser.Scene {
       if (p.getDistance() > 16 || this.diving) return;
       sfx.unlock(); sfx.ui();
       this.tweens.add({ targets: c, scale: 0.93, duration: 60, yoyo: true });
-      this.cameras.main.fadeOut(180, 5, 6, 11);
-      this.time.delayedCall(190, () => this.scene.start('Tutorial'));
+      action();
     });
   }
 
@@ -149,7 +155,7 @@ export class TitleScene extends Phaser.Scene {
     if (!this.shown && stage.frames > 4) { this.shown = true; document.getElementById('splash')?.classList.add('hide'); }
   }
 
-  /** Moldura técnica: cantos de mira, REC, coordenadas e texto vertical. */
+  /** Moldura técnica: cantos de mira, REC e coordenadas. */
   private hud() {
     const g = this.add.graphics();
     g.lineStyle(3, 0xeceef3, 0.65);
@@ -164,7 +170,5 @@ export class TitleScene extends Phaser.Scene {
     this.add.text(W - 58, 38, 'v' + __APP_VERSION__, { fontFamily: FONT, fontSize: '20px', color: '#9aa0ae' }).setOrigin(1, 0);
     const coord = this.add.text(W - 58, 62, '', { fontFamily: FONT, fontSize: '16px', color: '#9aa0ae' }).setOrigin(1, 0);
     this.time.addEvent({ delay: 140, loop: true, callback: () => { coord.setText(`SINAL ${(60 + Math.random() * 35) | 0}%`); } });
-    const v = this.add.text(W - 40, 640, 'NÃO OLHES PARA CIMA', { fontFamily: FONT_HEAD, fontSize: '22px', color: '#ffffff' }).setOrigin(0.5).setAngle(90).setAlpha(0.35);
-    v.setStyle({ letterSpacing: 10 } as any);
   }
 }

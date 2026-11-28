@@ -10,6 +10,7 @@ import { spawnGuards, guardDist, guardMove, collision, sunlit, ZAP_STUN } from '
 import { ELEMENTS, PUDDLE, REVIVE, LURE_R, LURE_TICKS, GAS_R, LOW, barrierNear, openBarrier } from '../core/viva';
 import { LevelDef, WorldDef, getWorld, isUnlocked, GUARD_HUNT, GUARD_STUN, GUARD_STUN_R, HINTS, guardEvery } from '../worlds';
 import { sfx } from '../core/audio';
+import { music } from '../audio/player';
 import { save } from '../core/save';
 import { playDialogue } from './dialogue';
 import { stage } from '../three/Stage';
@@ -119,10 +120,37 @@ export class GameScene extends Phaser.Scene {
     this.buildHud();
     this.setupInput();
     this.updateHud();
+    this.playTrack();
 
     const go = () => this.introCards(() => { this.blocked = false; this.updateHud(); });
     if (this.skipIntro || !def.intro.length) go();
     else this.time.delayedCall(1300, () => playDialogue(this, def.intro, go));
+  }
+
+  /** O tema deste nível; quando começa a ouvir-se, um letreiro diz quem está a tocar. */
+  private playTrack() {
+    const { wd, def, li } = this;
+    let shown = false, tag: Phaser.GameObjects.Container | undefined;
+    const announce = () => {
+      const n = music.now;
+      if (shown || !n || n.world !== wd.id || n.level !== li) return;
+      shown = true;
+      const text = this.add.text(0, 0, `♫  ${n.band}  ·  «${n.title}»`, { fontFamily: FONT, fontSize: '24px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+      text.setScale(Math.min(1, (W - 90) / text.width));
+      const g = this.add.graphics(), pw = text.displayWidth + 44;
+      g.fillStyle(0x15161a, 0.9); g.fillRoundedRect(-pw / 2, -25, pw, 50, 25);
+      g.fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1); g.fillRect(-pw / 2 + 24, 20, pw - 48, 3);
+      tag = this.add.container(W / 2, 330, [g, text]).setDepth(32).setAlpha(0);
+      this.tweens.add({ targets: tag, alpha: 1, y: 318, duration: 380, ease: 'Cubic.Out' });
+      this.tweens.add({ targets: tag, alpha: 0, delay: 5200, duration: 600, onComplete: () => tag?.destroy() });
+    };
+    this.events.once('shutdown', music.onNow(announce));
+    const same = music.now?.world === wd.id && music.now.level === li;
+    music.play({ world: wd.id, level: li, title: def.title });
+    if (same) announce();
+    // o tema do nível seguinte fica pronto enquanto se joga este
+    const next = wd.levels[li + 1];
+    if (next) this.time.delayedCall(9000, () => music.ahead({ world: wd.id, level: li + 1, title: next.title }));
   }
 
   /** Na primeira vez de cada regra (a Chama Viva, o sopro do mundo, a mecânica), um cartão curto explica-a. */
