@@ -1,7 +1,7 @@
 ﻿import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Maze, neighbor, DIRS } from '../core/maze';
-import { buildIceFx, buildLavaFx, IceFx, LavaFx } from './mechfx';
+import { buildIceFx, buildLavaFx, buildWarpFx, buildHoleFx, buildHazardFx, buildCloudFx, IceFx, LavaFx, WorldFx } from './mechfx';
 import { Pal } from '../core/theme';
 import { mulberry32 } from '../core/rng';
 import { collectWalls } from '../art/render';
@@ -29,6 +29,7 @@ export interface Island {
   setRingTarget?(layer: number): void;    // assinala o anel que o botão vai rodar
   ice?: IceFx;
   lava?: LavaFx;
+  fx?: WorldFx;
 }
 
 function paint(g: THREE.BufferGeometry, v: number) {
@@ -110,6 +111,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
   const fk = L.floor;
   // chão em xadrez (o plano de xadrez surreal de Dalí)
   const boxG = new THREE.BoxGeometry(0.985, FLOOR_T, 0.985);
+  const floorAt = new Map<number, [THREE.InstancedMesh, number][]>(); // para as nuvens poderem abrir um buraco
   const nA = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 0);
   const nB = open.filter((i) => ((i % cols) + ((i / cols) | 0)) % 2 === 1);
   const mk = (list: number[], color: number) => {
@@ -120,7 +122,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
       emissiveMap: flag.emissive, emissive: flag.emissive ? new THREE.Color(0xffffff) : new THREE.Color(0x000000), emissiveIntensity: flag.emissive ? (m.mech === 'lava' ? 0.22 : 1.4) : 0,
     }), list.length);
     const mat = new THREE.Matrix4();
-    list.forEach((i, k) => mesh.setMatrixAt(k, mat.makeTranslation(px(i), -FLOOR_T / 2, pz(i))));
+    list.forEach((i, k) => { mesh.setMatrixAt(k, mat.makeTranslation(px(i), -FLOOR_T / 2, pz(i))); (floorAt.get(i) ?? floorAt.set(i, []).get(i)!).push([mesh, k]); });
     mesh.receiveShadow = true;
     return mesh;
   };
@@ -158,6 +160,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
       const depth = (1.5 + 6.5 * Math.pow(1 - dn, 1.4)) * (0.75 + 0.5 * rng());
       mat.compose(new THREE.Vector3(px(i), -FLOOR_T - depth / 2, pz(i)), new THREE.Quaternion(), new THREE.Vector3(1, depth, 1));
       rocks.setMatrixAt(k, mat);
+      (floorAt.get(i) ?? floorAt.set(i, []).get(i)!).push([rocks, k]);
       rocks.setColorAt(k, cc.copy(cA).lerp(cB, rng()));
     });
     rocks.castShadow = false;
@@ -253,6 +256,12 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
     vertexColors: true, emissive: new THREE.Color(pal.accent), emissiveIntensity: 0.18,
   });
   const blossomMat = new THREE.MeshBasicMaterial({ color: hdr(0xffffff, 1.4), toneMapped: false });
+  // biblioteca: as paredes que a página troca são fúcsia; quando descem deixam uma marca azul no chão
+  const page = m.mech === 'page';
+  if (page) { dynMat.color.set(0xff4fd8); dynMat.emissive.set(0xc8179f); dynMat.emissiveIntensity = 0.55; }
+  const ghosts: THREE.Mesh[] = [];
+  const ghostGeo = page ? new THREE.PlaneGeometry(0.92, 0.2).rotateX(-Math.PI / 2) : undefined;
+  const ghostMat = page ? new THREE.MeshBasicMaterial({ color: 0x3b74f2, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }) : undefined;
   m.dyn.forEach((e, k) => {
     const horizontal = e.dir === 2;
     const r2 = mulberry32(seed * 53 + k);
@@ -269,6 +278,11 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
     g.position.set((e.a % cols) + (horizontal ? 0.5 : 1) - cols / 2, 0, ((e.a / cols) | 0) + (horizontal ? 1 : 0.5) - rows / 2);
     if (!horizontal) g.rotation.y = Math.PI / 2;
     group.add(g);
+    if (ghostGeo) {
+      const gh = new THREE.Mesh(ghostGeo, ghostMat!);
+      gh.position.set(g.position.x, 0.025, g.position.z); gh.rotation.y = g.rotation.y;
+      group.add(gh); ghosts.push(gh);
+    }
     dyn.push({ group: g, closed: true, cur: 1, vel: 0, target: 1 });
   });
 
@@ -284,9 +298,12 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
   const lava = m.mech === 'lava' ? buildLavaFx(m, cellPos) : undefined;
   if (ice) group.add(ice.group);
   if (lava) group.add(lava.mesh);
+  const hideFloor = (c: number) => { const zero = new THREE.Matrix4().makeScale(0, 0, 0); for (const [mesh, k] of floorAt.get(c) ?? []) { mesh.setMatrixAt(k, zero); mesh.instanceMatrix.needsUpdate = true; } };
+  const fx = m.warp ? buildWarpFx(m, cellPos) : m.holes ? buildHoleFx(m, cellPos) : m.haz ? buildHazardFx(m, cellPos) : m.clouds ? buildCloudFx(m, cellPos, hideFloor) : undefined;
+  if (fx) group.add(fx.group);
 
   return {
-    group, dyn, radius: R, ice, lava,
+    group, dyn, radius: R, ice, lava, fx,
     layers: R2 ? layers : undefined,
     setRingTarget: R2 ? (l: number) => { ringTargetL = l; } : undefined,
     pulse(p: number) { stripMat.color.copy(stripBase).multiplyScalar(1 + 1.1 * p); },
@@ -297,6 +314,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
       decor.update(t);
       ice?.update(t);
       lava?.update(dt, t);
+      fx?.update(dt, t);
       for (const g of marks) (g.material as THREE.MeshBasicMaterial).opacity = g.userData.layer === ringTargetL ? 0.35 + 0.3 * Math.sin(t * 4.5) : 0;
       for (const d of dyn) {
         d.vel += (d.target - d.cur) * 190 * dt;
@@ -306,6 +324,8 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
         d.group.scale.y = s;
         d.group.visible = d.cur > 0.03 || d.target > 0.5;
       }
+      ghosts.forEach((gh, k) => { gh.visible = dyn[k].cur < 0.5; });
+      if (ghostMat) ghostMat.opacity = 0.62 + 0.26 * Math.sin(t * 3);
     },
     dispose() { disposeTree(group); },
   };

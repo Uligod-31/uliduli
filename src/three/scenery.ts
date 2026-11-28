@@ -15,24 +15,24 @@ export function themeFor(id: string, pal: Pal): SceneTheme {
 
 function themeFor0(id: string, pal: Pal): SceneTheme {
   // Asteroide B-612: noite fria, névoa verde-ardósia, lua pálida (pesadelo em miniatura)
-  if (id === 'b612') return { top: 0x04070a, mid: 0x101c20, horizon: 0x2c3f3e, ground: 0x0a0e10, ground2: 0x060809, sun: 0xcfe6d8, planet: true, fogNear: 14, fogFar: 80, grade: 1, sunC: 0xb9d0c8, sunI: 2.3, hemiI: 1.0, rimI: 1.1, lampI: 2.2, lampD: 9, expo: 1.32 };
-  if (id === 'demoniaco') return { top: 0x0a0204, mid: 0x3a0a0c, horizon: 0xe04a16, ground: 0x2a0a08, ground2: 0x120404, sun: 0xff7a3a, fogNear: 40, fogFar: 260, grade: 0.9, sunC: 0xffb890, sunI: 2.4, hemiI: 1.05, rimI: 1.3, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
+  if (id === 'b612') return { top: 0x04070a, mid: 0x101c20, horizon: 0x2c3f3e, ground: 0x0a0e10, ground2: 0x060809, sun: 0xcfe6d8, planet: true, fogNear: 14, fogFar: 80, grade: 1, sunC: 0xb9d0c8, sunI: 2.3, hemiI: 1.15, rimI: 1.1, lampI: 2.2, lampD: 9, expo: 1.42 };
+  if (id === 'demoniaco') return { top: 0x0a0204, mid: 0x3a0a0c, horizon: 0xe04a16, ground: 0x2a0a08, ground2: 0x120404, sun: 0xff7a3a, fogNear: 40, fogFar: 260, grade: 0.9, sunC: 0xffb890, sunI: 2.4, hemiI: 1.35, rimI: 1.3, lampI: 2.2, lampD: 9, expo: 1.55, dim: 0.5 };
   if (id === 'glaciar') return { top: 0x050c18, mid: 0x143a5a, horizon: 0x88c6e4, ground: 0x6a9cbc, ground2: 0x4a7a9c, sun: 0xe8f6ff, fogNear: 26, fogFar: 190, grade: 0.5, sunC: 0xcfe8ff, sunI: 2.5, hemiI: 1.35, rimI: 1.1, lampI: 1.8, lampD: 9, expo: 1.35, dim: 0.5 };
   if (id === 'relogio') return { top: 0x0d0904, mid: 0x3a2a14, horizon: 0xd8a050, ground: 0x2a2012, ground2: 0x120c06, sun: 0xffc060, fogNear: 22, fogFar: 170, grade: 0.7, sunC: 0xffd090, sunI: 2.5, hemiI: 1.15, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.38, dim: 0.5 };
-  if (id === 'biblioteca') return { top: 0x070403, mid: 0x241408, horizon: 0x8a5a2a, ground: 0x1c120a, ground2: 0x0c0804, sun: 0xffc880, fogNear: 18, fogFar: 150, grade: 0.8, sunC: 0xffd8a0, sunI: 2.3, hemiI: 1.15, rimI: 1.0, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
-  if (id === 'elfico') return { top: 0x030a06, mid: 0x0c2414, horizon: 0x3a5c28, ground: 0x142210, ground2: 0x0a1408, sun: 0xffe6a0, fogNear: 16, fogFar: 150, grade: 0.85, sunC: 0xffe2a0, sunI: 2.5, hemiI: 1.7, rimI: 1.3, lampI: 2.2, lampD: 9, expo: 1.55, dim: 0.5 };
-  if (id === 'viking') return { top: 0x050914, mid: 0x16223a, horizon: 0x44546e, ground: 0x0e1c34, ground2: 0x08101e, sun: 0xffb070, fogNear: 22, fogFar: 180, grade: 0.7, sunC: 0xffc8a0, sunI: 2.7, hemiI: 1.8, rimI: 1.3, lampI: 2.0, lampD: 9, expo: 1.55, dim: 0.5 };
+  if (id === 'biblioteca') return { top: 0x070403, mid: 0x241408, horizon: 0x8a5a2a, ground: 0x1c120a, ground2: 0x0c0804, sun: 0xffc880, fogNear: 18, fogFar: 150, grade: 0.8, sunC: 0xffd8a0, sunI: 2.3, hemiI: 1.25, rimI: 1.0, lampI: 2.2, lampD: 9, expo: 1.44, dim: 0.5 };
+  if (id === 'elfico') return { top: 0x030a06, mid: 0x0c2414, horizon: 0x3a5c28, ground: 0x142210, ground2: 0x0a1408, sun: 0xffe6a0, fogNear: 16, fogFar: 150, grade: 0.85, sunC: 0xffe2a0, sunI: 2.5, hemiI: 1.85, rimI: 1.3, lampI: 2.2, lampD: 9, expo: 1.62, dim: 0.5 };
+  if (id === 'viking') return { top: 0x050914, mid: 0x16223a, horizon: 0x44546e, ground: 0x0e1c34, ground2: 0x08101e, sun: 0xffb070, fogNear: 22, fogFar: 180, grade: 0.7, sunC: 0xffc8a0, sunI: 2.7, hemiI: 1.95, rimI: 1.3, lampI: 2.0, lampD: 9, expo: 1.66, dim: 0.5 };
   if (id === 'egipto') return { top: 0x070518, mid: 0x3a1f58, horizon: 0xf2a152, ground: 0x45331c, ground2: 0x2a1d0e, sun: 0xffc060, fogNear: 70, fogFar: 520, grade: 0.55, sunC: 0xffd49a, sunI: 2.7, hemiI: 1.3, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.42, dim: 0.5 };
-  if (id === 'mandala') return { top: 0x1a0a04, mid: 0x5a2a0c, horizon: 0xffb04a, ground: 0x6a3a10, ground2: 0x3a1c06, sun: 0xffd070, fogNear: 60, fogFar: 480, grade: 0.5, sunC: 0xffe0a0, sunI: 2.6, hemiI: 1.3, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.4, dim: 0.5 };
-  if (id === 'tinta') return { top: 0x020812, mid: 0x08234a, horizon: 0x1a6aa8, ground: 0x061a34, ground2: 0x030c1c, sun: 0x80e8ff, fogNear: 14, fogFar: 150, grade: 0.7, sunC: 0x9ad8ff, sunI: 2.3, hemiI: 1.25, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
-  if (id === 'neon') return { top: 0x08040f, mid: 0x2a0a4a, horizon: 0xff2bd6, ground: 0x120a24, ground2: 0x08040f, sun: 0x27d3ff, fogNear: 40, fogFar: 380, grade: 0.4, sunC: 0xff9aea, sunI: 2.4, hemiI: 1.2, rimI: 1.4, lampI: 2.0, lampD: 9, expo: 1.42, dim: 0.5 };
-  if (id === 'galactico') return { top: 0x02030a, mid: 0x140a3a, horizon: 0x3a2a9a, ground: 0x0a0c24, ground2: 0x04050f, sun: 0x39f2d0, fogNear: 60, fogFar: 600, grade: 0.4, sunC: 0xa0c8ff, sunI: 2.4, hemiI: 1.2, rimI: 1.3, lampI: 2.0, lampD: 9, expo: 1.4, dim: 0.5 };
-  if (id === 'estelar') return { top: 0x03051a, mid: 0x0e1a52, horizon: 0x3a4aa0, ground: 0x0a1030, ground2: 0x050818, sun: 0xffe08a, fogNear: 60, fogFar: 560, grade: 0.4, sunC: 0xffe8b0, sunI: 2.4, hemiI: 1.25, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.4, dim: 0.5 };
+  if (id === 'mandala') return { top: 0x1a0a04, mid: 0x5a2a0c, horizon: 0xffb04a, ground: 0x6a3a10, ground2: 0x3a1c06, sun: 0xffd070, fogNear: 60, fogFar: 480, grade: 0.5, sunC: 0xffe0a0, sunI: 2.6, hemiI: 1.35, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.4, dim: 0.5 };
+  if (id === 'tinta') return { top: 0x020812, mid: 0x08234a, horizon: 0x1a6aa8, ground: 0x061a34, ground2: 0x030c1c, sun: 0x80e8ff, fogNear: 14, fogFar: 150, grade: 0.7, sunC: 0x9ad8ff, sunI: 2.3, hemiI: 1.45, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.48, dim: 0.5 };
+  if (id === 'neon') return { top: 0x08040f, mid: 0x2a0a4a, horizon: 0xff2bd6, ground: 0x120a24, ground2: 0x08040f, sun: 0x27d3ff, fogNear: 40, fogFar: 380, grade: 0.4, sunC: 0xff9aea, sunI: 2.4, hemiI: 1.6, rimI: 1.4, lampI: 2.0, lampD: 9, expo: 1.55, dim: 0.5 };
+  if (id === 'galactico') return { top: 0x02030a, mid: 0x140a3a, horizon: 0x3a2a9a, ground: 0x0a0c24, ground2: 0x04050f, sun: 0x39f2d0, fogNear: 60, fogFar: 600, grade: 0.4, sunC: 0xa0c8ff, sunI: 2.4, hemiI: 1.7, rimI: 1.3, lampI: 2.0, lampD: 9, expo: 1.56, dim: 0.5 };
+  if (id === 'estelar') return { top: 0x03051a, mid: 0x0e1a52, horizon: 0x3a4aa0, ground: 0x0a1030, ground2: 0x050818, sun: 0xffe08a, fogNear: 60, fogFar: 560, grade: 0.4, sunC: 0xffe8b0, sunI: 2.4, hemiI: 1.55, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.52, dim: 0.5 };
   if (id === 'angelico') return { top: 0x6a88d0, mid: 0xb8c8f0, horizon: 0xfff0d0, ground: 0xe8e0f0, ground2: 0xc8c0e0, sun: 0xffffff, fogNear: 50, fogFar: 360, grade: 0.1, sunC: 0xfff4d8, sunI: 2.5, hemiI: 1.5, rimI: 0.9, lampI: 1.0, lampD: 7, expo: 0.92, dim: 0.9 };
   if (id === 'animal') return { top: 0x1a1a3a, mid: 0xa04a2a, horizon: 0xffb050, ground: 0x8a6a2a, ground2: 0x5a4418, sun: 0xffc060, fogNear: 60, fogFar: 480, grade: 0.45, sunC: 0xffd49a, sunI: 2.6, hemiI: 1.3, rimI: 1.2, lampI: 2.0, lampD: 9, expo: 1.4, dim: 0.5 };
-  if (id === 'rockstar') return { top: 0x040208, mid: 0x1a0a2a, horizon: 0x6a0a4a, ground: 0x0a0810, ground2: 0x050408, sun: 0xff2b8a, fogNear: 30, fogFar: 300, grade: 0.5, sunC: 0xff9ac8, sunI: 2.3, hemiI: 1.1, rimI: 1.5, lampI: 2.0, lampD: 9, expo: 1.45, dim: 0.5 };
+  if (id === 'rockstar') return { top: 0x040208, mid: 0x1a0a2a, horizon: 0x6a0a4a, ground: 0x0a0810, ground2: 0x050408, sun: 0xff2b8a, fogNear: 30, fogFar: 300, grade: 0.5, sunC: 0xff9ac8, sunI: 2.3, hemiI: 2.05, rimI: 1.5, lampI: 2.0, lampD: 9, expo: 1.74, dim: 0.5 };
   // Jardim Sebe: entardecer doente, névoa verde-oliva, sebes apodrecidas e um sol pálido a morrer
-  if (id === 'jardim') return { dali: true, top: 0x040604, mid: 0x1a281c, horizon: 0x56613f, ground: 0x1b2014, ground2: 0x0c0f09, sun: 0xd9cf94, fogNear: 16, fogFar: 150, grade: 0.9, sunC: 0xd6cc9c, sunI: 2.7, hemiI: 1.2, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.4, dim: 0.5 };
+  if (id === 'jardim') return { dali: true, top: 0x040604, mid: 0x1a281c, horizon: 0x56613f, ground: 0x1b2014, ground2: 0x0c0f09, sun: 0xd9cf94, fogNear: 16, fogFar: 150, grade: 0.9, sunC: 0xd6cc9c, sunI: 2.7, hemiI: 1.25, rimI: 1.2, lampI: 2.2, lampD: 9, expo: 1.46, dim: 0.5 };
   return {
     top: mix(pal.bgBot, 0x000000, 0.2), mid: mix(pal.bgTop, pal.accent, 0.35), horizon: mix(pal.accent, 0xffffff, 0.25),
     ground: mix(pal.floorA, pal.accent, 0.3), ground2: mix(pal.floorB, pal.bgBot, 0.4), sun: mix(pal.accent, 0xffffff, 0.5),
@@ -668,12 +668,12 @@ export class Scenery {
   }
 
   setDark(d: number) {
-    const v = 1 - 0.78 * d;
+    const v = 1 - 0.5 * d;
     this.skyMat.uniforms.dark.value = v;
     for (const c of this.clocks) c.mat.uniforms.dark.value = v * this.dimBase;
     const gm = this.ground.material as THREE.MeshStandardMaterial;
     if (!this.groundTint) this.groundTint = gm.color.clone();
-    gm.color.copy(this.groundTint).multiplyScalar(1 - 0.7 * d);
+    gm.color.copy(this.groundTint).multiplyScalar(1 - 0.45 * d);
   }
 
   update(t: number, cam: THREE.Vector3) {

@@ -1,9 +1,9 @@
 {
   "name": "uliduli",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "private": true,
   "type": "module",
-  "description": "UliDUli — aventura de labirintos (Maze Art) com mundos temáticos",
+  "description": "ÜLidÜLi — aventura de labirintos (Maze Art) com mundos temáticos",
   "scripts": {
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",

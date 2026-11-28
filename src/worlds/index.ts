@@ -1,4 +1,4 @@
-import { MaskKind, MazeOpts } from '../core/maze';
+import { MaskKind, MazeOpts, MechKind } from '../core/maze';
 import { Pal, mkPal } from '../core/theme';
 import { CharKind } from '../art/characters';
 
@@ -27,7 +27,8 @@ export interface LevelDef {
   gp?: number;     // os guardas mexem-se de gp em gp passos teus (por defeito 3)
   weather?: Weather; // clima deste nível (por cima do do mundo)
   bonus?: boolean; // nível bónus: só abre com todas as estrelas dos outros
-  mech?: 'ice' | 'lava' | 'rings'; // mecânica do mundo
+  mech?: MechKind; // mecânica do mundo
+  amount?: number; // quanto há da mecânica (passagens, pares, zonas, nuvens)
   rings?: number;  // anéis: quantos rodam (1 ou 2)
   grip?: number;   // gelo: fração extra de neve (mais fácil)
   lavaK?: number;  // lava: passos por cada casa que avança
@@ -617,7 +618,7 @@ function mechanics(wd: WorldDef, rule: string, per: Partial<LevelDef>[], intros:
 
 // Gelo: escorrega-se até à parede ou à neve. As sebes dinâmicas dão lugar ao gelo.
 mechanics(glaciar, 'Escorregas até à parede ou à neve. A Brasa derrete o chão e dá-te onde travar.',
-  [0.4, 0.28, 0.2, 0.2, 0.14, 0.1, 0.07, 0.04].map((grip, i) => ({ mech: 'ice' as const, dyn: 0, grip, guards: [0, 0, 1, 1, 1, 2, 2, 2][i] })),
+  [0.42, 0.32, 0.26, 0.24, 0.2, 0.16, 0.14, 0.12].map((grip, i) => ({ mech: 'ice' as const, dyn: 0, grip, guards: [0, 0, 1, 1, 1, 1, 2, 2][i], rev: 3 })),
   {
     1: [{ who: 'geada', text: 'Aqui não se caminha: desliza-se. Só a neve te segura.' }, { who: 'uli', text: 'Então derreto onde quiser parar.' }, { who: 'geada', text: 'Três vezes. Depois és meu.' }],
   });
@@ -636,6 +637,41 @@ mechanics(mandala, 'Roda os anéis da mandala para alinhar as portas e chegar ao
     1: [{ who: 'mestra', text: 'Os anéis não giram sozinhos. Giram quando tu mandas. Pensa antes de mandar.' }],
     3: [{ who: 'mestra', text: 'Agora são dois anéis. O de dentro só obedece a quem está sobre ele.' }, { who: 'mestra', text: 'O incenso esconde o caminho. Confia na tua própria luz.' }],
   });
+
+// ───────────────────── Mecânicas dos mundos (Vaga 2) ─────────────────────
+const wave2 = (mech: MechKind, amount: number[], guards: number[]) => amount.map((a, i) => ({ mech, amount: a, guards: guards[i] }));
+
+mechanics(b612, 'O planeta é redondo: sai por um arco de luz e entras pelo arco da mesma cor, do outro lado.',
+  wave2('planet', [3, 3, 4, 4, 5, 5, 6, 6], [0, 0, 1, 1, 1, 2, 2, 3]),
+  { 1: [{ who: 'raposa', text: 'Isto é um planeta pequeno. Se andares sempre em frente, voltas a casa.' }, { who: 'uli', text: 'Então os becos têm saída?' }, { who: 'raposa', text: 'Alguns. Procura os arcos.' }] });
+mechanics(galactico, 'Buracos de verme: entra num portal e sais no outro da mesma cor.',
+  wave2('holes', [1, 2, 2, 2, 3, 3, 3, 4], [0, 0, 1, 1, 1, 2, 2, 3]),
+  { 1: [{ who: 'comandante', text: 'Buracos de verme a bordo. Entra num, sais no gémeo. Não perguntes pela física.' }] });
+mechanics(viking, 'A maré sobe e desce ao ritmo dos teus passos. Nas zonas baixas, quem fica é levado.',
+  wave2('tide', [0.24, 0.28, 0.3, 0.32, 0.34, 0.36, 0.38, 0.4], [0, 0, 0, 1, 1, 1, 2, 2]),
+  { 1: [{ who: 'jarl', text: 'O mar respira a cada doze passos. Quando enche, as zonas baixas são dele.' }, { who: 'uli', text: 'E eu apago-me.' }, { who: 'jarl', text: 'Então aprende a esperar.' }] });
+mechanics(rockstar, 'O palco explode ao ritmo: três cores de colunas rebentam à vez. Passa entre as batidas.',
+  wave2('beat', [0.16, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3, 0.32], [0, 0, 0, 1, 1, 1, 2, 2]),
+  { 1: [{ who: 'lenda', text: 'Ouve a batida, miúdo. Rosa, azul, amarelo. Quem pisa fora de tempo, voa do palco.' }] });
+mechanics(biblioteca, 'Vira a página quando quiseres: umas passagens abrem e outras fecham.',
+  wave2('page', [5, 6, 7, 8, 9, 10, 11, 12], [0, 0, 1, 0, 1, 1, 2, 2]),
+  { 1: [{ who: 'bibliotecario', text: 'Cada sala tem duas páginas. Vira com cuidado: o que se abre de um lado fecha-se do outro.' }] });
+mechanics(angelico, 'As nuvens desfazem-se depois de as pisares. Pensa no caminho de volta.',
+  wave2('clouds', [3, 4, 5, 5, 6, 6, 7, 7], [0, 0, 0, 1, 1, 1, 2, 2]),
+  { 1: [{ who: 'serafim', text: 'Pisa a nuvem uma vez. Ela não te segura duas.' }] });
+for (const w of [b612, galactico, viking, rockstar, biblioteca, angelico]) w.levels.forEach((l) => { if (l.mech === 'tide' || l.mech === 'beat' || l.mech === 'clouds' || l.mech === 'page') l.dyn = 0; });
+
+// sementes afinadas com o robô (tools/bot-mecanicas.ts): ganha-se e as 3 estrelas são alcançáveis mesmo com guardas
+const tuned: [WorldDef, Record<number, number>][] = [
+  [b612, { 2: 4139, 3: 8176, 4: 4141 }],
+  [galactico, { 2: 14050, 6: 28180, 7: 32217 }],
+  [viking, { 3: 3731, 7: 2726 }],
+  [rockstar, { 5: 1985, 6: 9049, 7: 4005 }],
+  [biblioteca, { 2: 6557, 4: 13622, 5: 8578, 6: 8579, 7: 4544 }],
+  [angelico, { 6: 11047 }],
+  [glaciar, { 5: 9387 }],
+];
+for (const [w, seeds] of tuned) for (const [i, seed] of Object.entries(seeds)) w.levels[Number(i)].seed = seed;
 
 export const getWorld = (id: string) => WORLDS.find((w) => w.id === id)!;
 

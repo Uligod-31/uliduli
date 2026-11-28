@@ -12,7 +12,7 @@ import { makeFlame, makePortal, Trail } from './actors';
 import { rotCell } from '../core/mech';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
 import { makeTitleGiant, TitleGiant } from './titlegiant';
-import { EyeTitle } from './eye';
+import { OrbitTitle } from './orbit';
 import { Weather, Mist } from './weather';
 import type { Weather as WeatherMode } from '../worlds';
 import { sfx } from '../core/audio';
@@ -43,6 +43,11 @@ export class Stage {
   portal = makePortal();
   trail = new Trail();
   private ringTrails: Trail[] = [];
+  private targets: THREE.Group[] = [];
+  private baseZoom = 1;
+  sliding = 0;            // 1 enquanto o Uli desliza
+  uliScale = 1;           // encolhe ao entrar num buraco de verme
+  private slideCur = 0;
   private spin?: { l: number; from: number; player?: { x: number; y: number; dir: number }; guards: { G: Stage['guards'][number]; x: number; y: number }[]; roses: { c: number; g: THREE.Group }[] };
   private spinLift = 0;
   roses = new Map<number, THREE.Group>();
@@ -83,10 +88,10 @@ export class Stage {
   quality = 0;
   private planet = false;
   private giant?: TitleGiant;
-  private eye?: EyeTitle;
-  private eyeCache?: EyeTitle;
-  /** 0..1: clarão do mergulho pela pupila (para o ecrã inicial desenhar por cima) */
-  onEyeFlash?: (a: number) => void;
+  orbit?: OrbitTitle;
+  private orbitCache?: OrbitTitle;
+  /** 0..1: clarão do mergulho num planeta (para o ecrã inicial desenhar por cima) */
+  onOrbitFlash?: (a: number) => void;
   private weather = new Weather();
   private mist = new Mist();
   private guardsArmed = false;
@@ -120,9 +125,9 @@ export class Stage {
     this.composer.addPass(this.bloom);
     // grão, vinheta e aberração cromática: ar de filme sujo / punk
     this.fx = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 }, tilt: { value: 0 }, res: { value: new THREE.Vector2(1 / 400, 1 / 700) } },
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 }, tilt: { value: 0 }, lift: { value: 0 }, res: { value: new THREE.Vector2(1 / 400, 1 / 700) } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; uniform float tilt; uniform vec2 res; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; uniform float tilt; uniform float lift; uniform vec2 res; varying vec2 vUv;
         vec3 smp(vec2 uv, vec2 bp){ vec3 a = texture2D(tDiffuse, uv).rgb * 0.36; a += texture2D(tDiffuse, uv + vec2(bp.x, 0.0)).rgb * 0.16; a += texture2D(tDiffuse, uv - vec2(bp.x, 0.0)).rgb * 0.16; a += texture2D(tDiffuse, uv + vec2(0.0, bp.y)).rgb * 0.16; a += texture2D(tDiffuse, uv - vec2(0.0, bp.y)).rgb * 0.16; return a; }
         float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
         void main(){
@@ -133,6 +138,7 @@ export class Stage {
           vec3 nb = (texture2D(tDiffuse, vUv + vec2(res.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(res.x, 0.0)).rgb + texture2D(tDiffuse, vUv + vec2(0.0, res.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, res.y)).rgb) * 0.25;
           col = max(col + clamp(col - nb, -0.3, 0.3) * 0.7, 0.0);
           col = mix(col, max((col - 0.32) * 1.14 + 0.32, 0.0), smoothstep(0.05, 0.5, dot(col, vec3(0.333))));
+          col += lift * (1.0 - smoothstep(0.0, 0.32, dot(col, vec3(0.333)))) * (col * 1.2 + 0.012);
           col *= 1.0 - smoothstep(0.2, 0.7, d) * (0.38 + 0.2 * grade);
           float lu = dot(col, vec3(0.299, 0.587, 0.114));
           col = mix(col, vec3(lu), 0.4 * grade);
@@ -170,6 +176,7 @@ export class Stage {
     this.scene.fog = new THREE.Fog(theme.horizon, this.fogNear, this.fogFar);
     this.th = theme;
     this.fx.uniforms.grade.value = theme.grade ?? 0;
+    this.fx.uniforms.lift.value = 0.34; // levanta as sombras: o labirinto vê-se mesmo nos mundos noturnos
     this.renderer.toneMappingExposure = theme.expo ?? 1.4;
 
     // luzes: sol-chave frontal-esquerda, contra-luz no horizonte
@@ -198,6 +205,8 @@ export class Stage {
     this.spin = undefined; this.spinLift = 0;
     if (m.rings) for (let l = 1; l <= m.rings.n; l++) { const tr = new Trail(); this.ringTrails[l] = tr; this.island.layers![l].add(tr.mesh, tr.dots); }
     this.island.lava?.set(0, true);
+    this.island.fx?.set?.(0, true);
+    this.uliScale = 1;
     const portalPos = this.island.cellPos(m.exit);
     this.portal.position.copy(portalPos);
     this.tintPortal(this.planet);
@@ -210,7 +219,10 @@ export class Stage {
     this.player.x = (m.start % m.cols) + 0.5; this.player.y = ((m.start / m.cols) | 0) + 0.5;
     this.player.h = 0; this.player.dir = 0;
     this.view = 'follow';
-    this.vw = { yaw: 0, pitch: 0, zoom: 1, px: 0, pz: 0 }; this.vc = { yaw: 0, pitch: 0, zoom: 1, px: 0, pz: 0 };
+    // no gelo a câmara afasta-se um pouco, para se ver onde o deslize acaba
+    this.baseZoom = m.mech === 'ice' ? 1.32 : 1; this.sliding = 0;
+    this.vw = { yaw: 0, pitch: 0, zoom: this.baseZoom, px: 0, pz: 0 }; this.vc = { ...this.vw };
+    this.setTargets([]);
     this.introT = opts.intro === false ? 1 : 0;
     this.celebrate = 0;
     this.darkTarget = this.dark = 0;
@@ -220,39 +232,37 @@ export class Stage {
     this.placeCamera(0, true);
   }
 
-  /** Ecrã inicial: o Olho (3D próprio, sem labirinto de jogo). */
-  loadEye() {
+  /** Ecrã inicial: o Sistema Uli (planetas-labirinto em órbita; sem labirinto de jogo). */
+  loadOrbit(ids: string[], onSelect: (i: number) => void) {
     this.clear();
     this.maze = undefined;
-    if (!this.eyeCache) this.eyeCache = new EyeTitle(this.renderer);
-    this.eye = this.eyeCache; this.eye.reset();
+    if (!this.orbitCache) this.orbitCache = new OrbitTitle(ids);
+    this.orbit = this.orbitCache;
+    this.orbit.onSelect = onSelect; this.orbit.reset();
     this.applyDpr();
-    this.eye.onFlash = (a) => this.onEyeFlash?.(a);
-    this.scene.add(this.eye.group);
-    this.scene.environment = this.eye.env; this.scene.environmentIntensity = 1;
-    this.scene.fog = null; this.scene.background = new THREE.Color(0x05030c);
+    this.orbit.onFlash = (a) => this.onOrbitFlash?.(a);
+    this.scene.add(this.orbit.group);
+    this.scene.environment = null; this.scene.fog = null; this.scene.background = this.orbit.background;
     this.uli.visible = false; this.portal.visible = false; this.trail.mesh.visible = false; this.trail.dots.visible = false;
     this.hemi.intensity = 0; this.sun.intensity = 0; this.rim.intensity = 0; this.lamp.intensity = 0;
-    this.fx.uniforms.grade.value = 0; this.renderer.toneMappingExposure = 0.95;
+    this.fx.uniforms.grade.value = 0; this.fx.uniforms.lift.value = 0; this.fx.uniforms.danger.value = 0; this.renderer.toneMappingExposure = 1.15;
     this.view = 'follow';
   }
-  private dropEye() {
-    if (!this.eye) return;
-    this.scene.remove(this.eye.group); this.eye.onFlash = undefined; this.eye = undefined;   // fica em cache para voltar ao ecrã inicial sem pausas
-    this.scene.environment = null; this.scene.background = null;
+  private dropOrbit() {
+    if (!this.orbit) return;
+    this.scene.remove(this.orbit.group); this.orbit.onFlash = undefined; this.orbit.onSelect = undefined; this.orbit = undefined; // fica em cache
+    this.scene.background = null;
     this.uli.visible = true; this.portal.visible = true; this.trail.mesh.visible = true; this.trail.dots.visible = true;
     this.camera.fov = 58; this.camera.updateProjectionMatrix();
   }
-  eyeLook(x: number, y: number) { this.eye?.setLook(x, y); }
-  eyeBlink() { this.eye?.blink(); }
-  eyePoke() { this.eye?.poke(); }
-  eyeTilt(gamma: number, beta: number) { this.eye?.setTilt(gamma, beta); }
-  /** Mergulho na pupila: baixa a resolução para o voo ser fluido, mesmo em telemóveis modestos. */
-  eyeDive(cb: () => void) {
-    if (!this.eye) { cb(); return; }
-    this.renderer.setPixelRatio(1); this.composer.setPixelRatio(1); this.sync(true);
-    this.eye.startDive(cb);
+  orbitTap(nx: number, ny: number) { this.orbit?.tap(nx, ny, this.camera); }
+  /** Mergulho no planeta: baixa a resolução para o voo ser fluido, mesmo em telemóveis modestos. */
+  orbitDive(cb: () => void) {
+    if (!this.orbit) { cb(); return; }
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); this.composer.setPixelRatio(this.renderer.getPixelRatio()); this.sync(true);
+    this.orbit.dive(cb);
   }
+
   private applyDpr() {
     const dpr = window.devicePixelRatio || 1;
     this.renderer.setPixelRatio(this.quality === 0 ? Math.min(dpr, DPR_MAX) : this.quality === 1 ? Math.min(dpr, 1.5) : this.quality === 2 ? Math.min(dpr, 1.25) : 1);
@@ -268,7 +278,9 @@ export class Stage {
   }
 
   private clear() {
-    this.dropEye();
+    this.dropOrbit();
+    for (const g of this.targets) this.scene.remove(g), disposeTree(g);
+    this.targets = [];
     for (const r of this.roses.values()) this.scene.remove(r), disposeTree(r);
     this.roses.clear();
     for (const o of this.orbs) this.scene.remove(o.m), disposeTree(o.m);
@@ -299,6 +311,7 @@ export class Stage {
     const l = m.rings ? m.rings.layer[b] : 0;
     if (m.rings && l) { a = rotCell(m, a, -m.rings.rot[l]); b = rotCell(m, b, -m.rings.rot[l]); }
     const pa = I.cellPos(a), pb = I.cellPos(b);
+    if (Math.abs(pa.x - pb.x) + Math.abs(pa.z - pb.z) > 1.5) return;   // saltos (arcos e buracos) não deixam trilho
     (this.ringTrails[l] ?? this.trail).add(pa.x, pa.z, pb.x, pb.z, k);
   }
 
@@ -317,6 +330,22 @@ export class Stage {
   }
   frost(cell: number) { const p = this.island!.cellPos(cell); this.burst(p.x, p.z, [0xdff4ff, 0x9bd8ff], 3, 0.08); }
   setRingTarget(l: number) { this.island?.setRingTarget?.(l); }
+  /** Maré e batida: acompanha o passo em que se está. */
+  setHazard(moves: number) { this.island?.fx?.set?.(moves); }
+  dropCloud(cell: number) { this.island?.fx?.drop?.(cell); const p = this.island!.cellPos(cell); this.burst(p.x, p.z, [0xffffff, 0xcfd8ff, 0x9ab8ff], 14, 0.1); }
+  /** Salto entre arcos ou buracos: faíscas e a câmara vai direta ao destino. */
+  warpBurst(cell: number, color: number) { const p = this.island!.cellPos(cell); this.burst(p.x, p.z, [color, 0xffffff, color], 18, 0.4); }
+  /** Gelo: aros no chão que mostram onde vais parar em cada direção. */
+  setTargets(cells: number[]) {
+    while (this.targets.length < cells.length) {
+      const g = new THREE.Group();
+      // cores cheias (sem brilho HDR, que no gelo fica branco) e sem teste de profundidade: vê-se mesmo atrás de uma parede
+      const mk = (a: number, b: number, color: number, op: number) => { const r = new THREE.Mesh(new THREE.RingGeometry(a, b, 36), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false, depthTest: false, toneMapped: false })); r.rotation.x = -Math.PI / 2; r.renderOrder = 3; return r; };
+      g.add(mk(0, 0.34, 0x2a5fe0, 0.34), mk(0.28, 0.39, 0xc8179f, 0.95), mk(0.07, 0.14, 0xc8179f, 0.95));
+      this.targets.push(g); this.scene.add(g);
+    }
+    this.targets.forEach((g, i) => { g.visible = i < cells.length; if (g.visible) { this.island!.cellPos(cells[i], g.position); g.position.y = 0.12; } });
+  }
 
   /** Anéis: começa a rodar a camada l; tudo o que está em cima dela viaja junto. */
   beginSpin(l: number) {
@@ -376,6 +405,7 @@ export class Stage {
   moveGuard(i: number, cell: number) {
     const G = this.guards[i];
     G.tx = (cell % this.maze!.cols) + 0.5; G.ty = ((cell / this.maze!.cols) | 0) + 0.5;
+    if (Math.hypot(G.tx - G.x, G.ty - G.y) > 1.6) { this.warpBurst(cell, 0xff3040); G.x = G.tx; G.y = G.ty; }   // passou por um arco
   }
 
   removeRose(idx: number) {
@@ -435,9 +465,9 @@ export class Stage {
     if (Math.abs(w.yaw - q) < 0.42) w.yaw = q;
   }
   /** Volta a centrar na personagem, com a vista normal. */
-  camRecenter() { this.vw = { yaw: 0, pitch: 0, zoom: 1, px: 0, pz: 0 }; this.vVel.yaw = 0; }
+  camRecenter() { this.vw = { yaw: 0, pitch: 0, zoom: this.baseZoom, px: 0, pz: 0 }; this.vVel.yaw = 0; }
   /** 0 = vista normal; maior = mais afastada do normal (para mostrar a dica de recentrar). */
-  get camOffset() { const w = this.vw; return Math.abs(w.yaw) + Math.abs(w.pitch) * 2 + Math.abs(w.zoom - 1) * 2 + Math.hypot(w.px, w.pz) * 0.3; }
+  get camOffset() { const w = this.vw; return Math.abs(w.yaw) + Math.abs(w.pitch) * 2 + Math.abs(w.zoom - this.baseZoom) * 2 + Math.hypot(w.px, w.pz) * 0.3; }
   get camYaw() { return this.vc.yaw; }
   /** Quarto de volta (0..3) em que está a vista: o joystick roda com ela. */
   get camQuarter() { return (((-Math.round(this.vw.yaw / (Math.PI / 2))) % 4) + 4) % 4; }
@@ -573,16 +603,17 @@ export class Stage {
     this.camera.lookAt(this.camLook);
   }
 
-  private stepEye(dt: number) {
+  private stepOrbit(dt: number) {
     const pulse = sfx.pulse();
     this.pulseCur += (pulse - this.pulseCur) * 0.6;
     this.fx.uniforms.pulse.value = this.pulseCur;
-    this.bloom.strength = 0.36 + 0.4 * this.pulseCur;
-    this.eye!.update(dt, this.camera, this.pulseCur);
+    this.fx.uniforms.time.value += dt;
+    this.bloom.strength = 0.55 + 0.4 * this.pulseCur;
+    this.orbit!.update(dt, this.camera, this.pulseCur);
   }
 
   private step(dt: number) {
-    if (this.eye) { this.stepEye(dt); return; }
+    if (this.orbit) { this.stepOrbit(dt); return; }
     if (!this.island || !this.scenery) return;
     const I = this.island;
     if (this.introT < 1) this.introT = Math.min(1, this.introT + dt / 2.6);
@@ -596,6 +627,7 @@ export class Stage {
     // jogador
     const wp = this.worldPlayer(this.tmp);
     this.uli.position.set(wp.x, this.spinLift, wp.z);
+    this.uli.scale.setScalar(this.uliScale);
     const body = this.uli.userData.body as THREE.Group;
     // marcha: velocidade a partir do deslocamento
     const spd = dt > 0 ? Math.hypot(wp.x - this.prevP.x, wp.z - this.prevP.z) / dt : 0;
@@ -613,6 +645,11 @@ export class Stage {
     const celeb = this.celebrate > 0;
     if (celeb) { (U.armL as THREE.Object3D).rotation.z = 2.6 + Math.sin(this.t * 9) * 0.3; (U.armR as THREE.Object3D).rotation.z = -2.6 - Math.sin(this.t * 9) * 0.3; (U.armL as THREE.Object3D).rotation.x = 0; (U.armR as THREE.Object3D).rotation.x = 0; body.position.y = Math.abs(Math.sin(this.t * 6)) * 0.12; }
     (U.head as THREE.Object3D).rotation.z = Math.sin(this.t * 1.3) * 0.04;
+    // a deslizar: inclina-se para a frente, de braços abertos
+    this.slideCur += (this.sliding - this.slideCur) * (1 - Math.exp(-dt * 14));
+    body.rotation.x = this.slideCur * 0.34;
+    if (this.slideCur > 0.02 && !celeb) { (U.armL as THREE.Object3D).rotation.z = 0.08 - this.slideCur * 1.35; (U.armR as THREE.Object3D).rotation.z = -0.08 + this.slideCur * 1.35; }
+    this.targets.forEach((g, i) => { if (g.visible) { g.scale.setScalar(1 + 0.12 * Math.sin(this.t * 5 + i)); g.rotation.y += dt; } });
     animateFlame(U.head as THREE.Object3D, this.t, this.speed, Math.sin(this.walkT * 0.5) * 0.15 * this.speed, celeb ? 1 : Math.min(1, this.player.h));
     // cachecol neon a flutuar atrás
     (U.scarf as THREE.Mesh[]).forEach((s, i) => {
@@ -684,16 +721,16 @@ export class Stage {
     this.dark += (this.darkTarget - this.dark) * (1 - Math.exp(-dt * 3));
     const d = this.dark;
     const T = this.th;
-    this.sun.intensity = (T.sunI ?? 2.4) * (1 - 0.82 * d); this.rim.intensity = (T.rimI ?? 1.4) * (1 - 0.7 * d); this.hemi.intensity = (T.hemiI ?? 1.05) * 1.3 * (1 - 0.62 * d) + 0.08 * d;
-    this.scene.environmentIntensity = 0.9 * (1 - 0.8 * d) + 0.1 * d;
+    this.sun.intensity = (T.sunI ?? 2.4) * (1 - 0.55 * d); this.rim.intensity = (T.rimI ?? 1.4) * (1 - 0.45 * d); this.hemi.intensity = (T.hemiI ?? 1.05) * 1.3 * (1 - 0.35 * d) + 0.18 * d;
+    this.scene.environmentIntensity = 0.9 * (1 - 0.5 * d) + 0.15 * d;
     this.scenery.setDark(d);
-    this.lamp.intensity = (T.lampI ?? 0.5) + d * 6.5;
+    this.lamp.intensity = (T.lampI ?? 0.5) + d * 7.5;
     this.lamp.decay = 1.25;
-    this.lamp.distance = (T.lampD ?? 3) + (this.darkR * 2.0) * d + 2 * (1 - d);
-    this.scenery.skyMat.uniforms.dark.value = 1 - 0.78 * d;
-    (this.scene.fog as THREE.Fog).near = this.fogNear * (1 - d) + 3 * d;
-    (this.scene.fog as THREE.Fog).far = this.fogFar * (1 - d) + 48 * d;
-    (this.scene.fog as THREE.Fog).color.copy(this.fogBase).multiplyScalar(1 - 0.62 * d);
+    this.lamp.distance = (T.lampD ?? 3) + (this.darkR * 2.6) * d + 2 * (1 - d);
+    this.scenery.skyMat.uniforms.dark.value = 1 - 0.5 * d;
+    (this.scene.fog as THREE.Fog).near = this.fogNear * (1 - d) + 12 * d;
+    (this.scene.fog as THREE.Fog).far = this.fogFar * (1 - d) + 80 * d;
+    (this.scene.fog as THREE.Fog).color.copy(this.fogBase).multiplyScalar(1 - 0.72 * d);
 
     // orbes de pista
     for (let i = this.orbs.length - 1; i >= 0; i--) {

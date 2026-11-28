@@ -19,6 +19,8 @@ export interface DynEdge {
   group: 0 | 1;
 }
 
+export type MechKind = 'ice' | 'lava' | 'rings' | 'planet' | 'holes' | 'tide' | 'beat' | 'page' | 'clouds';
+
 export interface Maze {
   cols: number;
   rows: number;
@@ -32,7 +34,11 @@ export interface Maze {
   shortest: number;
   par: number;
   // mecânicas dos mundos (ver core/mech.ts)
-  mech?: 'ice' | 'lava' | 'rings';
+  mech?: MechKind;
+  warp?: Map<number, number>;                          // planeta: idx*4+dir -> célula do outro lado
+  holes?: Map<number, number>;                         // buracos de verme: célula -> par
+  haz?: { period: number; group: Uint8Array };         // maré e batida: células perigosas em certos passos
+  clouds?: number[];                                   // nuvens que se desfazem depois de pisadas
   grip?: Uint8Array;                                   // gelo: 1 = neve ou poça (trava o deslize)
   lava?: { delay: number; k: number; at: Int32Array }; // lava: passo em que cada célula se incendeia
   rings?: { n: number; layer: Uint8Array; intra: Set<number>[]; door: Set<number>[]; rot: number[] };
@@ -122,6 +128,8 @@ export function canPass(m: Maze, idx: number, d: number, phase: number): boolean
 }
 
 export function neighbor(m: Maze, idx: number, d: number): number {
+  const w = m.warp?.get(idx * 4 + d);
+  if (w !== undefined) return w;
   const c = (idx % m.cols) + DIRS[d].dx;
   const r = ((idx / m.cols) | 0) + DIRS[d].dy;
   if (c < 0 || r < 0 || c >= m.cols || r >= m.rows) return -1;

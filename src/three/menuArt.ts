@@ -1,3 +1,4 @@
+import { logoPath, LOGO_W, LOGO_TOP, LOGO_H } from '../core/logo';
 // Arte do menu, desenhada por código a alta resolução: céu com lua, moldura de ramos mortos com corvos,
 // logótipo metálico com extrusão e relâmpagos, e placas de metal rebitadas para os botões.
 
@@ -200,30 +201,33 @@ export function drawFrame(px = 1080): HTMLCanvasElement {
 }
 
 // ═════════════════════════ LOGÓTIPO ═════════════════════════
-/** UliDUli em metal cromado com extrusão, brilho elétrico e riscos. 1440x420. */
-export function drawChrome(text: string, w: number, h: number, fontPx: number, bolts = true): HTMLCanvasElement {
+/** Texto em metal cromado com extrusão, brilho elétrico e riscos. 1440x420. */
+export function drawChrome(text: string, w: number, h: number, fontPx: number, bolts = true, shape?: Path2D): HTMLCanvasElement {
   const [c, g] = canvas(w, h);
   const R = mkRnd(31337);
   const FONT = `900 ${fontPx}px "Bebas Neue","Oswald",Impact,"Haettenschweiler","Arial Narrow Bold",sans-serif`;
   const ex = fontPx / 290;
   g.font = FONT; g.textBaseline = 'middle'; g.textAlign = 'center';
-  const tw = g.measureText(text).width, sc = Math.min(1, (w - 150) / (tw + 30));
+  /** pinta o texto, ou o caminho vetorial, deslocado de (dx, dy) */
+  const fillAt = (ctx: Ctx, dx: number, dy: number) => { if (!shape) { ctx.fillText(text, dx, dy); return; } ctx.save(); ctx.translate(dx, dy); ctx.fill(shape, 'evenodd'); ctx.restore(); };
+  const strokeAt = (ctx: Ctx, dx: number, dy: number) => { if (!shape) { ctx.strokeText(text, dx, dy); return; } ctx.save(); ctx.translate(dx, dy); ctx.lineJoin = 'round'; ctx.stroke(shape); ctx.restore(); };
+  const tw = shape ? LOGO_W * (fontPx / 135) : g.measureText(text).width, sc = Math.min(1, (w - 150) / (tw + 30));
   const cx = w / 2 - 14, cy = h / 2 - 6;
   const skew = (ctx: Ctx) => { ctx.translate(cx, cy); ctx.transform(1, 0, -0.17, 1, 0, 0); ctx.scale(sc, sc); };
 
   // brilho elétrico por trás
   g.save(); skew(g); g.font = FONT; g.textBaseline = 'middle'; g.textAlign = 'center';
   g.shadowColor = 'rgba(70,130,255,.95)'; g.shadowBlur = 55; g.fillStyle = '#0b1230';
-  for (let i = 0; i < 2; i++) g.fillText(text, 0, 0);
+  for (let i = 0; i < 2; i++) fillAt(g, 0, 0);
   g.restore();
   // extrusão (profundidade)
   g.save(); skew(g); g.font = FONT; g.textBaseline = 'middle'; g.textAlign = 'center';
-  for (let i = 26; i >= 1; i--) { const t = i / 26; g.fillStyle = `rgb(${Math.round(24 + 26 * (1 - t))},${Math.round(26 + 24 * (1 - t))},${Math.round(44 + 36 * (1 - t))})`; g.fillText(text, i * 0.95 * ex, i * 1.25 * ex); }
-  g.lineWidth = 7; g.strokeStyle = '#03040a'; g.strokeText(text, 26 * 0.95 * ex, 26 * 1.25 * ex);
+  for (let i = 26; i >= 1; i--) { const t = i / 26; g.fillStyle = `rgb(${Math.round(24 + 26 * (1 - t))},${Math.round(26 + 24 * (1 - t))},${Math.round(44 + 36 * (1 - t))})`; fillAt(g, i * 0.95 * ex, i * 1.25 * ex); }
+  g.lineWidth = 7; g.strokeStyle = '#03040a'; strokeAt(g, 26 * 0.95 * ex, 26 * 1.25 * ex);
   g.restore();
   // fuchsia na aresta inferior da extrusão
   g.save(); skew(g); g.font = FONT; g.textBaseline = 'middle'; g.textAlign = 'center';
-  g.shadowColor = '#e02bc0'; g.shadowBlur = 14; g.strokeStyle = 'rgba(224,43,192,.85)'; g.lineWidth = 2.5; g.strokeText(text, 27 * 0.95 * ex, 27 * 1.25 * ex);
+  g.shadowColor = '#e02bc0'; g.shadowBlur = 14; g.strokeStyle = 'rgba(224,43,192,.85)'; g.lineWidth = 2.5; strokeAt(g, 27 * 0.95 * ex, 27 * 1.25 * ex);
   g.restore();
 
   // face cromada, numa camada à parte para poder riscar
@@ -231,8 +235,8 @@ export function drawChrome(text: string, w: number, h: number, fontPx: number, b
   fg.save(); skew(fg); fg.font = FONT; fg.textBaseline = 'middle'; fg.textAlign = 'center';
   const gr = fg.createLinearGradient(0, -170 * ex, 0, 150 * ex);
   gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.28, '#dbe6ff'); gr.addColorStop(0.46, '#8da2d6'); gr.addColorStop(0.5, '#1c264a'); gr.addColorStop(0.6, '#5d71aa'); gr.addColorStop(0.82, '#c4d2f4'); gr.addColorStop(1, '#6a77a3');
-  fg.fillStyle = gr; fg.fillText(text, 0, 0);
-  fg.lineWidth = 6; fg.strokeStyle = '#02030a'; fg.strokeText(text, 0, 0);
+  fg.fillStyle = gr; fillAt(fg, 0, 0);
+  fg.lineWidth = 6; fg.strokeStyle = '#02030a'; strokeAt(fg, 0, 0);
   fg.restore();
   fg.globalCompositeOperation = 'source-atop';
   for (let i = 0; i < 70; i++) { fg.strokeStyle = R() < 0.5 ? 'rgba(255,255,255,.55)' : 'rgba(10,14,35,.5)'; fg.lineWidth = 0.8 + R() * 1.4; const x = R() * w, y = R() * h; fg.beginPath(); fg.moveTo(x, y); fg.lineTo(x + 20 + R() * 90, y - 4 + R() * 8); fg.stroke(); }
@@ -242,7 +246,7 @@ export function drawChrome(text: string, w: number, h: number, fontPx: number, b
 
   // brilho no topo das letras
   g.save(); skew(g); g.font = FONT; g.textBaseline = 'middle'; g.textAlign = 'center';
-  g.strokeStyle = 'rgba(255,255,255,.65)'; g.lineWidth = 1.6; g.strokeText(text, -1.5, -1.5);
+  g.strokeStyle = 'rgba(255,255,255,.65)'; g.lineWidth = 1.6; strokeAt(g, -1.5, -1.5);
   g.restore();
 
   // relâmpagos a rasgar o logótipo
@@ -256,7 +260,12 @@ export function drawChrome(text: string, w: number, h: number, fontPx: number, b
   return c;
 }
 
-export const drawLogo = (w = 1440, h = 420) => drawChrome('UliDUli', w, h, 290, true);
+/** O nome do jogo, em vetor (ver core/logo.ts). */
+export function drawLogo(w = 1440, h = 420): HTMLCanvasElement {
+  const fontPx = 290, k = fontPx / 135, shape = new Path2D();
+  shape.addPath(new Path2D(logoPath()), new DOMMatrix().scale(k).translate(-LOGO_W / 2, -(LOGO_TOP + LOGO_H / 2)));
+  return drawChrome('ÜLidÜLi', w, h, fontPx, true, shape);
+}
 
 // ═════════════════════════ PLACAS DE BOTÃO ═════════════════════════
 /** Placa de metal rebitada e riscada. `hot`: aço em brasa, com línguas de fogo no topo. Devolve canvas com folga de 44 px em cima. */

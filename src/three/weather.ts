@@ -10,7 +10,7 @@ const PRESETS: Record<string, Preset> = {
   ash: { col: [0.7, 0.7, 0.74], size: 2.4, fall: 0.045, dir: 1, drift: 1.2, alpha: 0.7, add: false, page: false },
   dust: { col: [1, 0.82, 0.5], size: 1.3, fall: 0.012, dir: 1, drift: 2.2, alpha: 0.4, add: true, page: false },
   fireflies: { col: [0.78, 1, 0.42], size: 2.0, fall: 0.012, dir: -1, drift: 3.2, alpha: 0.85, add: true, page: false },
-  pages: { col: [0.96, 0.9, 0.72], size: 5, fall: 0.03, dir: 1, drift: 2.6, alpha: 0.6, add: false, page: true },
+  pages: { col: [0.96, 0.9, 0.72], size: 3, fall: 0.03, dir: 1, drift: 2.6, alpha: 0.5, add: false, page: true },
 };
 
 /** Clima: chuva em riscos, ou partículas (neve, brasas, cinza, pó, páginas) que acompanham a câmara. */
@@ -35,8 +35,8 @@ export class Weather {
           float y = fract(p.y - dir * time * fall * (0.55 + rnd * 0.9));
           vec3 w = center + vec3((p.x - 0.5) * 30.0 + sin(time * 0.4 + rnd * 6.28) * drift, y * 20.0 - 2.0, (p.z - 0.5) * 30.0 + cos(time * 0.33 + rnd * 9.0) * drift);
           vec4 mv = viewMatrix * vec4(w, 1.0);
-          gl_PointSize = px * clamp(size * 80.0 / max(0.5, -mv.z), 1.1, page > 0.5 ? 16.0 : 4.2);
-          vA = alpha * smoothstep(0.0, 0.1, y) * smoothstep(1.0, 0.82, y) * smoothstep(1.5, 6.0, -mv.z); vRot = rnd * 6.28 + time * (0.4 + rnd);
+          gl_PointSize = px * clamp(size * 80.0 / max(0.5, -mv.z), 1.1, page > 0.5 ? 8.0 : 4.2);
+          vA = alpha * (page > 0.5 ? step(rnd, 0.35) : 1.0) * smoothstep(0.0, 0.1, y) * smoothstep(1.0, 0.82, y) * smoothstep(1.5, 6.0, -mv.z); vRot = rnd * 6.28 + time * (0.4 + rnd);
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `

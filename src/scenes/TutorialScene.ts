@@ -521,6 +521,23 @@ export class TutorialScene extends Phaser.Scene {
         },
       },
       {
+        title: 'Cada mundo, uma regra',
+        body: 'Na primeira vez em cada mundo aparece um cartão com a regra.\nO botão redondo, à direita do joystick, é a ação do mundo (Rodar, Virar, Esperar ou Brasa). O Vagalume também te diz quando a usar.',
+        draw: (root) => {
+          const list: [string, string, number][] = [['◠', 'B-612: o planeta dá a volta', 0x2fe6d0], ['◎', 'Intergaláctico: buracos de verme', 0x9a6bff], ['≈', 'Viking: a maré enche', 0x3ac8ff], ['♫', 'Rockstar: rebenta ao ritmo', 0xff4fd8], ['⇄', 'Biblioteca: vira a página', 0xffb860], ['☁', 'Angélico: nuvens que caem', 0xdfe8ff], ['❄', 'Glaciar: gelo que escorrega', 0x9bd8ff], ['▲', 'Abismo: lava que avança', 0xff6a20], ['⟳', 'Mandala: anéis que rodam', 0xffd24a]];
+          list.forEach(([icon, text, color], i) => {
+            const y = PY + 42 + i * 55;
+            const g = this.add.graphics(); root.add(g);
+            g.fillStyle(0x1e2025, 1); g.fillRoundedRect(PX + 26, y - 23, PW - 52, 46, 14);
+            g.fillStyle(color, 0.9); g.fillCircle(PX + 56, y, 17);
+            const a = this.add.text(PX + 56, y - 1, icon, { fontFamily: FONT, fontSize: '22px', color: '#0a0b10', fontStyle: 'bold' }).setOrigin(0.5);
+            const b = this.add.text(PX + 90, y, text, { fontFamily: FONT, fontSize: '26px', color: '#eceef3', fontStyle: 'bold' }).setOrigin(0, 0.5);
+            root.add([a, b]);
+            for (const o of [g, a, b]) { o.setAlpha(0); this.anim.push(this.tweens.add({ targets: o, alpha: 1, duration: 260, delay: 120 + i * 90 })); }
+          });
+        },
+      },
+      {
         title: 'A câmara',
         body: '1 dedo no mapa: roda e inclina o labirinto.\n2 dedos: arrasta e faz zoom.\nToca no centro do joystick (ou na bússola) para voltar à personagem. O botão ◎ mostra o labirinto todo.',
         draw: (root) => {

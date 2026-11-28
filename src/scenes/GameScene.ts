@@ -4,7 +4,7 @@ import { button, gradText, label, roundBtn, Btn } from '../core/ui';
 import { Maze, DIRS, OPP, canPass, neighbor, pathTo, distFrom } from '../core/maze';
 import { mulberry32, shuffle } from '../core/rng';
 import { levelMaze } from '../art/thumb';
-import { travel, solve, rotCell, setRot, ringTarget, BRASAS } from '../core/mech';
+import { travel, solve, rotCell, setRot, ringTarget, hazardAt, hazardIn, cloudBit, BRASAS } from '../core/mech';
 import { LevelDef, WorldDef, getWorld, isUnlocked, GUARD_HUNT, GUARD_STUN, GUARD_STUN_R, HINTS, guardEvery } from '../worlds';
 import { sfx } from '../core/audio';
 import { save } from '../core/save';
@@ -39,6 +39,7 @@ export class GameScene extends Phaser.Scene {
   private brasas = BRASAS;
   private armed = false;          // Brasa pronta (gelo)
   private flameStop = false;      // apanhou uma chama neste passo
+  private gone = 0;               // nuvens já desfeitas (um bit por nuvem)
   private actionBtn?: Btn;
   private mechTxt?: Phaser.GameObjects.Text;
   private mechPips!: Phaser.GameObjects.Graphics;
@@ -59,7 +60,7 @@ export class GameScene extends Phaser.Scene {
     this.skipIntro = !!d.skipIntro;
     this.moves = 0; this.phase = 0; this.moving = false; this.done = false; this.blocked = true;
     this.run = false; this.lastDir = -1; this.queued = null; this.collected = 0; this.hints = HINTS; this.overview = false;
-    this.brasas = BRASAS; this.armed = false; this.actionBtn = undefined; this.mechTxt = undefined;
+    this.brasas = BRASAS; this.armed = false; this.gone = 0; this.actionBtn = undefined; this.mechTxt = undefined;
     this.pad.id = -1; this.pad.dir = -1; this.pad.kx = 0; this.pad.ky = 0; this.padArrows = [];
   }
 
@@ -75,7 +76,7 @@ export class GameScene extends Phaser.Scene {
     this.guards = []; this.guardPrev = [];
     if (def.guards) {
       const rng = mulberry32(def.seed * 17 + 3);
-      const dist = distFrom(m, m.start);
+      const dist = distFrom(m, m.start, m.mech === 'page' ? 0 : -1);
       const far = Array.from({ length: m.cols * m.rows }, (_, i) => i)
         .filter((i) => !m.solid[i] && i !== m.exit && i !== m.start && !m.rosas.includes(i) && dist[i] >= Math.max(7, m.shortest * 0.35));
       shuffle(far, rng);
@@ -91,10 +92,11 @@ export class GameScene extends Phaser.Scene {
     stage.setWeather(def.weather ?? this.wd.weather ?? 'none');
     stage.start('game');
     // nos anéis é preciso ver a mandala toda: começa na vista geral (◎ volta a seguir a personagem)
-    if (m.mech === 'rings') { this.overview = true; stage.setView('overview'); }
+    if (m.mech === 'rings' || m.mech === 'planet' || m.mech === 'holes') { this.overview = true; stage.setView('overview'); } // é preciso ver as ligações
     if (def.fog) stage.setDark(def.fog * 1.0);
     this.events.once('shutdown', () => stage.stop());
 
+    if (m.haz) stage.setHazard(0);
     this.buildHud();
     this.setupInput();
     this.updateHud();
@@ -110,11 +112,17 @@ export class GameScene extends Phaser.Scene {
     const key = 'uliduli_mech_' + mech;
     let seen = false; try { seen = !!localStorage.getItem(key); } catch { /* ok */ }
     if (!mech || seen) { done(); return; }
-    const info = {
-      ice: ['GELO', 'Aqui não se caminha: desliza-se até à parede ou até à neve.\n\nO botão Brasa (3 cargas) faz o próximo passo ter só uma casa e derrete o chão numa poça onde podes travar.'],
+    const info = ({
+      ice: ['GELO', 'Aqui não se caminha: desliza-se até à parede ou até à neve. Os aros no chão mostram onde vais parar.\n\nO botão Brasa (3 cargas) faz o próximo passo ter só uma casa e derrete o chão numa poça onde podes travar.'],
       lava: ['A LAVA', 'Ao fim de uns passos, a lava nasce onde começaste e avança sempre.\n\nO chão que vai arder racha primeiro. Escolhe bem a ordem das chamas: só andas tu, só anda ela.'],
       rings: ['OS ANÉIS', 'O labirinto é feito de anéis. O botão Rodar gira o anel assinalado (leva-te se estiveres em cima dele) e conta como um passo.\n\nAlinha as portas e chega ao centro.'],
-    }[mech];
+      planet: ['PLANETA REDONDO', 'Os arcos de luz da mesma cor ligam os dois lados do mundo: sais por um e entras pelo outro.\n\nOs guardas também os usam.'],
+      holes: ['BURACOS DE VERME', 'Ao pisares um redemoinho, sais no redemoinho da mesma cor.\n\nSão atalhos: escondem o caminho mais curto até às chamas.'],
+      tide: ['A MARÉ', 'A cada 12 passos o mar enche durante 4. As poças azuis são zonas baixas: se lá estiveres quando a água subir, és levado.\n\nO botão Esperar deixa passar um passo.'],
+      beat: ['A BATIDA', 'As colunas rebentam à vez, por cores: rosa, azul e amarelo, dois passos cada. A que pisca é a seguinte.\n\nO botão Esperar deixa passar um passo.'],
+      page: ['VIRAR A PÁGINA', 'O botão Virar troca de página: umas passagens abrem-se e outras fecham-se. Conta como um passo.\n\nAs estantes com flores são as que se movem.'],
+      clouds: ['NUVENS', 'Os tufos desfazem-se quando sais de cima deles, e fica um buraco.\n\nPensa no caminho de volta antes de ires às chamas.'],
+    } as Record<string, string[]>)[mech];
     const root = this.add.container(0, 0).setDepth(170);
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x05060b, 0.72).setInteractive();
     const g = this.add.graphics();
@@ -155,7 +163,7 @@ export class GameScene extends Phaser.Scene {
     this.movesTxt = this.add.text(W - 50, 176, '', { fontFamily: FONT, fontSize: '25px', color: '#fff', fontStyle: 'bold' }).setOrigin(1, 0.5).setDepth(30);
     this.pips = this.add.graphics().setDepth(30);
     this.guardPips = this.add.graphics().setDepth(30);
-    if (this.m.dyn.length) label(this, W / 2, 160, 'as sebes mudam em', 18, UI.textDim as string).setDepth(30);
+    if (this.m.dyn.length && this.m.mech !== 'page') label(this, W / 2, 160, 'as sebes mudam em', 18, UI.textDim as string).setDepth(30);
 
     // rodapé: três botões numa linha; o joystick fica por cima deles
     this.hintBtn = button(this, 175, H - 70, 300, 88, 'Vagalume ✦' + HINTS, () => this.useHint(), 'primary', 28).setDepth(31);
@@ -171,9 +179,10 @@ export class GameScene extends Phaser.Scene {
     const mech = this.m.mech;
     if (!mech) return;
     this.mechTxt = this.add.text(W / 2, 232, '', { fontFamily: FONT, fontSize: '22px', color: '#ffffff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5).setDepth(30);
-    if (mech === 'lava') return;
-    const ice = mech === 'ice';
-    this.actionBtn = roundBtn(this, W - 88, H - 345, 66, ice ? '🔥' + BRASAS : '⟳', ice ? 'Brasa' : 'Rodar', () => this.action(), ice ? 34 : 50).setDepth(31);
+    const ACT: Record<string, [string, string, number]> = { ice: ['🔥' + BRASAS, 'Brasa', 34], rings: ['⟳', 'Rodar', 50], page: ['⇄', 'Virar', 50], tide: ['⏳', 'Esperar', 40], beat: ['⏳', 'Esperar', 40] };
+    const act = ACT[mech];
+    if (!act) return;
+    this.actionBtn = roundBtn(this, W - 88, H - 345, 66, act[0], act[1], () => this.action(), act[2]).setDepth(31);
     const ring = this.add.graphics().setDepth(30).setPosition(W - 88, H - 345);
     for (let i = 0; i < 40; i++) { const a0 = (i / 40) * Math.PI * 2; ring.lineStyle(5, brandAt(0.5 - 0.5 * Math.cos(a0)), 0.9); ring.beginPath(); ring.arc(0, 0, 74, a0, a0 + 0.18); ring.strokePath(); }
     this.tweens.add({ targets: ring, scale: 1.07, alpha: 0.55, duration: 850, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
@@ -181,7 +190,16 @@ export class GameScene extends Phaser.Scene {
 
   private action() {
     if (this.blocked || this.done) return;
-    if (this.m.mech === 'rings') { this.rotate(); return; }
+    const mech = this.m.mech;
+    if (mech === 'rings') { this.rotate(); return; }
+    if (mech === 'page' || mech === 'tide' || mech === 'beat') {
+      if (this.moving) return;
+      this.run = false; this.queued = null; this.flameStop = true;
+      if (mech === 'page') { this.phase ^= 1; stage.setPhase(this.phase, true); sfx.shift(); stage.shake(0.3); navigator.vibrate?.(26); }
+      else { sfx.step(); const a = { t: 0 }; this.tweens.add({ targets: a, t: 1, duration: 160, onUpdate: () => { stage.player.h = Math.sin(a.t * Math.PI) * 0.35; } }); }
+      this.endTurn();
+      return;
+    }
     if (this.brasas <= 0) { sfx.bump(); return; }
     this.armed = !this.armed; sfx.hint(); this.updateHud();
   }
@@ -291,7 +309,7 @@ export class GameScene extends Phaser.Scene {
     this.rosaTxt.setText(`🔥 ${this.collected}/${this.m.rosas.length}` + (this.guards.length ? `   ☠ ${this.guards.length}` : ''));
     this.movesTxt.setText(`Passos ${this.moves}  (par ${this.m.par})`);
     this.pips.clear();
-    if (this.m.dyn.length) {
+    if (this.m.dyn.length && this.m.mech !== 'page') {
       const n = this.def.shift, done = this.moves % n;
       const gap = 22, x0 = W / 2 - ((n - 1) * gap) / 2;
       for (let i = 0; i < n; i++) {
@@ -316,14 +334,33 @@ export class GameScene extends Phaser.Scene {
     g.clear();
     if (!this.mechTxt) return;
     if (m.mech === 'ice') {
+      // onde se vai parar em cada direção (com a Brasa pronta, só uma casa)
+      const ends: number[] = [];
+      for (let d = 0; d < 4 && !this.moving && !this.done; d++) {
+        const p = travel(m, this.idx, d, (i, dd) => canPass(m, i, dd, this.phase));
+        if (p.length) ends.push(this.armed ? p[0] : p[p.length - 1]);
+      }
+      stage.setTargets(ends);
       this.actionBtn!.txt.setText('🔥' + this.brasas);
       this.actionBtn!.setAlpha(this.brasas > 0 ? 1 : 0.45);
-      this.mechTxt.setText(this.armed ? 'Brasa pronta: o próximo passo derrete o chão' : 'No gelo deslizas até à parede ou à neve').setColor(this.armed ? '#ffc457' : '#cfeaff');
+      this.mechTxt.setText(this.armed ? 'Brasa pronta: o próximo passo derrete o chão' : 'Os aros mostram onde vais parar').setColor(this.armed ? '#ffc457' : '#cfeaff');
       if (this.armed) { g.lineStyle(6, 0xffc457, 0.95); g.strokeCircle(W - 88, H - 345, 84); }
     } else if (m.mech === 'rings') {
       stage.setRingTarget(ringTarget(m, this.idx));
       const inner = ringTarget(m, this.idx) === 2;
       this.mechTxt.setText(m.rings!.n === 2 ? `Rodar gira o anel ${inner ? 'rosa (centro)' : 'dourado'}` : 'Rodar gira o anel dourado').setColor(inner ? '#ff9ae6' : '#ffe28a');
+    } else if (m.mech === 'planet') this.mechTxt.setText('Arcos da mesma cor ligam os dois lados').setColor('#8affee');
+    else if (m.mech === 'holes') this.mechTxt.setText('Redemoinhos da mesma cor: entras num, sais no outro').setColor('#c9a8ff');
+    else if (m.mech === 'page') this.mechTxt.setText(`📖 Página ${this.phase ? 'B' : 'A'}  ·  Virar troca as passagens`).setColor('#ffd9a0');
+    else if (m.mech === 'clouds') { const n = m.clouds!.length, left = n - m.clouds!.filter((_, i) => this.gone & (1 << i)).length; this.mechTxt.setText(`☁ Nuvens inteiras: ${left} de ${n}`).setColor('#dfe8ff'); }
+    else if (m.mech === 'tide') {
+      const high = hazardIn(m, 1, this.moves) === 0;
+      let n = 0; while (n < 13 && (hazardIn(m, 1, this.moves + n) === 0) === high) n++;
+      this.mechTxt.setText(high ? `🌊 Maré cheia: desce em ${n}` : `🌊 A maré enche em ${n} ${n === 1 ? 'passo' : 'passos'}`).setColor(high ? '#5ad8ff' : n <= 2 ? '#ffd45a' : '#cfeaff');
+    } else if (m.mech === 'beat') {
+      const NAMES = ['rosa', 'azul', 'amarelo'], COL = ['#ff6ac8', '#5ab4ff', '#ffe04a'];
+      const on = Math.floor(this.moves % 6 / 2), nxt = (on + 1) % 3, k = 2 - (this.moves % 2);
+      this.mechTxt.setText(`♫ Rebenta: ${NAMES[on]}  ·  em ${k}: ${NAMES[nxt]}`).setColor(COL[on]);
     } else if (m.mech === 'lava') {
       const L = m.lava!, wait = L.delay - this.moves;
       const left = L.at[this.idx] - this.moves;
@@ -457,7 +494,10 @@ export class GameScene extends Phaser.Scene {
     const m = this.m;
     stage.player.dir = Math.atan2(DIRS[dir].dx, DIRS[dir].dy);
     let path = travel(m, this.idx, dir, (i, d) => canPass(m, i, d, this.phase));
-    if (!path.length) {
+    const wet = path.length > 0 && path.some((c) => hazardAt(m, c, this.moves + 1));
+    const lost = path.length > 0 && path.some((c) => { const b = cloudBit(m, c); return b >= 0 && (this.gone & (1 << b)) !== 0; });
+    if (wet) this.say(m.mech === 'tide' ? 'A água está lá!' : 'Fora de tempo!', '#ffb0a0');
+    if (!path.length || wet || lost) {
       sfx.bump(); this.run = false; navigator.vibrate?.(8);
       const a = { t: 0 };
       this.tweens.add({ targets: a, t: 1, duration: 120, onUpdate: () => { stage.player.h = Math.sin(a.t * Math.PI) * 0.25; } });
@@ -467,6 +507,7 @@ export class GameScene extends Phaser.Scene {
     if (brasa) path = path.slice(0, 1);
     this.moving = true; this.lastDir = dir; this.flameStop = false;
     sfx.step();
+    if (m.mech === 'ice') { stage.setTargets([]); if (path.length > 1) { stage.sliding = 1; sfx.shift(); } }
     const pts = [this.idx, ...path], len = path.length, slide = len > 1;
     const xy = (c: number) => ({ x: (c % m.cols) + 0.5, y: ((c / m.cols) | 0) + 0.5 });
     const a = { t: 0 };
@@ -474,32 +515,60 @@ export class GameScene extends Phaser.Scene {
     const advance = (upTo: number) => {
       while (reached < upTo && !this.done) {
         reached++;
-        this.enter(pts[reached], pts[reached - 1]);
-        if (slide && !this.done) stage.frost(pts[reached]);
+        const from = pts[reached - 1];
+        if (reached === 1) this.leaveCloud(from);
+        this.enter(pts[reached], from);
+        if (slide && !this.done && m.mech === 'ice') stage.frost(pts[reached]);
+        if (Math.abs((from % m.cols) - (pts[reached] % m.cols)) + Math.abs(((from / m.cols) | 0) - ((pts[reached] / m.cols) | 0)) > 1) { stage.warpBurst(pts[reached], 0x8affee); sfx.shift(); }
       }
     };
     const tw = this.tweens.add({
-      targets: a, t: len, duration: slide ? 70 * len + 90 : 112,
-      ease: slide ? 'Sine.Out' : (this.pad.dir >= 0 || this.queued || this.run) ? 'Linear' : 'Sine.InOut',
+      targets: a, t: len, duration: m.mech === 'ice' && slide ? 70 * len + 90 : slide ? 150 * len : path.some((c) => !!m.warp) && Math.abs((pts[0] % m.cols) - (pts[1] % m.cols)) + Math.abs(((pts[0] / m.cols) | 0) - ((pts[1] / m.cols) | 0)) > 1 ? 240 : 112,
+      ease: slide && m.mech === 'ice' ? 'Sine.Out' : slide ? 'Linear' : (this.pad.dir >= 0 || this.queued || this.run) ? 'Linear' : 'Sine.InOut',
       onUpdate: () => {
         if (this.done) return;
         const i = Math.min(len - 1, Math.floor(a.t)), f = a.t - i, p = xy(pts[i]), q = xy(pts[i + 1]);
-        stage.player.x = p.x + (q.x - p.x) * f; stage.player.y = p.y + (q.y - p.y) * f; stage.player.h = slide ? 0 : f;
+        if (Math.abs(p.x - q.x) + Math.abs(p.y - q.y) < 1.5) {
+          stage.player.x = p.x + (q.x - p.x) * f; stage.player.y = p.y + (q.y - p.y) * f; stage.player.h = slide && m.mech === 'ice' ? 0 : f % 1; stage.uliScale = 1;
+        } else if (m.holes?.get(pts[i]) === pts[i + 1]) {
+          // buraco de verme: encolhe de um lado e cresce no outro
+          const at = f < 0.5 ? p : q;
+          stage.player.x = at.x; stage.player.y = at.y; stage.player.h = 0; stage.uliScale = Math.max(0.05, Math.abs(1 - f * 2));
+        } else {
+          // arco do planeta: sai por um lado e entra pelo outro
+          const ux = DIRS[dir].dx, uy = DIRS[dir].dy;
+          if (f < 0.5) { stage.player.x = p.x + ux * f; stage.player.y = p.y + uy * f; } else { stage.player.x = q.x - ux * (1 - f); stage.player.y = q.y - uy * (1 - f); }
+          stage.player.h = 0;
+        }
         advance(Math.floor(a.t + 1e-6));
-        if (this.done) { tw.stop(); const e = xy(this.idx); stage.player.x = e.x; stage.player.y = e.y; stage.player.h = 0; }
+        if (this.done) { stage.sliding = 0; stage.setTargets([]); tw.stop(); const e = xy(this.idx); stage.player.x = e.x; stage.player.y = e.y; stage.player.h = 0; }
       },
       onComplete: () => {
-        stage.player.h = 0;
+        stage.player.h = 0; stage.uliScale = 1;
+        const e = xy(pts[len]); stage.player.x = e.x; stage.player.y = e.y;
         advance(len);
+        stage.sliding = 0;
         if (this.done) return;
         if (brasa) {
           this.armed = false;
           if (!m.grip![this.idx]) { m.grip![this.idx] = 1; this.brasas--; stage.melt(this.idx); sfx.shift(); navigator.vibrate?.(24); }
         }
-        if (slide) { stage.shake(0.14); this.run = false; }
+        if (slide) { if (m.mech === 'ice') stage.shake(0.14); this.run = false; }
         this.endTurn();
       },
     });
+  }
+
+  /** Nuvens: a casa de onde se sai desfaz-se. */
+  private leaveCloud(from: number) {
+    const b = cloudBit(this.m, from);
+    if (b >= 0 && !(this.gone & (1 << b))) { this.gone |= 1 << b; stage.dropCloud(from); sfx.shift(); this.flameStop = true; }
+  }
+
+  /** Aviso grande e curto a meio do ecrã. */
+  private say(msg: string, color: string) {
+    const t = this.add.text(W / 2, 290, msg, { fontFamily: FONT_HEAD, fontSize: '40px', color, stroke: '#05060b', strokeThickness: 8, align: 'center' }).setOrigin(0.5).setDepth(40);
+    this.tweens.add({ targets: t, y: 270, alpha: 0, delay: 1300, duration: 600, onComplete: () => t.destroy() });
   }
 
   /** A personagem entra numa casa (num deslize há várias por passo). */
@@ -522,7 +591,7 @@ export class GameScene extends Phaser.Scene {
     const m = this.m, ni = this.idx;
     this.moving = false; this.moves++;
     let stop = this.flameStop;
-    if (m.dyn.length && this.moves % this.def.shift === 0) {
+    if (m.dyn.length && m.mech !== 'page' && this.moves % this.def.shift === 0) {
       this.phase ^= 1; stage.setPhase(this.phase, true); stop = true;
       sfx.shift(); stage.shake(0.35); navigator.vibrate?.(26);
     }
@@ -530,6 +599,15 @@ export class GameScene extends Phaser.Scene {
     if (this.stun.some((v) => v > 0)) {
       this.stun = this.stun.map((v, i) => { const n = Math.max(0, v - 1); if (v > 0 && n === 0) stage.setGuardStun(i, false); return n; });
       if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.caught(); return; }
+    }
+    if (m.haz) {
+      stage.setHazard(this.moves);
+      if (m.mech === 'tide' && this.moves % m.haz.period === m.haz.period - 4) { sfx.shift(); stage.shake(0.25); }
+      if (hazardAt(m, this.idx, this.moves)) { this.updateHud(); this.caught(m.mech === 'tide' ? 'tide' : 'beat'); return; }
+    }
+    if (m.clouds && this.gone) {
+      const st = { cell: this.idx, flames: [...this.rosas], t: this.moves, gone: this.gone };
+      if (!solve(m, st, { needAll: false })) this.say('O caminho desfez-se: reinicia', '#ff6a50');
     }
     if (m.lava) {
       if (this.moves === m.lava.delay) { sfx.shift(); stage.shake(0.6); navigator.vibrate?.([40, 30, 80]); }
@@ -567,7 +645,7 @@ export class GameScene extends Phaser.Scene {
     this.guards.forEach((g, i) => {
       if (this.stun[i] > 0) return;
       const opts: number[] = [];
-      for (let d = 0; d < 4; d++) if (canPass(m, g, d, this.phase)) opts.push(neighbor(m, g, d));
+      for (let d = 0; d < 4; d++) if (canPass(m, g, d, this.phase)) { const n = neighbor(m, g, d), cb = cloudBit(m, n); if (cb < 0 || !(this.gone & (1 << cb))) opts.push(n); }
       if (!opts.length) return;
       let pick: number;
       const hunting = dist[g] >= 0 && dist[g] <= GUARD_HUNT;
@@ -587,7 +665,7 @@ export class GameScene extends Phaser.Scene {
     if (this.guards.some((g, i) => g === this.idx && !this.stun[i])) { this.blocked = true; this.time.delayedCall(160, () => this.caught()); }
   }
 
-  private caught(by: 'guard' | 'lava' = 'guard') {
+  private caught(by: 'guard' | 'lava' | 'tide' | 'beat' = 'guard') {
     if (this.done) return;
     const lava = by === 'lava';
     this.done = true;
@@ -598,9 +676,9 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.flash(260, 255, 30, 40);
     const root = this.add.container(0, 0).setDepth(160);
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x200006, 0.62).setInteractive();
-    const title = gradText(this, W / 2, 470, lava ? 'QUEIMADO' : 'APANHADO', 120);
-    title.setFill(lava ? '#ff7a20' : '#ff2a3d');
-    const quips = lava ? ['A lava não espera por ninguém.', 'Muda a ordem das chamas.', 'Os becos queimam primeiro.', 'Quase. Tenta outra vez.']
+    const title = gradText(this, W / 2, 470, { guard: 'APANHADO', lava: 'QUEIMADO', tide: 'LEVADO', beat: 'EXPLODIU' }[by], 120);
+    title.setFill({ guard: '#ff2a3d', lava: '#ff7a20', tide: '#3ac8ff', beat: '#ff4fd8' }[by]);
+    const quips = by === 'tide' ? ['O mar não avisa duas vezes.', 'Conta os passos até à maré.', 'Quase. Tenta outra vez.'] : by === 'beat' ? ['Fora de tempo!', 'Ouve a cor que pisca.', 'Quase. Tenta outra vez.'] : lava ? ['A lava não espera por ninguém.', 'Muda a ordem das chamas.', 'Os becos queimam primeiro.', 'Quase. Tenta outra vez.']
       : ['Os Espadas não perdoam.', 'A Rainha manda cumprimentos.', 'Aprende o ritmo deles, rebelde.', 'Quase. Tenta outra vez.'];
     const q = this.add.text(W / 2, 580, quips[Math.floor(Math.random() * quips.length)], { fontFamily: FONT, fontSize: '30px', color: '#ffd0d4' }).setOrigin(0.5);
     root.add([dim, title, q]);
@@ -632,22 +710,20 @@ export class GameScene extends Phaser.Scene {
 
   /** Vagalume nos mundos com mecânica: o mesmo solver mostra os próximos passos da melhor rota (ou diz quando rodar). */
   private mechHint() {
-    const st = { cell: this.idx, flames: [...this.rosas], t: this.moves };
+    const st = { cell: this.idx, flames: [...this.rosas], t: this.moves, phase: this.phase, gone: this.gone };
     const sol = solve(this.m, st) ?? solve(this.m, st, { needAll: false });
-    const say = (msg: string, color: string) => {
-      const t = this.add.text(W / 2, 290, msg, { fontFamily: FONT_HEAD, fontSize: '40px', color, stroke: '#05060b', strokeThickness: 8, align: 'center' }).setOrigin(0.5).setDepth(40);
-      this.tweens.add({ targets: t, y: 270, alpha: 0, delay: 1500, duration: 600, onComplete: () => t.destroy() });
-    };
-    if (!sol) { say('Já não há caminho: reinicia', '#ff6a50'); return; }
-    if (sol[0].type === 'rot') {
-      say('Roda agora!', '#ffe28a');
+    if (!sol) { this.say('Já não há caminho: reinicia', '#ff6a50'); return; }
+    const first = sol[0];
+    if (first.type !== 'move') {
+      this.say({ rot: 'Roda agora!', flip: 'Vira a página!', wait: 'Espera!' }[first.type], '#ffe28a');
       if (this.actionBtn) this.tweens.add({ targets: this.actionBtn, scale: 1.3, duration: 220, yoyo: true, repeat: 3 });
       return;
     }
     const cells: number[] = [];
     for (const a of sol) { if (a.type !== 'move' || cells.length >= 14) break; cells.push(...a.path); }
     stage.hint(cells.slice(0, 14));
-    if (this.m.mech === 'rings' && sol.some((a) => a.type === 'rot') && cells.length < 4) say('Depois, roda o anel', '#ffe28a');
+    const next = sol.find((a) => a.type !== 'move');
+    if (next && cells.length < 4) this.say({ rot: 'Depois, roda o anel', flip: 'Depois, vira a página', wait: 'Depois, espera', move: '' }[next.type], '#ffe28a');
   }
 
   // ───────────────────────── Fim de nível ─────────────────────────

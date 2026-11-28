@@ -1,6 +1,6 @@
 // Mecânicas dos mundos (lógica pura, sem gráficos): gelo que escorrega, lava que avança e anéis que rodam.
 // Um único solver (procura em largura sobre célula + rotações + chamas) calcula o par, as pistas e prova que há sempre saída.
-import { Maze, DIRS, OPP, generate, neighbor, MazeOpts } from './maze';
+import { Maze, MechKind, DIRS, OPP, generate, neighbor, canPass, distFrom, MazeOpts } from './maze';
 import { mulberry32, shuffle } from './rng';
 
 export const BRASAS = 3; // cargas da Brasa (gelo)
@@ -48,18 +48,40 @@ export function travel(m: Maze, from: number, dir: number, open: (i: number, d: 
   if (m.mech === 'ice') {
     while (n !== m.exit && !m.grip![n] && open(n, dir)) { n = neighbor(m, n, dir); path.push(n); }
   }
+  const h = m.holes?.get(n);
+  if (h !== undefined) path.push(h); // entra num buraco de verme e sai no par
   return path;
 }
 
+// ───────────────────────── Maré e batida ─────────────────────────
+/** A célula está perigosa depois de `t` passos? Maré: enche nos últimos passos de cada ciclo. Batida: dois grupos alternam. */
+export function hazardAt(m: Maze, cell: number, t: number): boolean {
+  const H = m.haz;
+  if (!H || !H.group[cell]) return false;
+  const k = t % H.period;
+  return m.mech === 'tide' ? k >= H.period - TIDE_HIGH : Math.floor(k / 2) === H.group[cell] - 1; // batida: um grupo de cada vez, 2 passos cada
+}
+export const TIDE_PERIOD = 12, TIDE_HIGH = 4, BEAT_PERIOD = 6;
+/** Quantos passos faltam para a célula (de um grupo) ficar perigosa (0 = já está). */
+export function hazardIn(m: Maze, group: number, t: number): number {
+  const cell = m.haz!.group.indexOf(group);
+  if (cell < 0) return 99;
+  for (let k = 0; k <= m.haz!.period; k++) if (hazardAt(m, cell, t + k)) return k;
+  return 99;
+}
+
 // ───────────────────────── Solver ─────────────────────────
-export interface SolveState { cell: number; flames: number[]; t: number }
-export type Act = { type: 'move'; dir: number; path: number[] } | { type: 'rot'; layer: number };
+export interface SolveState { cell: number; flames: number[]; t: number; phase?: number; gone?: number }
+export type Act = { type: 'move'; dir: number; path: number[] } | { type: 'rot'; layer: number } | { type: 'flip' } | { type: 'wait' };
 export interface SolveOpts { needAll?: boolean; block?: (cell: number, t: number) => boolean; noRot?: boolean }
+
+/** Bit de uma nuvem (para o conjunto das já desfeitas); -1 se a célula não é nuvem. */
+export const cloudBit = (m: Maze, cell: number) => (m.clouds ? m.clouds.indexOf(cell) : -1);
 
 /**
  * Menor sequência de ações até à saída (com todas as chamas, salvo needAll = false).
- * Considera só passagens fixas (as sebes dinâmicas são atalhos extra). A lava é respeitada: chegar cedo nunca é pior,
- * por isso a procura em largura é exata.
+ * Estado: célula, chamas apanhadas, rotações (anéis), página (biblioteca), nuvens desfeitas e fase do ciclo (maré/batida).
+ * Nas sebes que mudam sozinhas considera só as passagens fixas (são atalhos extra). A lava é respeitada.
  */
 export function solve(m: Maze, st: SolveState, o: SolveOpts = {}): Act[] | null {
   const N = m.cols * m.rows, R = m.rings;
@@ -69,6 +91,8 @@ export function solve(m: Maze, st: SolveState, o: SolveOpts = {}): Act[] | null 
   // chamas em coordenadas de origem (rodam com o seu anel)
   const base = R ? fl.map((c) => rotCell(m, c, -R.rot[R.layer[c]])) : fl;
   const code0 = R ? R.rot[1] + 4 * (R.rot[2] ?? 0) : 0;
+  const P = m.haz?.period ?? 1;
+  const w0 = m.mech === 'page' ? st.phase ?? 0 : m.mech === 'clouds' ? st.gone ?? 0 : 0;
   const passC = new Map<number, Uint8Array>();
   const passFor = (code: number) => {
     if (!R) return m.pass;
@@ -76,40 +100,50 @@ export function solve(m: Maze, st: SolveState, o: SolveOpts = {}): Act[] | null 
     if (!p) { p = ringPass(m, [0, code & 3, (code >> 2) & 3]); passC.set(code, p); }
     return p;
   };
-  const cells = [st.cell], codes = [code0], masks = [0], ts = [st.t], parent = [-1];
+  const cells = [st.cell], codes = [code0], masks = [0], ts = [st.t], ws = [w0], parent = [-1];
   const acts: (Act | null)[] = [null];
-  const seen = new Set<number>([st.cell + N * (code0 + 16 * 0)]);
+  const keyOf = (cell: number, code: number, mask: number, t: number, w: number) => cell + N * (mask + 8 * (code + 16 * ((t % P) + 16 * w)));
+  const seen = new Set<number>([keyOf(st.cell, code0, 0, st.t, w0)]);
   const build = (h: number, last: Act) => { const out: Act[] = [last]; for (let k = h; parent[k] >= 0; k = parent[k]) out.push(acts[k]!); return out.reverse(); };
-  const push = (cell: number, code: number, mask: number, t: number, from: number, act: Act) => {
-    const k = cell + N * (code + 16 * mask);
+  const push = (cell: number, code: number, mask: number, t: number, w: number, from: number, act: Act) => {
+    const k = keyOf(cell, code, mask, t, w);
     if (seen.has(k)) return;
-    seen.add(k); cells.push(cell); codes.push(code); masks.push(mask); ts.push(t); parent.push(from); acts.push(act);
+    seen.add(k); cells.push(cell); codes.push(code); masks.push(mask); ts.push(t); ws.push(w); parent.push(from); acts.push(act);
   };
-  for (let h = 0; h < cells.length; h++) {
-    const cell = cells[h], code = codes[h], mask = masks[h], t = ts[h] + 1;
+  for (let h = 0; h < cells.length && h < 400000; h++) {
+    const cell = cells[h], code = codes[h], mask = masks[h], t = ts[h] + 1, w = ws[h];
     const pass = passFor(code);
-    const open = (i: number, d: number) => (pass[i] & DIRS[d].b) !== 0;
+    const open = m.mech === 'page' ? (i: number, d: number) => canPass(m, i, d, w) : (i: number, d: number) => (pass[i] & DIRS[d].b) !== 0;
     for (let dir = 0; dir < 4; dir++) {
       const path = travel(m, cell, dir, open);
       if (!path.length) continue;
       const end = path[path.length - 1];
       if (m.lava && t >= m.lava.at[end]) continue;
+      if (m.haz && path.some((c) => hazardAt(m, c, t))) continue;
+      let nw = w;
+      if (m.clouds) {
+        if (path.some((c) => { const b = cloudBit(m, c); return b >= 0 && (w & (1 << b)) !== 0; })) continue;
+        const b = cloudBit(m, cell); if (b >= 0) nw |= 1 << b; // a nuvem de onde se sai desfaz-se
+      }
       if (o.block && path.some((c) => o.block!(c, t))) continue;
       let nm = mask;
       for (const c of path) for (let f = 0; f < base.length; f++) {
-        const cur = R ? rotCell(m, base[f], (code >> (2 * (R.layer[base[f]] - 1))) & (R.layer[base[f]] ? 3 : 0)) : base[f];
+        const L = R ? R.layer[base[f]] : 0;
+        const cur = R && L ? rotCell(m, base[f], (code >> (2 * (L - 1))) & 3) : base[f];
         if (cur === c) nm |= 1 << f;
       }
       const act: Act = { type: 'move', dir, path };
       if (end === m.exit) { if (!needAll || nm === full) return build(h, act); continue; }
-      push(end, code, nm, t, h, act);
+      push(end, code, nm, t, nw, h, act);
     }
     if (R && !o.noRot) {
       const L = ringTarget(m, cell), sh = 2 * (L - 1);
       const r = ((code >> sh) + 1) & 3, ncode = (code & ~(3 << sh)) | (r << sh);
       const ncell = R.layer[cell] === L ? rotCell(m, cell, 1) : cell;
-      if (!(o.block && o.block(ncell, t))) push(ncell, ncode, mask, t, h, { type: 'rot', layer: L });
+      if (!(o.block && o.block(ncell, t))) push(ncell, ncode, mask, t, w, h, { type: 'rot', layer: L });
     }
+    if (m.mech === 'page' && !o.noRot && !(o.block && o.block(cell, t))) push(cell, code, mask, t, w ^ 1, h, { type: 'flip' });
+    if (m.haz && !hazardAt(m, cell, t) && !(o.block && o.block(cell, t))) push(cell, code, mask, t, w, h, { type: 'wait' });
   }
   return null;
 }
@@ -279,23 +313,146 @@ export function generateRings(size: number, nr: number, seed: number, loops: num
   return (best ?? fallback)!;
 }
 
+// ───────────────────────── Planeta: dá-se a volta ─────────────────────────
+/** Liga bordas opostas (mesma linha ou coluna): sai-se por um lado e entra-se pelo outro. Só acrescenta caminhos. */
+function buildPlanet(m: Maze, seed: number, want: number) {
+  const rng = mulberry32(seed * 191 + 3);
+  m.mech = 'planet'; m.warp = new Map();
+  const pairs: { a: number; b: number; d: number; far: number }[] = [];
+  const dist = new Map<number, Int32Array>();
+  const dd = (a: number, b: number) => { let x = dist.get(a); if (!x) { x = distFrom(m, a); dist.set(a, x); } return x[b]; };
+  for (let r = 0; r < m.rows; r++) { const row = Array.from({ length: m.cols }, (_, c) => r * m.cols + c).filter((i) => !m.solid[i]); if (row.length >= 4) pairs.push({ a: row[row.length - 1], b: row[0], d: 1, far: dd(row[row.length - 1], row[0]) }); }
+  for (let c = 0; c < m.cols; c++) { const col = Array.from({ length: m.rows }, (_, r) => r * m.cols + c).filter((i) => !m.solid[i]); if (col.length >= 4) pairs.push({ a: col[col.length - 1], b: col[0], d: 2, far: dd(col[col.length - 1], col[0]) }); }
+  // preferem-se as passagens que poupam mais caminho, com um pouco de acaso, e sem repetir células
+  pairs.sort((x, y) => y.far + rng() * 8 - (x.far + rng() * 8));
+  const used = new Set<number>();
+  let n = 0;
+  for (const p of pairs) {
+    if (n >= want) break;
+    if (used.has(p.a) || used.has(p.b)) continue;
+    used.add(p.a); used.add(p.b); n++;
+    m.warp.set(p.a * 4 + p.d, p.b); m.warp.set(p.b * 4 + OPP[p.d], p.a);
+    m.pass[p.a] |= DIRS[p.d].b; m.pass[p.b] |= DIRS[OPP[p.d]].b;
+  }
+}
+
+// ───────────────────────── Buracos de verme ─────────────────────────
+/** Pares de portais em becos sem saída: nunca cortam um caminho, só criam atalhos (e voltam a trazer). */
+function buildHoles(m: Maze, seed: number, pairs: number) {
+  const rng = mulberry32(seed * 223 + 9);
+  m.mech = 'holes'; m.holes = new Map();
+  const dead = shuffle(Array.from({ length: m.cols * m.rows }, (_, i) => i).filter((i) => !m.solid[i] && popc(m.pass[i]) === 1 && i !== m.start && i !== m.exit && !m.rosas.includes(i)), rng);
+  while (dead.length >= 2 && m.holes.size < pairs * 2) {
+    const a = dead.shift()!, d = distFrom(m, a);
+    let bi = 0; for (let k = 1; k < dead.length; k++) if (d[dead[k]] > d[dead[bi]]) bi = k;
+    const b = dead.splice(bi, 1)[0];
+    m.holes.set(a, b); m.holes.set(b, a);
+  }
+}
+
+// ───────────────────────── Maré e batida ─────────────────────────
+function buildHazard(m: Maze, seed: number, frac: number, kind: 'tide' | 'beat') {
+  const rng = mulberry32(seed * 307 + 11);
+  m.mech = kind;
+  m.haz = { period: kind === 'tide' ? TIDE_PERIOD : BEAT_PERIOD, group: new Uint8Array(m.cols * m.rows) };
+  const near = distFrom(m, m.start);
+  const free = shuffle(Array.from({ length: m.cols * m.rows }, (_, i) => i).filter((i) => !m.solid[i] && near[i] > 2 && i !== m.exit), rng);
+  const n = Math.round(free.length * frac);
+  // a batida tem três grupos que se sucedem; a maré tem um só (zonas baixas, em manchas)
+  if (kind === 'beat') free.slice(0, n).forEach((c, k) => { m.haz!.group[c] = 1 + (k % 3); });
+  else {
+    let left = n;
+    for (const c of free) {
+      if (left <= 0) break;
+      const q = [c];
+      for (let h = 0; h < q.length && h < 5 && left > 0; h++) {
+        const x = q[h];
+        if (!m.haz.group[x] && near[x] > 2 && x !== m.exit) { m.haz.group[x] = 1; left--; }
+        for (let d = 0; d < 4; d++) if (m.pass[x] & DIRS[d].b) q.push(neighbor(m, x, d));
+      }
+    }
+  }
+}
+
+// ───────────────────────── Biblioteca: virar a página ─────────────────────────
+/** Algumas passagens passam a existir só numa das duas páginas. Virar é reversível, por isso nunca se fica preso. */
+function buildPage(m: Maze, seed: number, count: number) {
+  const rng = mulberry32(seed * 409 + 17);
+  m.mech = 'page';
+  const edges: [number, number][] = [];
+  for (let i = 0; i < m.cols * m.rows; i++) for (const d of [1, 2]) if (m.pass[i] & DIRS[d].b) edges.push([i, d]);
+  shuffle(edges, rng);
+  // primeiro as do caminho entre o início e a saída, para a página contar mesmo
+  const ds = distFrom(m, m.start), de = distFrom(m, m.exit), best = ds[m.exit];
+  const onPath = ([i, d]: [number, number]) => { const j = neighbor(m, i, d); return Math.min(ds[i] + de[j], ds[j] + de[i]) + 1 === best; };
+  edges.sort((a, b) => Number(onPath(b)) - Number(onPath(a)));
+  const used = new Set<number>();
+  for (const [i, d] of edges) {
+    if (m.dyn.length >= count) break;
+    const j = neighbor(m, i, d);
+    if (used.has(i) || used.has(j)) continue;
+    used.add(i); used.add(j);
+    const group = (m.dyn.length % 2) as 0 | 1;
+    m.pass[i] &= ~DIRS[d].b; m.pass[j] &= ~DIRS[OPP[d]].b;
+    m.dyn.push({ a: i, b: j, dir: d, group });
+    m.dynMap.set(i * 4 + d, group); m.dynMap.set(j * 4 + OPP[d], group);
+  }
+}
+
+// ───────────────────────── Nuvens que se desfazem ─────────────────────────
+function buildClouds(m: Maze, seed: number, count: number) {
+  const rng = mulberry32(seed * 503 + 23);
+  m.mech = 'clouds'; m.clouds = [];
+  const cand = shuffle(Array.from({ length: m.cols * m.rows }, (_, i) => i).filter((i) => !m.solid[i] && i !== m.start && i !== m.exit && !m.rosas.includes(i) && popc(m.pass[i]) >= 2), rng);
+  // uma de cada vez, e só fica se continuar a haver forma de fazer o nível por inteiro
+  for (const c of cand) {
+    if (m.clouds.length >= count) break;
+    m.clouds.push(c);
+    if (!solve(m, { cell: m.start, flames: m.rosas, t: 0 })) m.clouds.pop();
+  }
+}
+
 // ───────────────────────── Construção de um nível ─────────────────────────
-export interface MechParams { mech?: 'ice' | 'lava' | 'rings'; rings?: number; grip?: number; lavaK?: number; slack?: number; guards?: number; cols: number; seed: number; loops: number }
+export interface MechParams { mech?: MechKind; rings?: number; amount?: number; grip?: number; lavaK?: number; slack?: number; guards?: number; cols: number; seed: number; loops: number }
+
+/** Para as mecânicas em que o desenho importa: escolhe, sempre da mesma maneira, a semente em que a regra mais conta. */
+function bestOf(p: MechParams, opts: MazeOpts, kind: 'tide' | 'beat' | 'page' | 'clouds' | 'holes' | 'planet'): Maze {
+  let best: Maze | undefined, score = -1e9;
+  for (let k = 0; k < (kind === 'clouds' ? 4 : 16); k++) {
+    const seed = p.seed + k * 131;
+    const m = generate({ ...opts, seed, dyn: kind === 'page' ? 0 : opts.dyn });
+    const plain = solve(m, { cell: m.start, flames: m.rosas, t: 0 });
+    if (kind === 'planet') buildPlanet(m, seed, p.amount ?? 4);
+    else if (kind === 'holes') buildHoles(m, seed, p.amount ?? 2);
+    else if (kind === 'page') buildPage(m, seed, p.amount ?? 6);
+    else if (kind === 'clouds') buildClouds(m, seed, p.amount ?? 6);
+    else buildHazard(m, seed, p.amount ?? 0.3, kind);
+    const s = solve(m, { cell: m.start, flames: m.rosas, t: 0 });
+    if (!s || !plain) continue;
+    const gain = plain.length - s.length;                 // atalhos (planeta, buracos)
+    const flips = s.filter((a) => a.type === 'flip').length, waits = s.filter((a) => a.type === 'wait').length;
+    const used = s.filter((a) => a.type === 'move' && a.path.some((c) => (m.warp && [0, 1, 2, 3].some((d) => m.warp!.has(c * 4 + d))) || m.holes?.has(c) || m.haz?.group[c] || cloudBit(m, c) >= 0)).length;
+    const long = Math.max(0, s.length - p.cols * 6);
+    const sc = kind === 'planet' || kind === 'holes' ? gain * 2 + used * 3 - long
+      : kind === 'page' ? Math.min(flips, 6) * 14 - long * 1.5
+        : kind === 'clouds' ? used * 4 + m.clouds!.length * 6 - long
+          : Math.min(s.length - plain.length, 14) * 2 + used * 2 - waits * 3 - long * 4;
+    if (sc > score) { score = sc; best = m; }
+  }
+  return best!;
+}
 
 export function buildLevel(p: MechParams, opts: MazeOpts): Maze {
   const g = p.guards ?? 0;
   let m: Maze;
   if (p.mech === 'rings') m = generateRings(p.cols, p.rings ?? 1, p.seed, Math.max(p.loops, g ? 0.22 : 0.1));
-  else {
-    if (p.mech === 'ice') m = bestIce(p, opts);
-    else {
-      m = generate(opts);
-      if (p.mech !== 'lava') return m;
-      buildLava(m, p.lavaK ?? 2, (p.slack ?? 10) + g * 4);
-    }
-  }
+  else if (p.mech === 'ice') m = bestIce(p, opts);
+  else if (p.mech === 'lava') { m = generate(opts); buildLava(m, p.lavaK ?? 2, (p.slack ?? 10) + g * 4); }
+  else if (p.mech) m = bestOf(p, opts, p.mech);
+  else return generate(opts);
   // par = melhor rota com todas as chamas (exata) + folga
   const best = solve(m, { cell: m.start, flames: m.rosas, t: 0 })!.length;
+  m.shortest = solve(m, { cell: m.start, flames: m.rosas, t: 0 }, { needAll: false })!.length;
   const frac = m.mech === 'ice' ? 0.25 : m.mech === 'lava' ? 0.12 : 0.18;
   m.par = best + Math.max(m.mech === 'ice' ? 3 : 4, Math.round(best * frac)) + g * (m.mech === 'ice' ? 3 : 4);
   return m;
@@ -304,7 +461,7 @@ export function buildLevel(p: MechParams, opts: MazeOpts): Maze {
 /** Cópia independente (o jogo altera neve, rotações, etc.). */
 export function cloneMaze(m: Maze): Maze {
   return {
-    ...m, pass: m.pass.slice(), rosas: m.rosas.slice(), grip: m.grip?.slice(),
+    ...m, pass: m.pass.slice(), rosas: m.rosas.slice(), grip: m.grip?.slice(), clouds: m.clouds?.slice(),
     lava: m.lava ? { ...m.lava } : undefined, rings: m.rings ? { ...m.rings, rot: m.rings.rot.slice() } : undefined,
   };
 }

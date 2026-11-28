@@ -10,9 +10,16 @@ export class LevelsScene extends Phaser.Scene {
   private worldId = 'b612';
   private leaving = false;
   constructor() { super('Levels'); }
-  init(d: { world: string }) { this.worldId = d.world; }
+  private fromDive = false;
+  init(d: { world: string; dive?: boolean }) { this.worldId = d.world; this.fromDive = !!d.dive; }
 
   create() {
+    if (this.fromDive) {
+      // saímos do planeta: clarão que se dissipa e o ecrã a recuar até ao tamanho normal
+      const cam = this.cameras.main;
+      cam.setZoom(1.3); cam.fadeIn(700, 255, 214, 246);
+      this.tweens.add({ targets: cam, zoom: 1, duration: 900, ease: 'Cubic.Out' });
+    }
     this.leaving = false;
     const wd = getWorld(this.worldId);
     paintedBg(this, 0.45);

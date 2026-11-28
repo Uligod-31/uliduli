@@ -7,6 +7,7 @@ import { sfx } from '../core/audio';
 import { save } from '../core/save';
 import { stage } from '../three/Stage';
 import { warmMenus } from '../core/prewarm';
+import { WORLDS } from '../worlds';
 
 export class TitleScene extends Phaser.Scene {
   private shown = false;
@@ -21,9 +22,9 @@ export class TitleScene extends Phaser.Scene {
 
     // véus para legibilidade sobre o 3D
     const top = this.add.graphics();
-    top.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.8, 0.8, 0, 0); top.fillRect(0, 0, W, 470);
+    top.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0.85, 0.85, 0, 0); top.fillRect(0, 0, W, 380);
     const bot = this.add.graphics();
-    bot.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 0.88, 0.88); bot.fillRect(0, H - 420, W, 420);
+    bot.fillGradientStyle(0x05070a, 0x05070a, 0x05070a, 0x05070a, 0, 0, 0.94, 0.94); bot.fillRect(0, H - 430, W, 430);
 
     this.hud();
 
@@ -66,15 +67,26 @@ export class TitleScene extends Phaser.Scene {
     const sub2 = this.add.text(W / 2, 100, 'OS ADULTOS CRESCERAM. TU NÃO.', { fontFamily: FONT, fontSize: '19px', color: '#ff86e8', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5);
     sub2.setStyle({ letterSpacing: 6 } as any);
     this.tweens.add({ targets: sub2, alpha: 0.25, duration: 90, yoyo: true, repeat: -1, repeatDelay: 1700 + Math.random() * 1200 });
-    this.add.graphics().fillGradientStyle(UI.g1, UI.g3, UI.g1, UI.g3, 1).fillRect(W / 2 - 190, 380, 380, 4);
 
-    neoButton(this, 293, 1060, 486, 124, 'Jogar', '01', () => this.dive(), true, 52);
-    this.infoButton(608, 1060, 124);
-    neoButton(this, W / 2 - 160, 1178, 300, 88, 'Galeria', '02', () => this.scene.start('Gallery'), false, 30);
-    const snd = neoButton(this, W / 2 + 160, 1178, 300, 88, save.mute ? 'Som: off' : 'Som: on', '03', () => {
+    // planeta escolhido: nome e estrelas
+    const ready = WORLDS.filter((w) => w.ready);
+    const name = this.add.text(W / 2, 936, '', { fontFamily: FONT_HEAD, fontSize: '58px', color: '#f4f7ff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 9 }).setOrigin(0.5);
+    const info = this.add.text(W / 2, 978, '', { fontFamily: FONT, fontSize: '22px', color: UI.textDim as string, stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5);
+    const select = (i: number) => {
+      const w = ready[i];
+      name.setText(w.name.toUpperCase()).setScale(Math.min(1, 640 / Math.max(1, name.setScale(1).width)));
+      info.setText(`★ ${save.stars(w.id)} / ${w.levels.length * 3}   ·   toca noutro planeta ou desliza`);
+      this.tweens.add({ targets: [name, info], alpha: { from: 0, to: 1 }, duration: 260 });
+    };
+
+    neoButton(this, 293, 1078, 486, 112, 'Jogar aqui', '01', () => this.dive(), true, 46);
+    this.infoButton(608, 1078, 112);
+    neoButton(this, W / 2 - 207, 1190, 206, 80, 'Mundos', '02', () => this.scene.start('Worlds'), false, 26);
+    neoButton(this, W / 2 + 7, 1190, 206, 80, 'Galeria', '03', () => this.scene.start('Gallery'), false, 26);
+    const snd = neoButton(this, W / 2 + 214, 1190, 192, 80, save.mute ? 'Som: off' : 'Som: on', '04', () => {
       sfx.setMute(!save.mute);
       snd.txt.setText(save.mute ? 'Som: off' : 'Som: on');
-    }, false, 30);
+    }, false, 24);
 
     // película: linhas de varrimento, faixa que desce e cantos de mira
     if (!this.textures.exists('scan')) {
@@ -86,18 +98,22 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: bar, y: H, duration: 5200, repeat: -1, ease: 'Linear' });
     this.input.once('pointerdown', () => sfx.unlock());
 
-    // O Olho: 3D por baixo, segue o dedo e pisca ao toque
+    // O Sistema Uli: 3D por baixo; toca num planeta (ou desliza) e o Uli salta para lá
     this.flash = this.add.rectangle(W / 2, H / 2, W, H, 0xffd6f6, 0).setDepth(100);
-    stage.loadEye();
-    stage.onEyeFlash = (a) => { this.flash.setAlpha(a); };
+    stage.loadOrbit(ready.map((w) => w.id), select);
+    stage.onOrbitFlash = (a) => { this.flash.setAlpha(a); };
     stage.start('title');
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => stage.eyeLook((p.x / W - 0.5) * 2, (p.y / H - 0.5) * 2));
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { stage.eyeLook((p.x / W - 0.5) * 2, (p.y / H - 0.5) * 2); stage.eyePoke(); });
-    // inclinar o telemóvel move o olho e o labirinto (paralaxe)
-    const tilt = (e: DeviceOrientationEvent) => { if (e.gamma != null && e.beta != null) stage.eyeTilt(e.gamma, e.beta); };
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => stage.orbit?.lookAt((p.x / W - 0.5) * 2, (p.y / H - 0.5) * 2));
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (this.diving || p.downY < 300 || p.downY > 1010) return;
+      const dx = p.x - p.downX;
+      if (Math.abs(dx) > 60) stage.orbit?.step(dx < 0 ? 1 : -1);
+      else stage.orbitTap((p.x / W) * 2 - 1, 1 - (p.y / H) * 2);
+    });
+    const tilt = (e: DeviceOrientationEvent) => { if (e.gamma != null && e.beta != null) stage.orbit?.tilt(e.gamma, e.beta); };
     window.addEventListener('deviceorientation', tilt);
     warmMenus(this, () => this.scene.isActive() && !this.diving);
-    this.events.once('shutdown', () => { stage.onEyeFlash = undefined; window.removeEventListener('deviceorientation', tilt); stage.stop(); });
+    this.events.once('shutdown', () => { stage.onOrbitFlash = undefined; window.removeEventListener('deviceorientation', tilt); stage.stop(); });
   }
 
   /** Botão quadrado «i»: abre o tutorial. */
@@ -105,7 +121,8 @@ export class TitleScene extends Phaser.Scene {
     const key = `plate_${s}_${s}_0`;
     if (!this.textures.exists(key)) this.textures.addCanvas(key, drawPlate(s, s, false, 2));
     const img = this.add.image(0, -22, key).setScale(0.5);
-    const t = this.add.text(0, 2, 'i', { fontFamily: "Georgia,'Times New Roman',serif", fontSize: '84px', color: '#f4f7ff', fontStyle: 'bold italic', stroke: '#05060b', strokeThickness: 7 }).setOrigin(0.5);
+    // «i» minúsculo, em letra serifada (as outras letras da app só têm maiúsculas)
+    const t = this.add.text(0, -2, 'i', { fontFamily: "Georgia,'Times New Roman',serif", fontSize: '88px', color: '#f4f7ff', fontStyle: 'bold italic', stroke: '#05060b', strokeThickness: 7 }).setOrigin(0.5);
     try { (t as any).postFX?.addGlow(0xff4fd8, 2.5, 0, false, 0.1, 8); } catch { /* sem FX */ }
     const c = this.add.container(x, y, [img, t]);
     c.setSize(s, s).setInteractive({ useHandCursor: true });
@@ -118,12 +135,13 @@ export class TitleScene extends Phaser.Scene {
     });
   }
 
-  /** Jogar: a câmara mergulha pela pupila e só depois abre os Mundos. */
+  /** Jogar: a câmara mergulha no planeta escolhido e abre os níveis desse mundo. */
   private dive() {
-    if (this.diving) return;
+    if (this.diving || !stage.orbit) return;
     this.diving = true;
-    this.tweens.add({ targets: this.children.list.filter((c) => c !== this.flash), alpha: 0, duration: 520, ease: 'Sine.In' });
-    stage.eyeDive(() => this.scene.start('Worlds', { dive: true }));
+    const world = WORLDS.filter((w) => w.ready)[stage.orbit.selected].id;
+    this.tweens.add({ targets: this.children.list.filter((c) => c !== this.flash), alpha: 0, duration: 420, ease: 'Sine.In' });
+    stage.orbitDive(() => this.scene.start('Levels', { world, dive: true }));
   }
 
   update() {
