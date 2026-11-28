@@ -19,7 +19,16 @@ export interface DynEdge {
   group: 0 | 1;
 }
 
-export type MechKind = 'ice' | 'lava' | 'rings' | 'planet' | 'holes' | 'tide' | 'beat' | 'page' | 'clouds';
+export type MechKind = 'ice' | 'lava' | 'rings' | 'planet' | 'holes' | 'tide' | 'beat' | 'page' | 'clouds'
+  | 'size' | 'mounts' | 'echo' | 'roots' | 'ink' | 'glitch' | 'stars' | 'sun';
+
+/** Passagens que só se abrem com a regra do mundo (ver core/rules.ts); `inside` = lado de onde abrem sempre. */
+export type GateKind = 'crack' | 'low' | 'rock' | 'branch' | 'sunroot' | 'moon' | 'clock' | 'seal' | 'bridge';
+export interface Gate { a: number; b: number; dir: number; kind: GateKind; id: number; inside?: number }
+/** Coisas pousadas no chão; `id` liga-as a um portão ou a uma constelação, `k` é a ordem da estrela. */
+export type ItemKind = 'shrink' | 'grow' | 'elephant' | 'monkey' | 'gazelle' | 'plate' | 'inkpot' | 'switch' | 'star' | 'mirror' | 'seal';
+export interface Item { c: number; kind: ItemKind; id: number; k?: number }
+export interface Beam { src: number; dir: number; target: number }
 
 /** Elementos das barreiras de sopro (Chama Viva, ver core/viva.ts). */
 export type Element = 'heras' | 'gelo' | 'runa' | 'gas';
@@ -48,6 +57,11 @@ export interface Maze {
   rings?: { n: number; layer: Uint8Array; intra: Set<number>[]; door: Set<number>[]; rot: number[] };
   light?: number;                                      // Chama Viva: luz máxima (passos entre chamas)
   barriers?: Barrier[];                                // paredes que o sopro abre (de a para b, dir 1 = E, 2 = S)
+  gates?: Gate[];                                      // Vaga 3 (ver core/rules.ts)
+  items?: Item[];
+  water?: number[];                                    // tinta: casas de água
+  beams?: Beam[];                                      // areias: raios de sol
+  w0?: number;                                         // estado inicial da regra
 }
 
 export interface MazeOpts {

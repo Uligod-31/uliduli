@@ -98,7 +98,7 @@ export function makeUli(): THREE.Group {
   // marca do jogador: aro azul no chão, para nunca o confundir com as chamas a apanhar
   const mark = new THREE.Mesh(new THREE.RingGeometry(0.27, 0.32, 40), new THREE.MeshBasicMaterial({ color: hdr(0x3b74f2, 2.0), transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }));
   mark.rotation.x = -Math.PI / 2; mark.position.y = 0.02; root.add(mark);
-  root.userData = { body: fig, shadow, legL, legR, armL, armR, scarf, head };
+  root.userData = { body: fig, shadow, mark, legL, legR, armL, armR, scarf, head };
   return root;
 }
 

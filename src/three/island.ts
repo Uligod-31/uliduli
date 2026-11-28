@@ -6,6 +6,8 @@ import { Pal } from '../core/theme';
 import { mulberry32 } from '../core/rng';
 import { collectWalls } from '../art/render';
 import { buildBarrierFx, BarrierFx } from './barriers';
+import { buildRuleFx, RuleFx } from './rulefx';
+import { isRule, startState } from '../core/rules';
 import { hedgeTexture, smooth, vnoise, disposeTree, hdr } from './common';
 import { buildPlanetBody } from './planet';
 import { wallPBR, floorPBR } from './pbr2';
@@ -22,6 +24,7 @@ export interface Island {
   dyn: DynWall[];
   radius: number;
   barriers?: BarrierFx;
+  rule?: RuleFx;
   cellPos(i: number, out?: THREE.Vector3): THREE.Vector3;
   gridPos(gx: number, gy: number, out?: THREE.Vector3): THREE.Vector3;
   update(dt: number, t?: number): void;
@@ -261,15 +264,19 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
   // biblioteca: as paredes que a página troca são fúcsia; quando descem deixam uma marca azul no chão
   const page = m.mech === 'page';
   if (page) { dynMat.color.set(0xff4fd8); dynMat.emissive.set(0xc8179f); dynMat.emissiveIntensity = 0.55; }
+  // neon: dois conjuntos de blocos, ciano e magenta, que o interruptor troca
+  const swap = m.mech === 'glitch';
+  const blockMats = swap ? [0x27d3ff, 0xff2bd6].map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: new THREE.Color(c), emissiveIntensity: 0.62, roughness: 0.35, metalness: 0.2, vertexColors: true })) : undefined;
+  const ghostMats = swap ? [0x27d3ff, 0xff2bd6].map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false })) : undefined;
   const ghosts: THREE.Mesh[] = [];
-  const ghostGeo = page ? new THREE.PlaneGeometry(0.92, 0.2).rotateX(-Math.PI / 2) : undefined;
+  const ghostGeo = page || swap ? new THREE.PlaneGeometry(0.92, 0.2).rotateX(-Math.PI / 2) : undefined;
   const ghostMat = page ? new THREE.MeshBasicMaterial({ color: 0x3b74f2, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }) : undefined;
   m.dyn.forEach((e, k) => {
     const horizontal = e.dir === 2;
     const r2 = mulberry32(seed * 53 + k);
     const { solid, strip } = wallParts(1 + WALL_T, r2);
     const g = new THREE.Group();
-    const body = new THREE.Mesh(mergeGeometries(solid, false)!, dynMat);
+    const body = new THREE.Mesh(mergeGeometries(solid, false)!, blockMats ? blockMats[e.group] : dynMat);
     body.castShadow = true;
     g.add(body, new THREE.Mesh(strip, new THREE.MeshBasicMaterial({ color: hdr(0xffffff, 1.6), toneMapped: false })));
     for (let b = -1; b <= 1; b++) {
@@ -281,7 +288,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
     if (!horizontal) g.rotation.y = Math.PI / 2;
     group.add(g);
     if (ghostGeo) {
-      const gh = new THREE.Mesh(ghostGeo, ghostMat!);
+      const gh = new THREE.Mesh(ghostGeo, ghostMats ? ghostMats[e.group] : ghostMat!);
       gh.position.set(g.position.x, 0.025, g.position.z); gh.rotation.y = g.rotation.y;
       group.add(gh); ghosts.push(gh);
     }
@@ -289,7 +296,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
   });
 
   // detalhe de cenário: musgo, poças, ossos, lápides, velas, archotes
-  const reserved = new Set<number>([m.start, m.exit, ...m.rosas, ...(m.barriers ?? []).flatMap((b) => [b.a, b.b])]);
+  const reserved = new Set<number>([m.start, m.exit, ...m.rosas, ...(m.barriers ?? []).flatMap((b) => [b.a, b.b]), ...(m.items ?? []).map((i) => i.c), ...(m.water ?? [])]);
   // com mecânica, o chão fica limpo: nada se pode confundir com neve, lava ou anéis (nos anéis só o exterior tem adereços)
   const decorOpen = R2 ? open.filter((i) => R2.layer[i] === 0) : m.mech ? [] : open;
   const decor = buildDecor({ cols, rows, open: decorOpen, reserved, segs, rng: mulberry32(seed * 71 + 5), style: L.decor as DecorOpts['style'], accent: pal.accent, wallH: WALL_H, wallT: WALL_T });
@@ -305,9 +312,11 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
   if (fx) group.add(fx.group);
   const barriers = m.barriers?.length ? buildBarrierFx(m, cellPos) : undefined;
   if (barriers) group.add(barriers.group);
+  const rule = isRule(m.mech) ? buildRuleFx(m, cellPos) : undefined;
+  if (rule) { group.add(rule.group); rule.set(startState(m), m.start, true); rule.update(1, 0); }
 
   return {
-    group, dyn, radius: R, ice, lava, fx, barriers,
+    group, dyn, radius: R, ice, lava, fx, barriers, rule,
     layers: R2 ? layers : undefined,
     setRingTarget: R2 ? (l: number) => { ringTargetL = l; } : undefined,
     pulse(p: number) { stripMat.color.copy(stripBase).multiplyScalar(1 + 1.1 * p); },
@@ -320,6 +329,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
       lava?.update(dt, t);
       fx?.update(dt, t);
       barriers?.update(dt, t);
+      rule?.update(dt, t);
       for (const g of marks) (g.material as THREE.MeshBasicMaterial).opacity = g.userData.layer === ringTargetL ? 0.35 + 0.3 * Math.sin(t * 4.5) : 0;
       for (const d of dyn) {
         d.vel += (d.target - d.cur) * 190 * dt;
@@ -331,6 +341,7 @@ export function buildIsland(m: Maze, pal: Pal, seed: number, planet = false, loo
       }
       ghosts.forEach((gh, k) => { gh.visible = dyn[k].cur < 0.5; });
       if (ghostMat) ghostMat.opacity = 0.62 + 0.26 * Math.sin(t * 3);
+      ghostMats?.forEach((g) => { g.opacity = 0.6 + 0.28 * Math.sin(t * 3); });
     },
     dispose() { disposeTree(group); },
   };

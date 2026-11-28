@@ -4,6 +4,7 @@
 import { Maze, Element, DIRS, OPP, bestTour, distFrom } from './maze';
 import { solve, rotCell } from './mech';
 import { mulberry32, shuffle } from './rng';
+import { isRule } from './rules';
 
 export const PUDDLE = 3;      // luz extra que se perde de cada vez que se pisa uma poça
 export const REVIVE = 0.45;   // fração da luz que um Vagalume reacende quando a chama se apaga
@@ -50,7 +51,7 @@ export function routeLegs(m: Maze): number[] {
 export function lightBudget(m: Maze, k: number, guards = 0): number {
   let L = Math.max(MIN_LIGHT, Math.ceil(Math.max(...routeLegs(m)) * k) + 8);
   // no gelo e nos anéis a distância em casas não diz quantos passos são
-  if (m.mech !== 'ice' && m.mech !== 'rings') {
+  if (m.mech !== 'ice' && m.mech !== 'rings' && !isRule(m.mech)) {
     let far = 0;
     for (const p of [m.start, ...m.rosas]) {
       const d = distFrom(m, p);
@@ -68,6 +69,9 @@ export function lightBudget(m: Maze, k: number, guards = 0): number {
  */
 export function addBarriers(m: Maze, kind: Element, count: number, seed: number) {
   const rng = mulberry32(seed * 613 + 29), n = m.cols * m.rows;
+  // uma barreira nunca pode contornar a regra do mundo: não assenta em portões e liga casas da mesma zona
+  const gated = new Set<number>((m.gates ?? []).map((g) => g.a * 4 + g.dir));
+  const zone = zones(m);
   const base = bestTour(m);
   const cands: { a: number; b: number; dir: number; dist: number; gain: number }[] = [];
   const free = (c: number) => !m.solid[c] && c !== m.exit && c !== m.start;
@@ -77,6 +81,7 @@ export function addBarriers(m: Maze, kind: Element, count: number, seed: number)
       if (dir === 1 && a % m.cols === m.cols - 1) continue;
       const b = dir === 1 ? a + 1 : a + m.cols;
       if (b >= n || !free(b) || m.pass[a] & DIRS[dir].b) continue;
+      if (gated.has(a * 4 + dir) || (zone && zone[a] !== zone[b])) continue;
       if (m.dynMap.has(a * 4 + dir) || m.warp?.has(a * 4 + dir) || m.warp?.has(b * 4 + OPP[dir])) continue;
       const dist = distFrom(m, a)[b];
       if (dist < 6) continue;
@@ -99,9 +104,28 @@ export function addBarriers(m: Maze, kind: Element, count: number, seed: number)
   m.barriers = out;
 }
 
+/** Com portões ou água, a zona de cada casa (o que se alcança só por passagens normais, em qualquer página). */
+export function zones(m: Maze): Int32Array | null {
+  if (!m.gates?.length && !m.water?.length) return null;
+  const wet = new Set(m.water ?? []), zone = new Int32Array(m.cols * m.rows).fill(-1);
+  let z = 0;
+  for (let s = 0; s < zone.length; s++) {
+    if (zone[s] >= 0) continue;
+    zone[s] = z;
+    const q = wet.has(s) ? [] : [s];
+    for (let h = 0; h < q.length; h++) for (let d = 0; d < 4; d++) {
+      if (!(m.pass[q[h]] & DIRS[d].b)) continue;
+      const v = q[h] + (d === 0 ? -m.cols : d === 1 ? 1 : d === 2 ? m.cols : -1);
+      if (zone[v] < 0 && !wet.has(v)) { zone[v] = z; q.push(v); }
+    }
+    z++;
+  }
+  return zone;
+}
+
 /** Acrescenta a um labirinto já construído a luz e (se o mundo as tiver) as barreiras. */
 export function living(m: Maze, p: { seed: number; lightK?: number; element?: Element; barriers?: number; guards?: number }): Maze {
-  m.light = lightBudget(m, p.lightK ?? 1.8, p.guards ?? 0);
+  m.light ??= lightBudget(m, (p.lightK ?? 1.8) + (isRule(m.mech) ? 0.15 : 0), p.guards ?? 0); // nas raízes a luz já vem do gerador
   if (p.element) addBarriers(m, p.element, p.barriers ?? 3, p.seed);
   return m;
 }

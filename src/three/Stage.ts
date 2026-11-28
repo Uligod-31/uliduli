@@ -12,6 +12,7 @@ import { makeFlame, makePortal, Trail } from './actors';
 import { rotCell } from '../core/mech';
 import { LOW } from '../core/viva';
 import { makeUli, makeGuard, animateFlame } from './nightmare';
+import { makeAnimal, Animal, Beast } from './animals';
 import { makeTitleGiant, TitleGiant } from './titlegiant';
 import { OrbitTitle } from './orbit';
 import { Weather, Mist } from './weather';
@@ -59,6 +60,15 @@ export class Stage {
   private lifeCur = 1;
   private flashT = 0;
   private dying = 0;
+  // Vaga 3: tamanho (Jardim), montaria (Animal) e eco (Relógio)
+  private sizeK = 1;
+  private sizeCur = 1;
+  private zoomK = 1;
+  private mount?: { kind: Beast; a: Animal };
+  private rideCur = 0;
+  private ghost?: THREE.Group;
+  private ghostAt?: THREE.Vector3;
+  private warpT = 0;
 
   guards: { g: THREE.Group; x: number; y: number; tx: number; ty: number; dir: number; walk: number; stun?: boolean }[] = [];
   /** posição do jogador em unidades de grelha (células, fracionário), salto e direção */
@@ -131,16 +141,20 @@ export class Stage {
     this.composer.addPass(this.bloom);
     // grão, vinheta e aberração cromática: ar de filme sujo / punk
     this.fx = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 }, tilt: { value: 0 }, lift: { value: 0 }, res: { value: new THREE.Vector2(1 / 400, 1 / 700) }, candle: { value: new THREE.Vector2(0.5, 0.5) }, cr: { value: 1 }, dim: { value: 0 }, low: { value: 0 }, flash: { value: 0 } },
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, pulse: { value: 0 }, danger: { value: 0 }, grade: { value: 0 }, tilt: { value: 0 }, lift: { value: 0 }, res: { value: new THREE.Vector2(1 / 400, 1 / 700) }, candle: { value: new THREE.Vector2(0.5, 0.5) }, cr: { value: 1 }, dim: { value: 0 }, low: { value: 0 }, flash: { value: 0 }, warp: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; uniform float tilt; uniform float lift; uniform vec2 res; uniform vec2 candle; uniform float cr; uniform float dim; uniform float low; uniform float flash; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float pulse; uniform float danger; uniform float grade; uniform float tilt; uniform float lift; uniform vec2 res; uniform vec2 candle; uniform float cr; uniform float dim; uniform float low; uniform float flash; uniform float warp; varying vec2 vUv;
+        float h1(float x){ return fract(sin(x * 91.7) * 43758.5453); }
         vec3 smp(vec2 uv, vec2 bp){ vec3 a = texture2D(tDiffuse, uv).rgb * 0.36; a += texture2D(tDiffuse, uv + vec2(bp.x, 0.0)).rgb * 0.16; a += texture2D(tDiffuse, uv - vec2(bp.x, 0.0)).rgb * 0.16; a += texture2D(tDiffuse, uv + vec2(0.0, bp.y)).rgb * 0.16; a += texture2D(tDiffuse, uv - vec2(0.0, bp.y)).rgb * 0.16; return a; }
         float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
         void main(){
           vec2 c = vUv - 0.5; float d = dot(c,c);
-          vec2 off = c * (d * 0.005 + pulse * 0.01 + danger * 0.02);
+          // falha de ecrã (Neon): fatias que saltam de lado e cores que se separam
+          float slice = step(0.62, h1(floor(vUv.y * 34.0) + floor(time * 3.0))) * warp;
+          vec2 uvG = vUv + vec2(slice * (h1(floor(vUv.y * 34.0) * 3.1 + time) - 0.5) * 0.16, 0.0);
+          vec2 off = c * (d * 0.005 + pulse * 0.01 + danger * 0.02) + vec2(warp * 0.018, 0.0);
           float bl = smoothstep(0.28, 0.52, abs(vUv.y - 0.5)) * tilt; vec2 bp = res * bl * 4.5;
-          vec3 col = bl > 0.02 ? vec3(smp(vUv + off, bp).r, smp(vUv, bp).g, smp(vUv - off, bp).b) : vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+          vec3 col = bl > 0.02 ? vec3(smp(uvG + off, bp).r, smp(uvG, bp).g, smp(uvG - off, bp).b) : vec3(texture2D(tDiffuse, uvG + off).r, texture2D(tDiffuse, uvG).g, texture2D(tDiffuse, uvG - off).b);
           vec3 nb = (texture2D(tDiffuse, vUv + vec2(res.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(res.x, 0.0)).rgb + texture2D(tDiffuse, vUv + vec2(0.0, res.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, res.y)).rgb) * 0.25;
           col = max(col + clamp(col - nb, -0.3, 0.3) * 0.7, 0.0);
           col = mix(col, max((col - 0.32) * 1.14 + 0.32, 0.0), smoothstep(0.05, 0.5, dot(col, vec3(0.333))));
@@ -220,6 +234,8 @@ export class Stage {
     this.island.fx?.set?.(0, true);
     this.uliScale = 1;
     this.life = this.lifeCur = 1; this.flashT = 0; this.dying = 0;
+    this.sizeK = this.sizeCur = 1; this.zoomK = 1; this.rideCur = 0; this.warpT = 0;
+    this.setMount(undefined); this.setEcho(undefined);
     const portalPos = this.island.cellPos(m.exit);
     this.portal.position.copy(portalPos);
     this.tintPortal(this.planet);
@@ -258,7 +274,7 @@ export class Stage {
     this.scene.environment = null; this.scene.fog = null; this.scene.background = this.orbit.background;
     this.uli.visible = false; this.portal.visible = false; this.trail.mesh.visible = false; this.trail.dots.visible = false;
     this.hemi.intensity = 0; this.sun.intensity = 0; this.rim.intensity = 0; this.lamp.intensity = 0;
-    this.fx.uniforms.grade.value = 0; this.fx.uniforms.lift.value = 0; this.fx.uniforms.danger.value = 0; this.fx.uniforms.dim.value = 0; this.fx.uniforms.low.value = 0; this.fx.uniforms.flash.value = 0; this.renderer.toneMappingExposure = 1.15;
+    this.fx.uniforms.grade.value = 0; this.fx.uniforms.lift.value = 0; this.fx.uniforms.danger.value = 0; this.fx.uniforms.dim.value = 0; this.fx.uniforms.low.value = 0; this.fx.uniforms.flash.value = 0; this.fx.uniforms.warp.value = 0; this.renderer.toneMappingExposure = 1.15;
     this.view = 'follow';
   }
   private dropOrbit() {
@@ -302,6 +318,7 @@ export class Stage {
     this.parts = [];
     for (const G of this.guards) this.scene.remove(G.g), disposeTree(G.g);
     this.guards = [];
+    this.setMount(undefined); this.setEcho(undefined);
     if (this.island) { this.scene.remove(this.island.group); this.island.dispose(); this.island = undefined; }
     if (this.scenery) { this.scene.remove(this.scenery.group); this.scenery.dispose(); this.scenery = undefined; }
     if (this.scene.environment) { this.scene.environment.dispose(); this.scene.environment = null; }
@@ -387,6 +404,46 @@ export class Stage {
     this.shake(b.kind === 'gas' ? 0.9 : 0.25);
   }
   puddle(cell: number) { this.island?.barriers?.puddle(cell); }
+
+  // ───────────────────────── Vaga 3 ─────────────────────────
+  /** Leva o cenário ao estado da regra e solta faíscas onde algo acabou de mudar. */
+  setRule(w: number, cell: number, instant = false) {
+    for (const e of this.island?.rule?.set(w, cell, instant) ?? []) this.burst(e.x, e.z, [e.color, 0xffffff, e.color], e.n, e.y ?? 0.4);
+  }
+  /** Jardim: o Uli encolhe ou agiganta-se e a câmara acompanha. */
+  setSize(k: number, zoom: number) {
+    if (k !== this.sizeK) { const p = this.uli.position; this.burst(p.x, p.z, k > this.sizeK ? [0x4a8cff, 0x9ff4ff, 0xffffff] : [0xff4050, 0xff9ae0, 0xffffff], 28, 0.4); this.shake(k > 1.2 ? 0.5 : 0.15); }
+    const old = this.zoomK; this.sizeK = k; this.zoomK = zoom;
+    this.vw.zoom = Math.max(0.35, this.vw.zoom * (zoom / old));
+  }
+  /** Animal: o Uli monta (ou troca de) montaria. */
+  setMount(kind: Beast | undefined) {
+    if (kind === this.mount?.kind) return;
+    if (this.mount) { this.scene.remove(this.mount.a.group); disposeTree(this.mount.a.group); this.mount = undefined; }
+    if (!kind) return;
+    const a = makeAnimal(kind);
+    this.mount = { kind, a };
+    this.scene.add(a.group);
+    const p = this.uli.position; this.burst(p.x, p.z, [0xffe27a, 0xffffff, 0x7be08f], 24, 0.5);
+  }
+  /** Relógio: onde está o eco do Uli (nada = não há). */
+  setEcho(cell: number | undefined) {
+    if (cell === undefined || !this.island) { this.ghostAt = undefined; if (this.ghost) this.ghost.visible = false; return; }
+    if (!this.ghost) {
+      this.ghost = makeUli();
+      // um Uli de vidro azul: vê-se que é um eco e não o próprio
+      const glass = new THREE.MeshBasicMaterial({ color: hdr(0x6fd8ff, 1.15), transparent: true, opacity: 0.42, depthWrite: false, toneMapped: false });
+      this.ghost.traverse((n: any) => { if (n.isMesh) n.material = glass; if (n.isSprite) n.visible = false; });
+      this.scene.add(this.ghost);
+    }
+    const at = this.island.cellPos(cell);
+    if (!this.ghostAt || !this.ghost.visible) this.ghost.position.copy(at);
+    this.ghostAt = at; this.ghost.visible = true;
+  }
+  /** Neon: a imagem falha por um instante. */
+  glitch(power = 1) { this.warpT = power; }
+  /** Um guarda apanhado por um raio de sol. */
+  zap(i: number) { const G = this.guards[i]; if (G) this.burst(G.g.position.x, G.g.position.z, [0xffe9a0, 0xffd45a, 0xffffff], 22, 0.7); }
 
   /** Gelo: aros no chão que mostram onde vais parar em cada direção. */
   setTargets(cells: number[]) {
@@ -518,7 +575,7 @@ export class Stage {
     if (Math.abs(w.yaw - q) < 0.42) w.yaw = q;
   }
   /** Volta a centrar na personagem, com a vista normal. */
-  camRecenter() { this.vw = { yaw: 0, pitch: 0, zoom: this.baseZoom, px: 0, pz: 0 }; this.vVel.yaw = 0; }
+  camRecenter() { this.vw = { yaw: 0, pitch: 0, zoom: this.baseZoom * this.zoomK, px: 0, pz: 0 }; this.vVel.yaw = 0; }
   /** 0 = vista normal; maior = mais afastada do normal (para mostrar a dica de recentrar). */
   get camOffset() { const w = this.vw; return Math.abs(w.yaw) + Math.abs(w.pitch) * 2 + Math.abs(w.zoom - this.baseZoom) * 2 + Math.hypot(w.px, w.pz) * 0.3; }
   get camYaw() { return this.vc.yaw; }
@@ -684,7 +741,26 @@ export class Stage {
     if (this.dying) this.dying += dt;
     const alive = this.dying ? Math.max(0.001, 1 - this.dying * 1.6) : 1;
     const vigor = this.celebrate > 0 ? 1 : 0.68 + 0.32 * this.lifeCur;
-    this.uli.scale.setScalar(this.uliScale * vigor * alive);
+    this.sizeCur += (this.sizeK - this.sizeCur) * (1 - Math.exp(-dt * 8));
+    this.uli.scale.setScalar(this.uliScale * vigor * alive * this.sizeCur);
+    this.rideCur += ((this.mount ? this.mount.a.ride : 0) - this.rideCur) * (1 - Math.exp(-dt * 10));
+    if (this.mount) {
+      const A = this.mount.a;
+      A.group.position.set(wp.x, this.spinLift + Math.min(1, this.player.h) * 0.12, wp.z);
+      A.group.rotation.y = this.uli.rotation.y;
+      A.group.scale.setScalar(alive);
+      A.animate(this.t, this.speed);
+      this.uli.position.y = this.spinLift + this.rideCur;
+    }
+    if (this.ghost?.visible && this.ghostAt) {
+      const g = this.ghost, dx = this.ghostAt.x - g.position.x, dz = this.ghostAt.z - g.position.z;
+      const f = 1 - Math.exp(-dt * 9);
+      if (Math.hypot(dx, dz) > 0.05) g.rotation.y = Math.atan2(dx, dz);
+      g.position.x += dx * f; g.position.z += dz * f; g.position.y = 0.04 + Math.sin(this.t * 4) * 0.035;
+      animateFlame(g.userData.head as THREE.Object3D, this.t + 2, 0.3, 0, 0);
+    }
+    this.warpT = Math.max(0, this.warpT - dt * 2.6);
+    this.fx.uniforms.warp.value = this.warpT;
     const body = this.uli.userData.body as THREE.Group;
     // marcha: velocidade a partir do deslocamento
     const spd = dt > 0 ? Math.hypot(wp.x - this.prevP.x, wp.z - this.prevP.z) / dt : 0;
@@ -718,6 +794,11 @@ export class Stage {
     da = Math.atan2(Math.sin(da), Math.cos(da));
     this.uli.rotation.y += da * (1 - Math.exp(-dt * 14));
     (this.uli.userData.shadow as THREE.Mesh).scale.setScalar(1 - Math.min(1, this.player.h) * 0.25);
+    // montado, o aro e a sombra ficam no chão (à volta do animal) e o aro alarga
+    const down = (this.spinLift - this.uli.position.y) / Math.max(0.001, this.uli.scale.y), riding = this.mount ? 1 : 0;
+    (this.uli.userData.shadow as THREE.Mesh).position.y = 0.012 + down * riding;
+    const mark = this.uli.userData.mark as THREE.Mesh;
+    mark.position.y = 0.02 + down * riding; mark.scale.setScalar(1 + 0.4 * riding);
     this.lamp.position.set(wp.x, 1.4, wp.z);
 
     // Espadas: deslizam até à nova casa, viram-se para onde vão

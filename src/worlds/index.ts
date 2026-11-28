@@ -37,6 +37,8 @@ export interface LevelDef {
   lightK?: number; // Chama Viva: folga da luz sobre o troço mais longo
   element?: Element; // elemento das barreiras de sopro deste mundo
   barriers?: number; // quantas barreiras
+  pick?: number;   // Vaga 3: candidato escolhido pela ferramenta tools/gerar-vaga3.ts
+  level?: number;  // posição do nível no mundo (a Vaga 3 apresenta as coisas aos poucos)
   intro: Line[];
   outro?: Line[];
 }
@@ -108,7 +110,7 @@ const b612: WorldDef = {
       title: 'O Homem dos Números', cols: 9, rows: 11, mask: 'circle', seed: 7167, dyn: 3, shift: 8, loops: 0.05, fog: 3.2, guards: 1,
       intro: [
         { who: 'acendedor', text: 'Não acendas nada. Ele conta tudo. As estrelas, os passos, os teus dias.' },
-        { who: 'acendedor', text: 'Fica escuro. Só vês o que está perto de ti. Eu só tenho duas centelhas para te dar.' },
+        { who: 'acendedor', text: 'Fica escuro. Só vês o que está perto de ti. Eu só tenho três centelhas para te dar.' },
         { who: 'uli', text: 'O Vagalume.' },
         { who: 'acendedor', text: 'Gasta-as bem.' },
       ],
@@ -192,7 +194,7 @@ const jardim: WorldDef = {
         { who: 'sorriso', text: 'Nevoeiro. A minha casa. Aqui ninguém me vê a rir de ti.' },
         { who: 'sorriso', text: 'Só vês o que está perto de ti. Como na vida real.' },
         { who: 'uli', text: 'E o Vagalume?' },
-        { who: 'sorriso', text: 'Duas vezes. Gasta bem.' },
+        { who: 'sorriso', text: 'Três vezes. Gasta bem.' },
       ],
     },
     {
@@ -208,7 +210,7 @@ const jardim: WorldDef = {
       intro: [
         { who: 'rainha', text: 'QUEM É QUE PISOU O MEU RELVADO?!' },
         { who: 'uli', text: 'Passava por aqui.' },
-        { who: 'rainha', text: 'Pinto as sebes de vermelho e elas crescem à vontade. Rebeldes. Como tu.' },
+        { who: 'rainha', text: 'Mandei plantar sebes por todo o lado. Rebeldes como tu não passam.' },
         { who: 'rainha', text: 'Se chegares à saída, deixo-te ir. Spoiler: não chegas.' },
       ],
       outro: [
@@ -223,7 +225,7 @@ const jardim: WorldDef = {
     lv('O Trono da Rainha', 13, 17, 'cross', 2086, { dyn: 9, shift: 5, loops: 0.09, fog: 4, guards: 4, bonus: true }, [
       { who: 'rainha', text: 'APANHASTE TODAS AS ESTRELAS?! Ninguém me tira as estrelas!' },
       { who: 'uli', text: 'Já tirei.' },
-      { who: 'rainha', text: 'Então chega ao meu trono, rebelde. Quatro Crescidos a guardá-lo. Corta-te a cabeça quem lá chegar... ou quase.' },
+      { who: 'rainha', text: 'Então chega ao meu trono, rebelde. Os meus Espadas a guardá-lo. Corta-te a cabeça quem lá chegar... ou quase.' },
     ], [{ who: 'rainha', text: 'Hmpf! Está bem. O jardim é teu. Mas a roseira fica comigo.' }]),
   ],
 };
@@ -357,7 +359,7 @@ const elfico: WorldDef = {
     ]),
     lv('Clareira dos Pirilampos', 8, 10, 'rect', 602, { dyn: 3, loops: 0.05 }, [{ who: 'dama', text: 'As raízes crescem quando ninguém olha. Anda devagar e olha sempre.' }]),
     lv('Raízes Vivas', 9, 12, 'diamond', 603, { dyn: 3, loops: 0.07, guards: 1, weather: 'mist' }, [{ who: 'dama', text: 'Os meus Espíritos de Raiz mexem-se de três em três passos teus. Cheiram-te a quatro casas.' }]),
-    lv('Ponte de Cipós', 9, 12, 'rect', 8676, { dyn: 4, shift: 7, loops: 0.07, fog: 3.6, guards: 1, weather: 'rain' }, [{ who: 'dama', text: 'Chove. As raízes bebem e crescem mais depressa.' }]),
+    lv('Ponte de Cipós', 9, 12, 'rect', 8676, { dyn: 4, shift: 7, loops: 0.07, fog: 3.6, guards: 1, weather: 'rain' }, [{ who: 'dama', text: 'Chove. As raízes bebem. A tua chama é que não gosta.' }]),
     lv('Cogumelos Gigantes', 10, 13, 'circle', 5650, { dyn: 4, shift: 7, loops: 0.08, guards: 2 }, [{ who: 'dama', text: 'Não toques nos chapéus brilhantes. Têm opinião.' }]),
     lv('Coração da Floresta', 11, 14, 'heart', 6660, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2, weather: 'mist' }, [{ who: 'dama', text: 'Ouves? É o coração da floresta. Bate mais depressa quando estás perto.' }]),
     lv('Trono de Raízes', 12, 15, 'cross', 8679, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [
@@ -466,7 +468,7 @@ const tinta: WorldDef = {
     lv('Maré Baixa', 7, 9, 'rect', 911, {  }, [{ who: 'polvo', text: 'Uma luz no meu oceano! Cuidado, pinga! Estou a meio de uma frase.' }, { who: 'uli', text: 'Quem és tu?' }, { who: 'polvo', text: 'O escritor. Oito braços, nenhum rascunho.' }]),
     lv('Recife de Páginas', 8, 10, 'rect', 912, { dyn: 3, loops: 0.05 }, [{ who: 'polvo', text: 'As paredes sobem e descem com a corrente. É a minha pontuação.' }]),
     lv('Gruta das Medusas', 9, 12, 'diamond', 2931, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'polvo', text: 'As minhas Lulas de Tinta nadam de três em três passos teus e cheiram-te a quatro casas.' }]),
-    lv('Corrente Negra', 9, 12, 'rect', 914, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1 }, [{ who: 'polvo', text: 'A corrente negra apaga tudo. Até as minhas ideias.' }]),
+    lv('Corrente Negra', 9, 12, 'rect', 914, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1 }, [{ who: 'polvo', text: 'A corrente negra é funda e comprida. Mede bem a tua tinta.' }]),
     lv('Biblioteca Afundada', 10, 13, 'rect', 3942, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'polvo', text: 'Estes livros já não se secam. Mas ainda se lêem.' }]),
     lv('Abismo de Tinta', 11, 14, 'cross', 3943, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'polvo', text: 'Lá em baixo, até a escuridão tem medo do escuro.' }]),
     lv('Coração do Polvo', 12, 15, 'rect', 9998, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'polvo', text: 'Estás no meu coração. Bate três vezes por capítulo.' }]),
@@ -524,7 +526,7 @@ const estelar: WorldDef = {
     lv('Mapa de Cassiopeia', 8, 10, 'rect', 942, { dyn: 3, loops: 0.05 }, [{ who: 'cartografa', text: 'As portas seguem as constelações. Quando o céu muda, o caminho muda.' }]),
     lv('Cometa Perdido', 9, 12, 'diamond', 9015, { dyn: 3, loops: 0.07, guards: 1 }, [{ who: 'cartografa', text: 'As Sentinelas Estelares cintilam de três em três passos teus e farejam-te a quatro casas.' }]),
     lv('Eclipse', 9, 12, 'rect', 16079, { dyn: 4, shift: 7, loops: 0.07, fog: 3.4, guards: 1 }, [{ who: 'cartografa', text: 'Um eclipse. Durante o escuro, só se vê quem brilha.' }]),
-    lv('Roda dos Signos', 10, 13, 'rect', 19107, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'cartografa', text: 'Doze signos, doze portas. Nenhum diz a verdade ao primeiro olhar.' }]),
+    lv('Roda dos Signos', 10, 13, 'rect', 19107, { dyn: 5, shift: 6, loops: 0.08, guards: 2 }, [{ who: 'cartografa', text: 'Doze signos, doze histórias. Nenhum diz a verdade ao primeiro olhar.' }]),
     lv('Via Láctea', 11, 14, 'cross', 946, { dyn: 6, shift: 6, loops: 0.08, fog: 4, guards: 2 }, [{ who: 'cartografa', text: 'A estrada de leite do céu. Mas ninguém a pavimentou para pés.' }]),
     lv('Trono das Constelações', 12, 15, 'rect', 15073, { dyn: 6, shift: 6, loops: 0.09, fog: 3.6, guards: 3 }, [{ who: 'cartografa', text: 'O trono onde se sentam as constelações. Hoje está vago. Convém não o aquecer.' }]),
     lv('Big Bang', 14, 17, 'ring', 17092, { dyn: 9, shift: 5, loops: 0.09, fog: 3.2, guards: 3, bonus: true }, [{ who: 'cartografa', text: 'Todas as estrelas. O mapa completo é o princípio de tudo.' }, { who: 'uli', text: 'E a saída?' }, { who: 'cartografa', text: 'É o início de outro mapa.' }], [{ who: 'cartografa', text: "Leva esta estrela de bolso. Desenha o teu próprio céu." }]),
@@ -676,6 +678,36 @@ const tuned: [WorldDef, Record<number, number>][] = [
 ];
 for (const [w, seeds] of tuned) for (const [i, seed] of Object.entries(seeds)) w.levels[Number(i)].seed = seed;
 
+// ───────────────────── Mecânicas dos mundos (Vaga 3) ─────────────────────
+const wave3 = (mech: MechKind, amount: number[], guards: number[]) => amount.map((a, i) => ({ mech, amount: a, guards: guards[i], dyn: 0, level: i }));
+const GUARDS3 = [0, 0, 1, 1, 1, 2, 2, 2];
+
+mechanics(egipto, 'Roda os espelhos para guiar o sol até aos selos: as portas de pedra abrem, e quem fica no raio adormece.',
+  wave3('sun', [1, 1, 1, 2, 2, 2, 2, 2], GUARDS3),
+  { 1: [{ who: 'esfinge', text: 'O sol só abre o que alguém lhe aponta. Roda os meus espelhos, pequena chama.' }, { who: 'uli', text: 'E os teus guardas?' }, { who: 'esfinge', text: 'Quem fica no raio, adormece. Escolhe quando.' }] });
+mechanics(jardim, 'Cogumelos vermelhos encolhem, azuis fazem crescer. Pequeno passas nas fendas; gigante saltas as sebes baixas.',
+  wave3('size', [2, 2, 2, 3, 3, 3, 4, 4], GUARDS3),
+  { 1: [{ who: 'lagarta', text: 'Um lado faz-te... pequeno. O outro... enorme. Qual é qual, adivinha.' }, { who: 'uli', text: 'Vermelho encolhe, azul estica.' }, { who: 'lagarta', text: 'Pequeno, os guardas não te veem. Gigante, são eles que fogem.' }] });
+mechanics(relogio, 'Pisa um botão: seis passos depois o teu eco aparece lá e segura o portão da mesma cor. Chega a tempo.',
+  wave3('echo', [1, 2, 2, 2, 2, 3, 3, 3], GUARDS3),
+  { 1: [{ who: 'relojoeiro', text: 'Aqui o tempo repete-se. Dá corda a um botão e o teu eco há-de lá passar.' }, { who: 'uli', text: 'E eu?' }, { who: 'relojoeiro', text: 'Tu corres para o portão. Seis passos. Nem mais, nem menos.' }] });
+mechanics(elfico, 'A floresta sente a tua chama: as flores de lua só abrem quando ela está fraca; as raízes de sol, quando está forte.',
+  wave3('roots', [1, 1, 2, 2, 2, 2, 3, 3], GUARDS3),
+  { 1: [{ who: 'dama', text: 'A minha floresta lê-te a chama. Há flores que só se abrem a quem quase se apaga.' }, { who: 'uli', text: 'Então espero.' }, { who: 'dama', text: 'Esperar gasta-te. É esse o preço.' }] });
+mechanics(tinta, 'Enche-te de tinta nos tinteiros e pinta o teu caminho sobre a água. O que pintas fica.',
+  wave3('ink', [1, 2, 2, 2, 3, 3, 3, 4], GUARDS3),
+  { 1: [{ who: 'polvo', text: 'Onde há água não há caminho. Há folha em branco!' }, { who: 'uli', text: 'E com que escrevo?' }, { who: 'polvo', text: 'Com a minha tinta, claro. Não a desperdices.' }] });
+mechanics(neon, 'Os interruptores trocam os blocos ciano e magenta. O Glitch deixa-te atravessar uma parede, poucas vezes.',
+  wave3('glitch', [4, 5, 6, 6, 7, 8, 9, 10], GUARDS3),
+  { 1: [{ who: 'glitch', text: 'Interruptor: metade das paredes muda de ideias. Glitch: tu ignoras uma. É ilegal.' }, { who: 'uli', text: 'Quantas vezes?' }, { who: 'glitch', text: 'Conta as cargas. Eu conto-as todas.' }] });
+mechanics(estelar, 'Liga as estrelas pela ordem certa: a constelação completa faz nascer uma ponte de luz.',
+  wave3('stars', [3, 3, 4, 4, 4, 4, 4, 4], [0, 0, 1, 1, 1, 2, 2, 2]),
+  { 1: [{ who: 'cartografa', text: 'Primeiro a um, depois a dois. O céu não aceita atalhos na contagem.' }, { who: 'uli', text: 'E se me enganar?' }, { who: 'cartografa', text: 'Nada acontece. É essa a crueldade.' }] });
+mechanics(animal, 'Monta os animais: o elefante parte rochas, o macaco passa pelos ramos, a gazela corre até ao próximo cruzamento.',
+  wave3('mounts', [1, 2, 2, 3, 3, 3, 4, 4], GUARDS3),
+  { 1: [{ who: 'leao', text: 'No meu reino ninguém vai longe sozinho. Sobe. Eles não mordem. Quase.' }] });
+for (const w of [egipto, jardim, relogio, elfico, tinta, neon, estelar, animal]) w.levels.forEach((l) => { l.rev = 3; });
+
 // ───────────────────────── Chama Viva ─────────────────────────
 // A luz é igual para todos (mais folgada nos primeiros níveis). O sopro tem um elemento por mundo; o Glaciar fica
 // com a sua Brasa (abrir paredes no gelo podia prender o jogador) e a Mandala com os anéis, que rodam.
@@ -690,6 +722,19 @@ for (const w of WORLDS) w.levels.forEach((l, i) => {
   const e = SOPRO[w.id];
   if (e) { l.element = e; l.barriers = [2, 3, 3, 3, 3, 4, 4, 4][i] ?? 3; }
 });
+
+// Candidatos escolhidos com tools/gerar-vaga3.ts (se mudar o gerador, as regras, os tamanhos ou as sementes, voltar a correr).
+const PICKS: [WorldDef, number[]][] = [
+  [egipto, [93, 56, 39, 65, 63, 55, 82, 94]],
+  [jardim, [94, 163, 118, 101, 73, 74, 79, 122]],
+  [relogio, [18, 76, 24, 34, 13, 51, 75, 51]],
+  [elfico, [6, 2, 51, 36, 14, 2, 10, 30]],
+  [tinta, [23, 14, 18, 18, 37, 25, 10, 33]],
+  [neon, [22, 65, 70, 38, 64, 325, 90, 140]],
+  [estelar, [36, 33, 49, 5, 66, 11, 2, 59]],
+  [animal, [31, 20, 6, 16, 31, 67, 92, 37]],
+];
+for (const [w, picks] of PICKS) picks.forEach((k, i) => { w.levels[i].pick = k; });
 
 export const getWorld = (id: string) => WORLDS.find((w) => w.id === id)!;
 

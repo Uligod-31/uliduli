@@ -5,6 +5,8 @@ import { Maze, DIRS, OPP, canPass, neighbor, pathTo, distFrom } from '../core/ma
 import { mulberry32, shuffle } from '../core/rng';
 import { levelMaze } from '../art/thumb';
 import { travel, solve, rotCell, setRot, ringTarget, hazardAt, hazardIn, cloudBit, BRASAS } from '../core/mech';
+import { RULES, isRule, startState, gateAt, indexOf, mountOf, smashed, progressOf, starCount, sealOpen, inkOf, painted, chargesOf, phaseOf, echoTimer, moonAt, sunAt, itemAt, ECHO_K, ECHO_W, INK_CAP } from '../core/rules';
+import { spawnGuards, guardDist, guardMove, collision, sunlit, ZAP_STUN } from '../core/guards';
 import { ELEMENTS, PUDDLE, REVIVE, LURE_R, LURE_TICKS, GAS_R, LOW, barrierNear, openBarrier } from '../core/viva';
 import { LevelDef, WorldDef, getWorld, isUnlocked, GUARD_HUNT, GUARD_STUN, GUARD_STUN_R, HINTS, guardEvery } from '../worlds';
 import { sfx } from '../core/audio';
@@ -61,6 +63,11 @@ export class GameScene extends Phaser.Scene {
   private blowRing?: Phaser.GameObjects.Graphics;
   private blowTip?: Phaser.GameObjects.Text;
 
+  // Vaga 3
+  private w = 0;                  // estado da regra (ver core/rules.ts)
+  private shownW = 0;             // o que o cenário já mostra
+  private history: number[] = []; // onde estavas em cada passo (o eco repete-o)
+
   private pips!: Phaser.GameObjects.Graphics;
   private guardPips!: Phaser.GameObjects.Graphics;
   private movesTxt!: Phaser.GameObjects.Text;
@@ -81,6 +88,7 @@ export class GameScene extends Phaser.Scene {
     this.relit = false; this.soak = 0; this.puddles = new Set(); this.lure = 0; this.facing = 2; this.warned = false; this.bumpTip = false;
     this.blowBtn = undefined; this.blowRing = undefined; this.blowTip = undefined; this.lightShown = 1;
     this.pad.id = -1; this.pad.dir = -1; this.pad.kx = 0; this.pad.ky = 0; this.padArrows = [];
+    this.w = this.shownW = 0; this.history = [];
   }
 
   create() {
@@ -93,26 +101,17 @@ export class GameScene extends Phaser.Scene {
     this.rosas = new Set(m.rosas);
 
     // Espadas: nascem longe do início, nunca em cima de chamas ou da saída
-    this.guards = []; this.guardPrev = [];
-    if (def.guards) {
-      const rng = mulberry32(def.seed * 17 + 3);
-      const dist = distFrom(m, m.start, m.mech === 'page' ? 0 : -1);
-      const far = Array.from({ length: m.cols * m.rows }, (_, i) => i)
-        .filter((i) => !m.solid[i] && i !== m.exit && i !== m.start && !m.rosas.includes(i) && dist[i] >= Math.max(7, m.shortest * 0.35));
-      shuffle(far, rng);
-      for (const c of far) {
-        if (this.guards.length >= def.guards) break;
-        if (this.guards.every((g) => Math.abs((g % m.cols) - (c % m.cols)) + Math.abs(((g / m.cols) | 0) - ((c / m.cols) | 0)) >= 5)) this.guards.push(c);
-      }
-      this.guardPrev = this.guards.map(() => -1);
-    }
+    this.guards = spawnGuards(m, def.guards ?? 0, def.seed);
+    this.guardPrev = this.guards.map(() => -1);
     this.stun = this.guards.map(() => 0);
     stage.load(m, this.wd, def.seed, { intro: !this.skipIntro });
     stage.setGuards(this.guards, this.wd.guardStyle ?? 0);
     stage.setWeather(def.weather ?? this.wd.weather ?? 'none');
     stage.start('game');
-    // nos anéis é preciso ver a mandala toda: começa na vista geral (◎ volta a seguir a personagem)
-    if (m.mech === 'rings' || m.mech === 'planet' || m.mech === 'holes') { this.overview = true; stage.setView('overview'); } // é preciso ver as ligações
+    this.history = [m.start];
+    if (isRule(m.mech)) { this.w = this.shownW = startState(m); stage.setRule(this.ruleW, this.idx, true); if (m.mech === 'glitch') { this.phase = phaseOf(this.w); stage.setPhase(this.phase, false); } }
+    // quando é preciso ver as ligações (anéis, arcos, redemoinhos, raios, constelações), começa na vista geral
+    if (['rings', 'planet', 'holes', 'sun', 'stars'].includes(m.mech ?? '')) { this.overview = true; stage.setView('overview'); }
     if (def.fog) stage.setDark(def.fog * 1.0);
     this.events.once('shutdown', () => stage.stop());
 
@@ -143,6 +142,14 @@ export class GameScene extends Phaser.Scene {
         beat: ['A BATIDA', 'As colunas rebentam à vez, por cores: rosa, azul e amarelo, dois passos cada. A que pisca é a seguinte.\n\nO botão Esperar deixa passar um passo.'],
         page: ['VIRAR A PÁGINA', 'O botão Virar troca de página: umas passagens abrem-se e outras fecham-se. Conta como um passo.\n\nAs estantes fúcsia são as que se movem; a marca azul no chão mostra onde podem voltar.'],
         clouds: ['NUVENS', 'Os tufos desfazem-se quando sais de cima deles, e fica um buraco.\n\nPensa no caminho de volta antes de ires às chamas.'],
+        sun: ['ESPELHOS DO SOL', 'Fica num espelho e carrega em Girar. Leva o raio ao selo da mesma cor para abrir a porta de pedra.\n\nOs guardas apanhados pelo raio adormecem.'],
+        size: ['COGUMELOS', 'Vermelho encolhe um tamanho, azul faz crescer. Pequeno passas nas fendas e os guardas não te farejam.\n\nGigante saltas as sebes baixas e derrubas os guardas.'],
+        echo: ['O TEU ECO', 'Pisa um botão: 6 passos depois o teu eco chega lá e abre o portão da mesma cor durante 4 passos.\n\nPor dentro o portão abre sempre. Esperar deixa passar um passo.'],
+        roots: ['A FLORESTA SENTE', 'As flores de lua só abrem com a chama fraca; as raízes de sol, com a chama forte. As marcas na barra de luz mostram os limites.\n\nEsperar gasta 1 de luz.'],
+        ink: ['TINTA', 'Os tinteiros enchem-te com 4 gotas. Cada casa de água que pisas gasta uma e fica pintada para sempre.\n\nOs guardas também passam pelo que pintares.'],
+        glitch: ['GLITCH', 'Os interruptores trocam os blocos ciano e magenta.\n\nBotão Glitch e depois uma direção: atravessas essa parede. As cargas não voltam.'],
+        stars: ['CONSTELAÇÕES', 'Toca nas estrelas pela ordem dos números. Constelação completa, nasce uma ponte de luz da mesma cor.\n\nPisar fora de ordem não estraga nada.'],
+        mounts: ['MONTARIAS', 'Pisa um animal para o montares. O elefante parte rochas, o macaco passa pelos ramos, a gazela corre até ao próximo cruzamento.\n\nTrocas pisando outro.'],
       } as Record<string, string[]>)[mech];
       cards.push(['mech_' + mech, info[0], info[1]]);
     }
@@ -194,7 +201,7 @@ export class GameScene extends Phaser.Scene {
     this.movesTxt = this.add.text(W - 50, 176, '', { fontFamily: FONT, fontSize: '25px', color: '#fff', fontStyle: 'bold' }).setOrigin(1, 0.5).setDepth(30);
     this.pips = this.add.graphics().setDepth(30);
     this.guardPips = this.add.graphics().setDepth(30);
-    if (this.m.dyn.length && this.m.mech !== 'page') label(this, W / 2, 168, 'sebes mudam', 17, UI.textDim as string).setDepth(30);
+    if (this.autoShift) label(this, W / 2, 168, 'sebes mudam', 17, UI.textDim as string).setDepth(30);
 
     // rodapé: três botões numa linha; o joystick fica por cima deles
     this.hintBtn = button(this, 175, H - 70, 300, 88, 'Vagalume ✦' + HINTS, () => this.useHint(), 'primary', 28).setDepth(31);
@@ -220,6 +227,13 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0xffe9a0, 0.95); g.fillCircle(end, y + h / 2, 7);
     }
     g.lineStyle(2, low ? 0xffb040 : UI.line, 1); g.strokeRoundedRect(x, y, w, h, 13);
+    if (this.m.mech === 'roots') {
+      // até à marca violeta abrem as flores de lua; a partir da dourada, as raízes de sol
+      for (const [v, color] of [[moonAt(this.m), 0x9f8cff], [sunAt(this.m), 0xffb63a]] as const) {
+        const at = x + 3 + (w - 6) * Math.min(1, v / this.lightMax);
+        g.fillStyle(0x05060b, 1); g.fillRect(at - 4, y - 5, 8, h + 10); g.fillStyle(color, 1); g.fillRect(at - 2, y - 4, 4, h + 8);
+      }
+    }
   }
 
   /** Botão «Soprar»: só aparece quando o Uli está encostado a uma barreira. */
@@ -276,13 +290,83 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** Estado da regra; na Floresta Élfica é a própria luz. */
+  private get ruleW() { return this.m.mech === 'roots' ? this.light : this.w; }
+  /** Paredes que mudam sozinhas (na Biblioteca e no Neon és tu que as trocas). */
+  private get autoShift() { return this.m.dyn.length > 0 && this.m.mech !== 'page' && this.m.mech !== 'glitch'; }
+  private canGo(from: number, d: number) {
+    const m = this.m;
+    return isRule(m.mech) ? !!RULES[m.mech].step(m, from, d, this.ruleW) : canPass(m, from, d, this.phase);
+  }
+  /** Distâncias como os guardas as sentem. */
+  private guardView(from: number) { return isRule(this.m.mech) ? guardDist(this.m, from, { phase: this.phase, w: this.ruleW, gone: this.gone }) : distFrom(this.m, from, this.phase); }
+
+  /** Mostra o que a regra mudou: cenário, tamanho, montaria, paredes e os sons de cada coisa. */
+  private applyRule() {
+    const m = this.m;
+    if (!isRule(m.mech)) return;
+    const w = this.ruleW, was = this.shownW;
+    this.shownW = w;
+    stage.setRule(w, this.idx);
+    if (m.mech === 'size') {
+      stage.setSize([0.58, 1, 1.45][w], [0.84, 1, 1.18][w]);
+      if (w !== was) { if (w > was) sfx.grow(); else sfx.shrink(); navigator.vibrate?.(30); }
+    } else if (m.mech === 'mounts') {
+      stage.setMount(([undefined, 'elephant', 'monkey', 'gazelle'] as const)[mountOf(w)]);
+      if (mountOf(w) !== mountOf(was)) sfx.mount();
+      if (m.gates!.some((g) => g.kind === 'rock' && smashed(w, g.id) && !smashed(was, g.id))) { sfx.smash(); stage.shake(0.75); navigator.vibrate?.([40, 20, 70]); }
+    } else if (m.mech === 'sun') {
+      if (m.gates!.some((g) => sealOpen(w, g.id) && !sealOpen(was, g.id))) { sfx.seal(); stage.shake(0.55); this.say('O selo abriu a porta!', '#ffd45a'); navigator.vibrate?.([30, 30, 80]); }
+    } else if (m.mech === 'stars') {
+      for (const c of new Set(m.gates!.map((g) => g.id))) {
+        const p = progressOf(w, c);
+        if (p === progressOf(was, c)) continue;
+        sfx.chime(p - 1);
+        if (p >= starCount(m, c)) { sfx.seal(); stage.shake(0.4); this.say('Nasceu uma ponte!', c ? '#7ad8ff' : '#ffd45a'); }
+      }
+    } else if (m.mech === 'ink') {
+      if (m.water!.some((_, k) => painted(w, k) && !painted(was, k))) sfx.splash();
+      if (inkOf(w) > inkOf(was)) sfx.refill();
+    } else if (m.mech === 'glitch' && phaseOf(w) !== phaseOf(was)) {
+      this.phase = phaseOf(w); stage.setPhase(this.phase, true); stage.glitch(0.7); sfx.swap(); stage.shake(0.3); navigator.vibrate?.(26);
+    }
+  }
+
+  /** O eco: caminha pelo teu passado até ao botão que deste corda e segura-o. */
+  private showEcho() {
+    const m = this.m;
+    if (m.mech !== 'echo') return;
+    const timers = m.gates!.map((g) => ({ id: g.id, c: echoTimer(this.w, g.id) }));
+    const holding = timers.filter((t) => t.c >= 1 && t.c <= ECHO_W).sort((a, b) => b.c - a.c)[0];
+    const coming = timers.some((t) => t.c > ECHO_W);
+    const back = this.history.length - 1 - ECHO_K;
+    stage.setEcho(holding ? m.items!.find((i) => i.kind === 'plate' && i.id === holding.id)!.c : coming && back >= 0 ? this.history[back] : undefined);
+    if (timers.some((t) => t.c === ECHO_W)) { sfx.chime(2); navigator.vibrate?.(22); } else if (coming) sfx.tick();
+  }
+
+  /** Porque é que não se passa: uma pista curta, em vez de só bater na «parede». */
+  private whyBlocked(dir: number): [string, string] | null {
+    const m = this.m;
+    if (!isRule(m.mech)) return null;
+    const g = m.gates ? gateAt(m, this.idx, dir) : undefined;
+    if (g) return ({
+      crack: ['Só pequeno cabes na fenda', '#ff8a90'], low: ['Só gigante saltas esta sebe', '#8ab8ff'], rock: ['O elefante parte isto', '#b9c8ff'], branch: ['O macaco passa aqui', '#ffb870'],
+      moon: [`Só com a luz em ${moonAt(m)} ou menos`, '#c3b4ff'], sunroot: [`Só com a luz em ${sunAt(m)} ou mais`, '#ffc86a'], clock: ['O eco tem de segurar o botão', '#a8ccff'], seal: ['Leva o sol ao selo desta cor', '#ffd45a'], bridge: ['Completa a constelação', '#cfeaff'],
+    } as Record<string, [string, string]>)[g.kind];
+    if (m.mech === 'ink') {
+      const n = neighbor(m, this.idx, dir), k = m.pass[this.idx] & DIRS[dir].b ? indexOf(m).water.get(n) : undefined;
+      if (k !== undefined) return ['Sem tinta! Vai a um tinteiro', '#9fe6ff'];
+    }
+    return null;
+  }
+
   /** Linha de estado da mecânica e, no gelo e nos anéis, o botão de ação (à direita do joystick). */
   private buildMech() {
     this.mechPips = this.add.graphics().setDepth(30);
     const mech = this.m.mech;
     if (!mech) return;
     this.mechTxt = this.add.text(W / 2, 232, '', { fontFamily: FONT, fontSize: '22px', color: '#ffffff', fontStyle: 'bold', stroke: '#05060b', strokeThickness: 5 }).setOrigin(0.5).setDepth(30);
-    const ACT: Record<string, [string, string, number]> = { ice: ['🔥' + BRASAS, 'Brasa', 34], rings: ['⟳', 'Rodar', 50], page: ['⇄', 'Virar', 50], tide: ['⏳', 'Esperar', 40], beat: ['⏳', 'Esperar', 40] };
+    const ACT: Record<string, [string, string, number]> = { ice: ['🔥' + BRASAS, 'Brasa', 34], rings: ['⟳', 'Rodar', 50], page: ['⇄', 'Virar', 50], tide: ['⏳', 'Esperar', 40], beat: ['⏳', 'Esperar', 40], sun: ['↻', 'Girar', 52], echo: ['⏳', 'Esperar', 40], roots: ['⏳', 'Esperar', 40], glitch: ['⚡', 'Glitch', 36] };
     const act = ACT[mech];
     if (!act) return;
     this.actionBtn = roundBtn(this, W - 88, H - 345, 66, act[0], act[1], () => this.action(), act[2]).setDepth(31);
@@ -295,7 +379,21 @@ export class GameScene extends Phaser.Scene {
     if (this.blocked || this.done) return;
     const mech = this.m.mech;
     if (mech === 'rings') { this.rotate(); return; }
-    if (mech === 'page' || mech === 'tide' || mech === 'beat') {
+    if (mech === 'sun') {
+      if (this.moving) return;
+      const turn = RULES.sun.acts(this.m, this.idx, this.w)[0];
+      if (!turn) { sfx.bump(); this.say('Vai para cima de um espelho', '#ffd45a'); return; }
+      this.run = false; this.queued = null; this.flameStop = true;
+      this.w = turn.w; sfx.mirror(); navigator.vibrate?.(20);
+      this.applyRule();
+      this.endTurn();
+      return;
+    }
+    if (mech === 'glitch') {
+      if (!chargesOf(this.w)) { sfx.bump(); this.say('Sem cargas de Glitch', '#ff9ae6'); return; }
+      this.armed = !this.armed; sfx.hint(); if (this.armed) stage.glitch(0.35); this.updateHud(); return;
+    }
+    if (mech === 'page' || mech === 'tide' || mech === 'beat' || mech === 'echo' || mech === 'roots') {
       if (this.moving) return;
       this.run = false; this.queued = null; this.flameStop = true;
       if (mech === 'page') { this.phase ^= 1; stage.setPhase(this.phase, true); sfx.shift(); stage.shake(0.3); navigator.vibrate?.(26); }
@@ -415,7 +513,7 @@ export class GameScene extends Phaser.Scene {
     this.rosaTxt.setText(`🔥 ${this.collected}/${this.m.rosas.length}` + (this.guards.length ? `   ☠ ${this.guards.length}` : ''));
     this.movesTxt.setText(`Passos ${this.moves}  (par ${this.m.par})`);
     this.pips.clear();
-    if (this.m.dyn.length && this.m.mech !== 'page') {
+    if (this.autoShift) {
       const n = this.def.shift, done = this.moves % n;
       const gap = 22, x0 = W / 2 - ((n - 1) * gap) / 2;
       for (let i = 0; i < n; i++) {
@@ -467,6 +565,35 @@ export class GameScene extends Phaser.Scene {
       const NAMES = ['rosa', 'azul', 'amarelo'], COL = ['#ff6ac8', '#5ab4ff', '#ffe04a'];
       const on = Math.floor(this.moves % 6 / 2), nxt = (on + 1) % 3, k = 2 - (this.moves % 2);
       this.mechTxt.setText(`♫ Rebenta: ${NAMES[on]}  ·  em ${k}: ${NAMES[nxt]}`).setColor(COL[on]);
+    } else if (m.mech === 'size') {
+      const [text, color] = [['Pequeno: passas fendas, não te farejam', '#ff9aa0'], ['Cogumelos: vermelho encolhe, azul estica', '#e6ecff'], ['Gigante: saltas sebes, derrubas guardas', '#8ab8ff']][this.w];
+      this.mechTxt.setText(text).setColor(color);
+    } else if (m.mech === 'mounts') {
+      const [text, color] = [['A pé: sobe para um animal', '#e6ecff'], ['Elefante: parte as rochas', '#b9c8ff'], ['Macaco: passa pelos ramos', '#ffb870'], ['Gazela: corre até ao cruzamento', '#ffe27a']][mountOf(this.w)];
+      this.mechTxt.setText(text).setColor(color);
+    } else if (m.mech === 'sun') {
+      const open = m.gates!.filter((x) => sealOpen(this.w, x.id)).length, on = itemAt(m, this.idx)?.kind === 'mirror';
+      this.mechTxt.setText(`☀ Selos acesos ${open}/${m.gates!.length}${on ? '  ·  carrega em Girar' : ''}`).setColor(on ? '#ffe28a' : '#ffd9a0');
+      this.actionBtn!.setAlpha(on ? 1 : 0.4);
+      if (on) { g.lineStyle(6, 0xffd45a, 0.95); g.strokeCircle(W - 88, H - 345, 84); }
+    } else if (m.mech === 'echo') {
+      const NAMES = ['azul', 'fúcsia', 'dourado'], COL = ['#8ab4ff', '#ff8ae6', '#ffd47a'];
+      const busy = m.gates!.map((x) => ({ id: x.id, c: echoTimer(this.w, x.id) })).filter((x) => x.c > 0).sort((a, b) => a.c - b.c);
+      this.mechTxt.setText(busy.length ? busy.map((x) => (x.c > ECHO_W ? `${NAMES[x.id]}: abre em ${x.c - ECHO_W}` : `${NAMES[x.id]}: ABERTO ${x.c}`)).join('  ·  ') : '⏱ Pisa um botão para chamar o teu eco').setColor(busy.length ? COL[busy[0].id] : '#ffe6c0');
+    } else if (m.mech === 'roots') {
+      const lo = this.light <= moonAt(m), hi = this.light >= sunAt(m);
+      this.mechTxt.setText(lo ? '☾ Chama fraca: as flores de lua abrem' : hi ? '☀ Chama forte: as raízes de sol abrem' : `☾ até ${moonAt(m)}  ·  ☀ desde ${sunAt(m)}`).setColor(lo ? '#c3b4ff' : hi ? '#ffc86a' : '#dfffe6');
+    } else if (m.mech === 'ink') {
+      const n = inkOf(this.w);
+      this.mechTxt.setText(`Tinta ${'●'.repeat(n)}${'○'.repeat(INK_CAP - n)}${n ? '' : '  ·  enche num tinteiro'}`).setColor(n ? '#9fe6ff' : '#ffd45a');
+    } else if (m.mech === 'glitch') {
+      const n = chargesOf(this.w);
+      this.actionBtn!.txt.setText('⚡' + n); this.actionBtn!.setAlpha(n ? 1 : 0.45);
+      this.mechTxt.setText(this.armed ? 'Glitch pronto: vai contra uma parede' : `Blocos ${phaseOf(this.w) ? 'magenta' : 'ciano'} abertos  ·  ⚡${n}`).setColor(this.armed ? '#ff8ae6' : phaseOf(this.w) ? '#ff8ae6' : '#7ae8ff');
+      if (this.armed) { g.lineStyle(6, 0xff4fd8, 0.95); g.strokeCircle(W - 88, H - 345, 84); }
+    } else if (m.mech === 'stars') {
+      const sets = [...new Set(m.gates!.map((x) => x.id))].sort();
+      this.mechTxt.setText(sets.map((c) => { const p = progressOf(this.w, c), n = starCount(m, c), name = c ? 'azul' : 'dourada'; return p >= n ? `★ ${name}: ponte feita` : `★ ${name}: próxima ${p + 1} de ${n}`; }).join('  ·  ')).setColor('#fff0b8');
     } else if (m.mech === 'lava') {
       const L = m.lava!, wait = L.delay - this.moves;
       const left = L.at[this.idx] - this.moves;
@@ -557,6 +684,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
   private recFlash = 0;
+  private whyAt = -9999;
 
   private drawCompass() {
     const g = this.compass, cx = 84, cy = H - 350, r = 38, yaw = stage.camYaw, off = stage.camOffset;
@@ -582,7 +710,7 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(k.SPACE)) { if (this.actionBtn) this.action(); else this.blow(); return; }
     let dir = -1;
     // joystick segurado: continua a andar (sem repetir o "toc" na parede). No gelo, cada deslize pede um toque.
-    if (this.m.mech !== 'ice' && this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 150 && canPass(this.m, this.idx, this.mapDir(this.pad.dir), this.phase)) this.queued = { dir: this.mapDir(this.pad.dir), run: false };
+    if (this.m.mech !== 'ice' && !this.armed && this.pad.dir >= 0 && !this.queued && this.time.now - this.padSince > 150 && this.canGo(this.idx, this.mapDir(this.pad.dir))) this.queued = { dir: this.mapDir(this.pad.dir), run: false };
     if (k.UP.isDown || k.W.isDown) dir = 0;
     else if (k.RIGHT.isDown || k.D.isDown) dir = 1;
     else if (k.DOWN.isDown || k.S.isDown) dir = 2;
@@ -602,13 +730,18 @@ export class GameScene extends Phaser.Scene {
     const m = this.m;
     this.facing = dir;
     stage.player.dir = Math.atan2(DIRS[dir].dx, DIRS[dir].dy);
-    let path = travel(m, this.idx, dir, (i, d) => canPass(m, i, d, this.phase));
+    const rule = isRule(m.mech) ? RULES[m.mech] : undefined;
+    // com o Glitch armado atravessa-se a parede; se afinal houver passagem, anda-se sem gastar carga
+    const ruled = rule ? (this.armed && m.mech === 'glitch' ? rule.step(m, this.idx, dir, this.ruleW, true) : null) ?? rule.step(m, this.idx, dir, this.ruleW) : null;
+    let path = rule ? ruled?.path ?? [] : travel(m, this.idx, dir, (i, d) => canPass(m, i, d, this.phase));
     const wet = path.length > 0 && path.some((c) => hazardAt(m, c, this.moves + 1));
     const lost = path.length > 0 && path.some((c) => { const b = cloudBit(m, c); return b >= 0 && (this.gone & (1 << b)) !== 0; });
     if (wet) this.say(m.mech === 'tide' ? 'A água está lá!' : 'Fora de tempo!', '#ffb0a0');
     if (!path.length || wet || lost) {
       this.refreshBlow();
       if (!path.length && !this.bumpTip && barrierNear(m, this.idx, dir)?.side === dir) { this.bumpTip = true; this.say('Sopra para abrir!', '#ffe28a'); }
+      const why = path.length ? null : this.whyBlocked(dir);
+      if (why && this.time.now - this.whyAt > 1500) { this.whyAt = this.time.now; this.say(why[0], why[1]); }
       sfx.bump(); this.run = false; navigator.vibrate?.(8);
       const a = { t: 0 };
       this.tweens.add({ targets: a, t: 1, duration: 120, onUpdate: () => { stage.player.h = Math.sin(a.t * Math.PI) * 0.25; } });
@@ -619,6 +752,14 @@ export class GameScene extends Phaser.Scene {
     this.moving = true; this.lastDir = dir; this.flameStop = false;
     this.refreshBlow();
     sfx.step();
+    let arrive = false; // a regra mostra-se à chegada (cogumelos, montarias, estrelas) ou já (o que se parte, pinta ou atravessa)
+    if (ruled && m.mech !== 'roots') {
+      const changed = ruled.w !== this.w;
+      if (ruled.glitch) { this.armed = false; stage.glitch(1); sfx.swap(); stage.shake(0.3); navigator.vibrate?.([20, 20, 40]); }
+      const now = m.mech === 'ink' || (m.mech === 'mounts' && ((ruled.w >> 2) !== (this.w >> 2)));
+      this.w = ruled.w;
+      if (changed) { if (now) this.applyRule(); else arrive = true; }
+    }
     if (m.mech === 'ice') { stage.setTargets([]); if (path.length > 1) { stage.sliding = 1; sfx.shift(); } }
     const pts = [this.idx, ...path], len = path.length, slide = len > 1;
     const xy = (c: number) => ({ x: (c % m.cols) + 0.5, y: ((c / m.cols) | 0) + 0.5 });
@@ -635,7 +776,7 @@ export class GameScene extends Phaser.Scene {
       }
     };
     const tw = this.tweens.add({
-      targets: a, t: len, duration: m.mech === 'ice' && slide ? 70 * len + 90 : slide ? 150 * len : path.some((c) => !!m.warp) && Math.abs((pts[0] % m.cols) - (pts[1] % m.cols)) + Math.abs(((pts[0] / m.cols) | 0) - ((pts[1] / m.cols) | 0)) > 1 ? 240 : 112,
+      targets: a, t: len, duration: m.mech === 'ice' && slide ? 70 * len + 90 : m.mech === 'mounts' && slide ? 62 * len + 90 : slide ? 150 * len : path.some((c) => !!m.warp) && Math.abs((pts[0] % m.cols) - (pts[1] % m.cols)) + Math.abs(((pts[0] / m.cols) | 0) - ((pts[1] / m.cols) | 0)) > 1 ? 240 : 112,
       ease: slide && m.mech === 'ice' ? 'Sine.Out' : slide ? 'Linear' : (this.pad.dir >= 0 || this.queued || this.run) ? 'Linear' : 'Sine.InOut',
       onUpdate: () => {
         if (this.done) return;
@@ -666,6 +807,7 @@ export class GameScene extends Phaser.Scene {
           if (!m.grip![this.idx]) { m.grip![this.idx] = 1; this.brasas--; stage.melt(this.idx); sfx.shift(); navigator.vibrate?.(24); }
         }
         if (slide) { if (m.mech === 'ice') stage.shake(0.14); this.run = false; }
+        if (arrive) { this.flameStop = true; this.applyRule(); }
         this.endTurn();
       },
     });
@@ -697,7 +839,16 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.puddles.has(ni)) { this.soak += PUDDLE; this.say('A água apaga-te!', '#8fdcff'); sfx.bump(); }
     if (ni === m.exit) { this.moves++; this.moving = false; this.updateHud(); this.finish(); return; }
-    if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.moves++; this.moving = false; this.caught(); }
+    if (this.meet()) { this.moves++; this.moving = false; this.caught(); }
+  }
+
+  /** O Uli e um guarda na mesma casa: o gigante derruba-o; de outro modo, apanhado. */
+  private meet(): boolean {
+    const i = this.guards.findIndex((g, k) => g === this.idx && !this.stun[k]);
+    if (i < 0) return false;
+    if (collision(this.m, this.ruleW) === 'catch') return true;
+    this.stun[i] = GUARD_STUN; stage.setGuardStun(i, true); stage.zap(i); sfx.smash(); stage.shake(0.5);
+    return false;
   }
 
   /** Fim de um passo: o mundo reage (sebes, guardas, lava). */
@@ -705,14 +856,23 @@ export class GameScene extends Phaser.Scene {
     const m = this.m, ni = this.idx;
     this.moving = false; this.moves++;
     let stop = this.flameStop;
-    if (m.dyn.length && m.mech !== 'page' && this.moves % this.def.shift === 0) {
+    this.history.push(ni);
+    if (isRule(m.mech) && m.mech !== 'roots') {
+      this.w = RULES[m.mech].end(m, ni, this.w, this.relit)!; // relógios do eco
+      if (m.mech === 'echo') { this.applyRule(); this.showEcho(); }
+    }
+    if (this.autoShift && this.moves % this.def.shift === 0) {
       this.phase ^= 1; stage.setPhase(this.phase, true); stop = true;
       sfx.shift(); stage.shake(0.35); navigator.vibrate?.(26);
     }
     if (this.guards.length && this.moves % guardEvery(this.def) === 0) { this.tickGuards(); if (this.done) return; }
     if (this.stun.some((v) => v > 0)) {
       this.stun = this.stun.map((v, i) => { const n = Math.max(0, v - 1); if (v > 0 && n === 0) stage.setGuardStun(i, false); return n; });
-      if (this.guards.some((g, i) => g === ni && !this.stun[i])) { this.caught(); return; }
+      if (this.meet()) { this.caught(); return; }
+    }
+    if (m.mech === 'sun' && this.guards.length) { // quem fica no raio adormece
+      const lit = sunlit(m, this.w);
+      this.guards.forEach((g, i) => { if (lit.has(g)) { if (!this.stun[i]) { stage.zap(i); stage.setGuardStun(i, true); sfx.chime(4); } this.stun[i] = Math.max(this.stun[i], ZAP_STUN); } });
     }
     if (m.haz) {
       stage.setHazard(this.moves);
@@ -740,25 +900,26 @@ export class GameScene extends Phaser.Scene {
       if (!this.warned) { this.warned = true; stop = true; this.say('A tua chama está a morrer!', '#ffb040'); }
       if (this.light % 2 === 0) sfx.heartbeat();
     } else this.warned = false;
+    this.applyRule(); // o cenário acompanha sempre (o que está debaixo dos pés, a luz, os relógios)
     this.updateHud();
     if (this.blocked) return;
 
     if (this.queued) {
       const q = this.queued; this.queued = null;
-      if (canPass(m, ni, q.dir, this.phase)) { this.run = q.run; this.step(q.dir); return; }
+      if (this.armed || this.canGo(ni, q.dir)) { this.run = q.run; this.step(q.dir); return; }
     }
     if (m.mech === 'ice') { this.run = false; return; }
     // joystick segurado: fluxo contínuo, sem pausas, e dobra sozinho nas esquinas de um corredor
     if (!stop && this.pad.dir >= 0 && this.time.now - this.padSince > 150) {
       const held = this.mapDir(this.pad.dir);
-      if (canPass(m, ni, held, this.phase)) { this.step(held); return; }
+      if (this.canGo(ni, held)) { this.step(held); return; }
       const opts: number[] = [];
-      for (let d = 0; d < 4; d++) if (d !== OPP[this.lastDir] && canPass(m, ni, d, this.phase)) opts.push(d);
+      for (let d = 0; d < 4; d++) if (d !== OPP[this.lastDir] && this.canGo(ni, d)) opts.push(d);
       if (opts.length === 1) { this.step(opts[0]); return; }
     }
     if (this.run && !stop) {
       const opts: number[] = [];
-      for (let d = 0; d < 4; d++) if (d !== OPP[this.lastDir] && canPass(m, ni, d, this.phase)) opts.push(d);
+      for (let d = 0; d < 4; d++) if (d !== OPP[this.lastDir] && this.canGo(ni, d)) opts.push(d);
       if (opts.length === 1) { this.step(opts[0]); return; }
     }
     this.run = false;
@@ -767,29 +928,18 @@ export class GameScene extends Phaser.Scene {
   /** Os Espadas movem-se de gp em gp passos: caçam se estiveres a ≤ 4 casas, senão patrulham. Ofuscados ficam parados. */
   private tickGuards() {
     const m = this.m;
-    const dist = distFrom(m, this.idx, this.phase);
+    const ctx = { phase: this.phase, w: this.ruleW, gone: this.gone, lure: this.lure };
+    const dist = this.guardView(this.idx);
     this.guards.forEach((g, i) => {
       if (this.stun[i] > 0) return;
-      const opts: number[] = [];
-      for (let d = 0; d < 4; d++) if (canPass(m, g, d, this.phase)) { const n = neighbor(m, g, d), cb = cloudBit(m, n); if (cb < 0 || !(this.gone & (1 << cb))) opts.push(n); }
-      if (!opts.length) return;
-      let pick: number;
-      const hunting = dist[g] >= 0 && (dist[g] <= GUARD_HUNT || (this.lure > 0 && dist[g] <= LURE_R));
-      if (hunting) {
-        const best = Math.min(...opts.map((o) => (dist[o] < 0 ? 99 : dist[o])));
-        const cands = opts.filter((o) => (dist[o] < 0 ? 99 : dist[o]) === best && !this.guards.some((h, j) => j !== i && h === o));
-        pick = (cands.length ? cands : opts.filter((o) => (dist[o] < 0 ? 99 : dist[o]) === best))[0];
-      } else {
-        const fwd = opts.filter((o) => o !== this.guardPrev[i]);
-        const pool = fwd.length ? fwd : opts;
-        pick = pool[Math.floor(Math.random() * pool.length)];
-      }
+      const pick = guardMove(m, g, this.guardPrev[i], this.guards.filter((_, j) => j !== i), dist, ctx, Math.random);
+      if (pick === null) return;
       this.guardPrev[i] = g;
       this.guards[i] = pick;
       stage.moveGuard(i, pick);
     });
     if (this.lure > 0) this.lure--;
-    if (this.guards.some((g, i) => g === this.idx && !this.stun[i])) { this.blocked = true; this.time.delayedCall(160, () => this.caught()); }
+    if (this.meet()) { this.blocked = true; this.time.delayedCall(160, () => this.caught()); }
   }
 
   private caught(by: 'guard' | 'lava' | 'tide' | 'beat' | 'dark' = 'guard') {
@@ -837,7 +987,7 @@ export class GameScene extends Phaser.Scene {
     }
     // a luz do Vagalume ofusca os guardas por perto: ficam parados e podes passar por eles
     if (this.guards.length) {
-      const d = distFrom(this.m, this.idx, this.phase);
+      const d = this.guardView(this.idx);
       let any = false;
       this.guards.forEach((g, i) => {
         if (d[g] >= 0 && d[g] <= GUARD_STUN_R) {
@@ -851,20 +1001,19 @@ export class GameScene extends Phaser.Scene {
 
   /** Vagalume nos mundos com mecânica: o mesmo solver mostra os próximos passos da melhor rota (ou diz quando rodar). */
   private mechHint() {
-    const st = { cell: this.idx, flames: [...this.rosas], t: this.moves, phase: this.phase, gone: this.gone };
+    const st = { cell: this.idx, flames: [...this.rosas], t: this.moves, phase: this.phase, gone: this.gone, w: isRule(this.m.mech) ? this.ruleW : undefined };
     const sol = solve(this.m, st) ?? solve(this.m, st, { needAll: false });
     if (!sol) { this.say('Já não há caminho: reinicia', '#ff6a50'); return; }
     const first = sol[0];
-    if (first.type !== 'move') {
-      this.say({ rot: 'Roda agora!', flip: 'Vira a página!', wait: 'Espera!' }[first.type], '#ffe28a');
-      if (this.actionBtn) this.tweens.add({ targets: this.actionBtn, scale: 1.3, duration: 220, yoyo: true, repeat: 3 });
-      return;
-    }
+    const SAY: Record<string, string> = { rot: 'Roda agora!', flip: 'Vira a página!', wait: 'Espera!', turn: 'Roda este espelho!' };
+    const flash = () => { if (this.actionBtn) this.tweens.add({ targets: this.actionBtn, scale: 1.3, duration: 220, yoyo: true, repeat: 3 }); };
+    if (first.type !== 'move') { this.say(SAY[first.type], '#ffe28a'); flash(); return; }
+    if (first.glitch) { this.say(`Glitch ${['para cima', 'para a direita', 'para baixo', 'para a esquerda'][first.dir]}!`, '#ff8ae6'); stage.hint(first.path); flash(); return; }
     const cells: number[] = [];
-    for (const a of sol) { if (a.type !== 'move' || cells.length >= 14) break; cells.push(...a.path); }
+    for (const a of sol) { if (a.type !== 'move' || a.glitch || cells.length >= 14) break; cells.push(...a.path); }
     stage.hint(cells.slice(0, 14));
-    const next = sol.find((a) => a.type !== 'move');
-    if (next && cells.length < 4) this.say({ rot: 'Depois, roda o anel', flip: 'Depois, vira a página', wait: 'Depois, espera', move: '' }[next.type], '#ffe28a');
+    const next = sol.find((a) => a.type !== 'move' || a.glitch);
+    if (next && cells.length < 4) this.say({ rot: 'Depois, roda o anel', flip: 'Depois, vira a página', wait: 'Depois, espera', turn: 'Depois, roda o espelho', move: 'Depois, usa o Glitch' }[next.type], '#ffe28a');
   }
 
   // ───────────────────────── Fim de nível ─────────────────────────

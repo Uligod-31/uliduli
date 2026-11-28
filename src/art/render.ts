@@ -29,7 +29,7 @@ export function collectWalls(m: Maze): Seg[] {
       // (nos arcos do planeta a parede fica aberta)
       const arch = (d: number) => !!m.warp?.has(i * 4 + d);
       // as barreiras de sopro têm desenho próprio (e desaparecem quando ardem)
-      const soft = (d: number) => !!m.barriers?.some((b) => b.b === i && b.dir === (d + 2) % 4);
+      const soft = (d: number) => !!m.barriers?.some((b) => b.b === i && b.dir === (d + 2) % 4) || !!m.gates?.some((g) => g.b === i && g.dir === (d + 2) % 4);
       if (!arch(0) && !soft(0) && (!free(c, r - 1) || (!(m.pass[i] & DIRS[0].b) && !m.dynMap.has(i * 4)))) segs.push({ x1: c, y1: r, x2: c + 1, y2: r });
       if (!arch(3) && !soft(3) && (!free(c - 1, r) || (!(m.pass[i] & DIRS[3].b) && !m.dynMap.has(i * 4 + 3)))) segs.push({ x1: c, y1: r, x2: c, y2: r + 1 });
       // Sul e Este: só quando o vizinho é vazio/fora (o vizinho livre trata do seu N/W)

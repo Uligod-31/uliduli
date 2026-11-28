@@ -116,6 +116,21 @@ export class TutorialScene extends Phaser.Scene {
   }
 
   // ───────────────────────── Peças de desenho ─────────────────────────
+  private ruleList(root: Root, list: [string, string, number][]) {
+    const gap = Math.min(55, Math.floor((PH - 40) / list.length)), top = PY + (PH - gap * (list.length - 1)) / 2;
+    list.forEach(([icon, text, color], i) => {
+      const y = top + i * gap;
+      const g = this.add.graphics(); root.add(g);
+      g.fillStyle(0x1e2025, 1); g.fillRoundedRect(PX + 26, y - 23, PW - 52, 46, 14);
+      g.fillStyle(color, 0.9); g.fillCircle(PX + 56, y, 17);
+      const a = this.add.text(PX + 56, y - 1, icon, { fontFamily: FONT, fontSize: '22px', color: '#0a0b10', fontStyle: 'bold' }).setOrigin(0.5);
+      const b = this.add.text(PX + 90, y, text, { fontFamily: FONT, fontSize: '26px', color: '#eceef3', fontStyle: 'bold' }).setOrigin(0, 0.5);
+      b.setScale(Math.min(1, (PW - 52 - 90) / b.width));
+      root.add([a, b]);
+      for (const o of [g, a, b]) { o.setAlpha(0); this.anim.push(this.tweens.add({ targets: o, alpha: 1, duration: 260, delay: 120 + i * 90 })); }
+    });
+  }
+
   private map(root: Root, ox: number, oy: number, cs: number, rows: string[], skip?: Set<string>): MapPos {
     const g = this.add.graphics(); root.add(g);
     rows.forEach((r, y) => [...r].forEach((c, x) => {
@@ -591,20 +606,13 @@ export class TutorialScene extends Phaser.Scene {
       },
       {
         title: 'Cada mundo, uma regra',
-        body: 'Na primeira vez em cada mundo aparece um cartão com a regra.\nO botão redondo, à direita do joystick, é a ação do mundo (Rodar, Virar, Esperar ou Brasa). O Vagalume também te diz quando a usar.',
-        draw: (root) => {
-          const list: [string, string, number][] = [['◠', 'B-612: o planeta dá a volta', 0x2fe6d0], ['◎', 'Intergaláctico: buracos de verme', 0x9a6bff], ['≈', 'Viking: a maré enche', 0x3ac8ff], ['♫', 'Rockstar: rebenta ao ritmo', 0xff4fd8], ['⇄', 'Biblioteca: vira a página', 0xffb860], ['☁', 'Angélico: nuvens que caem', 0xdfe8ff], ['❄', 'Glaciar: gelo que escorrega', 0x9bd8ff], ['▲', 'Abismo: lava que avança', 0xff6a20], ['⟳', 'Mandala: anéis que rodam', 0xffd24a]];
-          list.forEach(([icon, text, color], i) => {
-            const y = PY + 42 + i * 55;
-            const g = this.add.graphics(); root.add(g);
-            g.fillStyle(0x1e2025, 1); g.fillRoundedRect(PX + 26, y - 23, PW - 52, 46, 14);
-            g.fillStyle(color, 0.9); g.fillCircle(PX + 56, y, 17);
-            const a = this.add.text(PX + 56, y - 1, icon, { fontFamily: FONT, fontSize: '22px', color: '#0a0b10', fontStyle: 'bold' }).setOrigin(0.5);
-            const b = this.add.text(PX + 90, y, text, { fontFamily: FONT, fontSize: '26px', color: '#eceef3', fontStyle: 'bold' }).setOrigin(0, 0.5);
-            root.add([a, b]);
-            for (const o of [g, a, b]) { o.setAlpha(0); this.anim.push(this.tweens.add({ targets: o, alpha: 1, duration: 260, delay: 120 + i * 90 })); }
-          });
-        },
+        body: 'Na primeira vez em cada mundo aparece um cartão com a regra.\nO botão redondo, à direita do joystick, é a ação do mundo. O Vagalume também te diz quando a usar.',
+        draw: (root) => this.ruleList(root, [['◠', 'B-612: o planeta dá a volta', 0x2fe6d0], ['◎', 'Intergaláctico: buracos de verme', 0x9a6bff], ['≈', 'Viking: a maré enche', 0x3ac8ff], ['♫', 'Rockstar: rebenta ao ritmo', 0xff4fd8], ['⇄', 'Biblioteca: vira a página', 0xffb860], ['☁', 'Angélico: nuvens que caem', 0xdfe8ff], ['❄', 'Glaciar: gelo que escorrega', 0x9bd8ff], ['▲', 'Abismo: lava que avança', 0xff6a20], ['⟳', 'Mandala: anéis que rodam', 0xffd24a]]),
+      },
+      {
+        title: 'Mais oito regras',
+        body: 'Todas se aprendem num minuto.\nSe um caminho estiver trancado, empurra contra ele: o jogo diz-te o que falta.',
+        draw: (root) => this.ruleList(root, [['☀', 'Areias: espelhos guiam o sol', 0xffd45a], ['▼', 'Jardim: cogumelos mudam o tamanho', 0xff6a80], ['⏱', 'Relógio: o teu eco abre portões', 0x7aa8ff], ['☾', 'Élfica: a floresta sente a chama', 0x9f8cff], ['●', 'Tinta: pinta o caminho na água', 0x7ae8ff], ['⚡', 'Neon: troca blocos, atravessa paredes', 0xff2bd6], ['★', 'Estelar: liga as constelações', 0xfff0b8], ['♞', 'Animal: monta e abre caminho', 0x7be08f]]),
       },
       {
         title: 'A câmara',

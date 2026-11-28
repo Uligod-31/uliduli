@@ -2,6 +2,8 @@
 // Um único solver (procura em largura sobre célula + rotações + chamas) calcula o par, as pistas e prova que há sempre saída.
 import { Maze, MechKind, DIRS, OPP, generate, neighbor, canPass, distFrom, MazeOpts } from './maze';
 import { mulberry32, shuffle } from './rng';
+import { RULES, isRule, startState, stateSpace } from './rules';
+import { buildRuleLevel } from './rulegen';
 
 export const BRASAS = 3; // cargas da Brasa (gelo)
 
@@ -71,8 +73,8 @@ export function hazardIn(m: Maze, group: number, t: number): number {
 }
 
 // ───────────────────────── Solver ─────────────────────────
-export interface SolveState { cell: number; flames: number[]; t: number; phase?: number; gone?: number }
-export type Act = { type: 'move'; dir: number; path: number[] } | { type: 'rot'; layer: number } | { type: 'flip' } | { type: 'wait' };
+export interface SolveState { cell: number; flames: number[]; t: number; phase?: number; gone?: number; w?: number }
+export type Act = { type: 'move'; dir: number; path: number[]; glitch?: boolean } | { type: 'rot'; layer: number } | { type: 'flip' } | { type: 'wait' } | { type: 'turn' };
 export interface SolveOpts { needAll?: boolean; block?: (cell: number, t: number) => boolean; noRot?: boolean }
 
 /** Bit de uma nuvem (para o conjunto das já desfeitas); -1 se a célula não é nuvem. */
@@ -84,6 +86,7 @@ export const cloudBit = (m: Maze, cell: number) => (m.clouds ? m.clouds.indexOf(
  * Nas sebes que mudam sozinhas considera só as passagens fixas (são atalhos extra). A lava é respeitada.
  */
 export function solve(m: Maze, st: SolveState, o: SolveOpts = {}): Act[] | null {
+  if (isRule(m.mech)) return solveRule(m, st, o);
   const N = m.cols * m.rows, R = m.rings;
   const needAll = o.needAll ?? true;
   const fl = st.flames;
@@ -144,6 +147,48 @@ export function solve(m: Maze, st: SolveState, o: SolveOpts = {}): Act[] | null 
     }
     if (m.mech === 'page' && !o.noRot && !(o.block && o.block(cell, t))) push(cell, code, mask, t, w ^ 1, h, { type: 'flip' });
     if (m.haz && !hazardAt(m, cell, t) && !(o.block && o.block(cell, t))) push(cell, code, mask, t, w, h, { type: 'wait' });
+  }
+  return null;
+}
+
+/** O mesmo solver para as regras da Vaga 3: o estado é (casa, chamas apanhadas, w). */
+function solveRule(m: Maze, st: SolveState, o: SolveOpts): Act[] | null {
+  const N = m.cols * m.rows, rule = RULES[m.mech as keyof typeof RULES];
+  const needAll = o.needAll ?? true, fl = st.flames, full = (1 << fl.length) - 1;
+  const w0 = st.w ?? startState(m);
+  const cells = [st.cell], masks = [0], ws = [w0], ts = [st.t], parent = [-1];
+  const acts: (Act | null)[] = [null];
+  const keyOf = (c: number, mask: number, w: number) => c + N * (mask + 8 * w);
+  const seen = new Uint8Array(N * 8 * stateSpace(m)); // um byte por estado: muito mais rápido que um conjunto
+  seen[keyOf(st.cell, 0, w0)] = 1;
+  const build = (h: number, last: Act) => { const out: Act[] = [last]; for (let k = h; parent[k] >= 0; k = parent[k]) out.push(acts[k]!); return out.reverse(); };
+  const push = (cell: number, mask: number, w: number, t: number, from: number, act: Act) => {
+    const k = keyOf(cell, mask, w);
+    if (seen[k]) return;
+    seen[k] = 1; cells.push(cell); masks.push(mask); ws.push(w); ts.push(t); parent.push(from); acts.push(act);
+  };
+  const through = m.mech === 'glitch' && !o.noRot ? [false, true] : [false];
+  for (let h = 0; h < cells.length && h < 1500000; h++) {
+    const cell = cells[h], mask = masks[h], w = ws[h], t = ts[h] + 1;
+    for (let dir = 0; dir < 4; dir++) {
+      for (const g of through) {
+        const r = rule.step(m, cell, dir, w, g);
+        if (!r) continue;
+        if (o.block && r.path.some((c) => o.block!(c, t))) continue;
+        let nm = mask;
+        for (const c of r.path) { const f = fl.indexOf(c); if (f >= 0) nm |= 1 << f; }
+        const end = r.path[r.path.length - 1];
+        const act: Act = { type: 'move', dir, path: r.path, glitch: g || undefined };
+        if (end === m.exit) { if (!needAll || nm === full) return build(h, act); continue; }
+        const nw = rule.end(m, end, r.w, nm !== mask);
+        if (nw !== null) push(end, nm, nw, t, h, act);
+      }
+    }
+    for (const a of rule.acts(m, cell, w, true)) {
+      if (o.block && o.block(cell, t)) continue;
+      const nw = rule.end(m, cell, a.w, false);
+      if (nw !== null) push(cell, mask, nw, t, h, { type: a.type });
+    }
   }
   return null;
 }
@@ -413,7 +458,7 @@ function buildClouds(m: Maze, seed: number, count: number) {
 }
 
 // ───────────────────────── Construção de um nível ─────────────────────────
-export interface MechParams { mech?: MechKind; rings?: number; amount?: number; grip?: number; lavaK?: number; slack?: number; guards?: number; cols: number; seed: number; loops: number }
+export interface MechParams { mech?: MechKind; rings?: number; amount?: number; grip?: number; lavaK?: number; slack?: number; guards?: number; cols: number; seed: number; loops: number; pick?: number; level?: number; lightK?: number }
 
 /** Para as mecânicas em que o desenho importa: escolhe, sempre da mesma maneira, a semente em que a regra mais conta. */
 function bestOf(p: MechParams, opts: MazeOpts, kind: 'tide' | 'beat' | 'page' | 'clouds' | 'holes' | 'planet'): Maze {
@@ -445,7 +490,8 @@ function bestOf(p: MechParams, opts: MazeOpts, kind: 'tide' | 'beat' | 'page' | 
 export function buildLevel(p: MechParams, opts: MazeOpts): Maze {
   const g = p.guards ?? 0;
   let m: Maze;
-  if (p.mech === 'rings') m = generateRings(p.cols, p.rings ?? 1, p.seed, Math.max(p.loops, g ? 0.22 : 0.1));
+  if (isRule(p.mech)) m = buildRuleLevel(p, opts);
+  else if (p.mech === 'rings') m = generateRings(p.cols, p.rings ?? 1, p.seed, Math.max(p.loops, g ? 0.22 : 0.1));
   else if (p.mech === 'ice') m = bestIce(p, opts);
   else if (p.mech === 'lava') { m = generate(opts); buildLava(m, p.lavaK ?? 2, (p.slack ?? 10) + g * 4); }
   else if (p.mech) m = bestOf(p, opts, p.mech);
@@ -453,7 +499,7 @@ export function buildLevel(p: MechParams, opts: MazeOpts): Maze {
   // par = melhor rota com todas as chamas (exata) + folga
   const best = solve(m, { cell: m.start, flames: m.rosas, t: 0 })!.length;
   m.shortest = solve(m, { cell: m.start, flames: m.rosas, t: 0 }, { needAll: false })!.length;
-  const frac = m.mech === 'ice' ? 0.25 : m.mech === 'lava' ? 0.12 : 0.18;
+  const frac = m.mech === 'ice' ? 0.25 : m.mech === 'lava' ? 0.12 : isRule(m.mech) ? 0.15 : 0.18;
   m.par = best + Math.max(m.mech === 'ice' ? 3 : 4, Math.round(best * frac)) + g * (m.mech === 'ice' ? 3 : 4);
   return m;
 }
